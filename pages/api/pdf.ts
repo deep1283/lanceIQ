@@ -28,14 +28,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
          return res.status(413).json({ error: 'Payload size exceeds limit.' });
     }
 
-    const { payload, headers, timestamp, status, id } = req.body;
+    const { payload, headers, timestamp, status, id, showWatermark } = req.body;
 
     if (!payload || !headers || !timestamp || !id) {
        return res.status(400).json({ error: 'Missing required fields' });
     }
 
     // 2. Generate HTML
-    const html = generateHtml({ id, payload, headers, timestamp, status });
+    const html = generateHtml({ id, payload, headers, timestamp, status, showWatermark: showWatermark ?? true });
 
     // 3. Launch Puppeteer
     const isLocal = process.env.NODE_ENV === 'development';
@@ -44,7 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (isLocal) {
         const execPath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
         browser = await puppeteer.launch({
-            args: chromium.args,
+            args: [], // Local chrome doesn't need sparticuz args
             defaultViewport: { width: 1920, height: 1080 },
             executablePath: execPath, 
             headless: true,
@@ -59,7 +59,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 10000 });
+    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 10000 });
     
     const pdfBuffer = await page.pdf({
       format: 'A4',
@@ -67,12 +67,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       margin: { top: '0', right: '0', bottom: '0', left: '0' },
     });
 
+
     await browser.close();
 
     // 4. Return PDF
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="webhook-proof-${id}.pdf"`);
-    res.status(200).send(pdfBuffer);
+    res.status(200).end(pdfBuffer);
 
   } catch (error: any) {
     console.error('PDF Generation Error:', error);

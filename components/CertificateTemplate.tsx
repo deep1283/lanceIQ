@@ -14,6 +14,7 @@ interface CertificateTemplateProps {
   headers: Record<string, string>;
   timestamp: string;
   status: number;
+  showWatermark?: boolean;
 }
 
 export function CertificateTemplate({
@@ -22,6 +23,7 @@ export function CertificateTemplate({
   headers,
   timestamp,
   status,
+  showWatermark = true,
 }: CertificateTemplateProps) {
   const isSuccess = status >= 200 && status < 300;
   
@@ -47,6 +49,23 @@ export function CertificateTemplate({
       <div className="absolute inset-4 border-4 border-slate-900 double-border pointer-events-none" />
       <div className="absolute inset-5 border border-slate-300 pointer-events-none" />
 
+      {/* Watermark for Free Tier */}
+      {showWatermark && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden z-10">
+          <div 
+            className="text-slate-300 text-4xl font-bold uppercase tracking-widest opacity-30"
+            style={{
+              transform: 'rotate(-35deg)',
+              whiteSpace: 'nowrap',
+              fontSize: '48px',
+              letterSpacing: '0.1em',
+            }}
+          >
+            FREE • LANCEIQ.COM • FREE • LANCEIQ.COM
+          </div>
+        </div>
+      )}
+
       {/* Badge - Top Right */}
       <div className="absolute top-12 right-12 flex items-center gap-2 px-3 py-1 bg-slate-100 border border-slate-200 rounded-full">
         <Shield className="w-4 h-4 text-slate-500" />
@@ -56,7 +75,7 @@ export function CertificateTemplate({
       {/* Header */}
       <div className="mt-8 mb-12 text-center">
         <h1 className="text-4xl font-bold font-serif text-slate-900 tracking-tight mb-2 uppercase border-b-2 border-slate-900 pb-4 inline-block">
-          Webhook Proof
+          LanceIQ
         </h1>
         <p className="text-sm font-sans text-slate-500 tracking-widest uppercase mt-2">Delivery Certificate</p>
       </div>
@@ -121,7 +140,7 @@ export function CertificateTemplate({
 
       {/* Headers Table */}
       <div className="mb-10">
-        <h3 className="text-lg font-bold mb-4 font-serif text-slate-900 border-b border-slate-200 pb-2">Verified Headers</h3>
+        <h3 className="text-lg font-bold mb-4 font-serif text-slate-900 border-b border-slate-200 pb-2">Provided Headers</h3>
         <div className="bg-slate-50 rounded-lg border border-slate-200 overflow-hidden text-sm">
            <table className="w-full text-left font-mono">
              <tbody>
@@ -151,11 +170,10 @@ export function CertificateTemplate({
       {/* Legal Footer */}
       <div className="absolute bottom-12 left-12 right-12 text-center border-t border-slate-200 pt-6">
         <p className="text-[10px] font-sans text-slate-400 uppercase tracking-widest">
-           Document Generated via WebhookProof.com
+           Document Generated via LanceIQ
         </p>
         <p className="text-[10px] font-sans text-slate-400 mt-1 max-w-lg mx-auto leading-relaxed">
-          This document is generated from user-provided webhook data and serves as a record of the input provided. 
-          It does not legally guarantee that the event originated from the Claimed Provider unless cryptographically verified by the recipient endpoint.
+          This document is a human-readable record generated from user-provided webhook data.
         </p>
       </div>
     </div>

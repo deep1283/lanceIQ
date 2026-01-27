@@ -2,7 +2,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { CertificateTemplate } from '@/components/CertificateTemplate';
 
-export function generateHtml(data: { id: string, payload: string, headers: Record<string, string>, timestamp: string, status: number }) {
+export function generateHtml(data: { id: string, payload: string, headers: Record<string, string>, timestamp: string, status: number, showWatermark?: boolean }) {
     const componentHtml = renderToStaticMarkup(
         <CertificateTemplate 
             id={data.id}
@@ -10,6 +10,7 @@ export function generateHtml(data: { id: string, payload: string, headers: Recor
             headers={data.headers}
             timestamp={data.timestamp}
             status={data.status}
+            showWatermark={data.showWatermark ?? true}
         />
     );
 
@@ -18,7 +19,7 @@ export function generateHtml(data: { id: string, payload: string, headers: Recor
       <html>
         <head>
           <meta charset="utf-8">
-          <title>Webhook Proof ${data.id}</title>
+          <title>LanceIQ ${data.id}</title>
           <script src="https://cdn.tailwindcss.com"></script>
           <link rel="preconnect" href="https://fonts.googleapis.com">
           <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

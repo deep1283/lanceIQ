@@ -1,0 +1,80 @@
+.electric-border-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.electric-border {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.electric-border-line {
+    position: absolute;
+    background: linear-gradient(90deg,
+            transparent,
+            var(--electric-color, #00f0ff),
+            transparent);
+    opacity: 0;
+    animation: electric-glow 2s ease-in-out infinite;
+}
+
+.electric-border-line-top,
+.electric-border-line-bottom {
+    left: 0;
+    right: 0;
+    height: 2px;
+}
+
+.electric-border-line-top {
+    top: 0;
+    animation-delay: 0s;
+}
+
+.electric-border-line-bottom {
+    bottom: 0;
+    animation-delay: 0.5s;
+}
+
+.electric-border-line-left,
+.electric-border-line-right {
+    top: 0;
+    bottom: 0;
+    width: 2px;
+}
+
+.electric-border-line-left {
+    left: 0;
+    animation-delay: 1s;
+}
+
+.electric-border-line-right {
+    right: 0;
+    animation-delay: 1.5s;
+}
+
+@keyframes electric-glow {
+    0% {
+        opacity: 0;
+        transform: scaleX(0);
+    }
+
+    50% {
+        opacity: 1;
+        transform: scaleX(1);
+    }
+
+    100% {
+        opacity: 0;
+        transform: scaleX(0);
+    }
+}
+
+.electric-border-content {
+    position: relative !important;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+}
