@@ -4,6 +4,7 @@ import Footer from "../../../components/Footer";
 import { ArrowLeft, Calendar, Clock, Tag } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Metadata } from "next";
 
 // Mock Data for the 3 articles
 const blogPosts = {
@@ -72,6 +73,30 @@ const blogPosts = {
     )
   }
 };
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const post = blogPosts[slug as keyof typeof blogPosts];
+
+  if (!post) {
+      return {
+          title: 'Article Not Found',
+          description: 'The article you are looking for does not exist.'
+      }
+  }
+
+  return {
+    title: `${post.title} | LanceIQ Blog`,
+    description: `Read about ${post.title}. ${post.category} insights for webhook management.`,
+    openGraph: {
+      title: post.title,
+      description: `Read about ${post.title}. ${post.category} insights for webhook management.`,
+      type: 'article',
+      publishedTime: post.date,
+      authors: ['LanceIQ Team'],
+    }
+  }
+}
 
 export default async function BlogPost({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;

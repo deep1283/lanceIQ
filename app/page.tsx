@@ -20,6 +20,24 @@ export const metadata: Metadata = {
 export default function Home() {
   return (
     <main className="flex flex-col bg-black min-h-screen">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "SoftwareApplication",
+            "name": "LanceIQ",
+            "applicationCategory": "DeveloperApplication",
+            "operatingSystem": "Web",
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "USD"
+            },
+            "description": "Generate verifiable, professional PDF certificates for every webhook event your system processes."
+          })
+        }}
+      />
       <Navbar />
       <Hero />
       <Features />

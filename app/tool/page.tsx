@@ -14,6 +14,8 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  
   // Pro status
   const [isPro, setIsPro] = useState(false);
   const [verifyEmail, setVerifyEmail] = useState("");
@@ -97,6 +99,7 @@ export default function Home() {
   });
 
   const handleBuy = async () => {
+    setCheckoutError(null);
     if (!verifyEmail || !verifyEmail.includes('@')) {
       setVerifyMessage("Please enter a valid email address first.");
       // Focus the input if possible, or just rely on the message
@@ -113,11 +116,13 @@ export default function Home() {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        alert('Failed to start checkout');
+        setCheckoutError('Failed to start checkout. Please try again.');
+        setTimeout(() => setCheckoutError(null), 5000);
       }
     } catch (err) {
       console.error(err);
-      alert('Error starting checkout');
+      setCheckoutError('Error connecting to payment provider.');
+      setTimeout(() => setCheckoutError(null), 5000);
     }
   };
 
@@ -251,6 +256,9 @@ export default function Home() {
                         <CreditCard className="w-4 h-4" />
                         Remove Watermark - $9
                     </button>
+                    {checkoutError && (
+                        <p className="text-sm text-red-600 font-medium mt-2 text-center">{checkoutError}</p>
+                    )}
                     {!verifyEmail && (
                       <p className="text-xs text-slate-500 mt-2 text-center">We'll send your Pro key to this email.</p>
                     )}
