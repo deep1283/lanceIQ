@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
+import dynamic from 'next/dynamic';
 import Navbar from '../components/Navbar';
 import Hero from '../components/Hero';
-import Features from '../components/Features';
-import FAQ from '../components/FAQ';
-import BlogPreview from '../components/BlogPreview';
-import Footer from '../components/Footer';
+
+const Features = dynamic(() => import('../components/Features'));
+const FAQ = dynamic(() => import('../components/FAQ'));
+const BlogPreview = dynamic(() => import('../components/BlogPreview'));
+const Footer = dynamic(() => import('../components/Footer'));
 
 export const metadata: Metadata = {
   title: 'LanceIQ – Professional Webhook Delivery Certificates & API Proof',
