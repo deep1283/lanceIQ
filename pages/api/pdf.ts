@@ -2,12 +2,13 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
 import { generateHtml } from '@/lib/generate-html';
+import QRCode from 'qrcode';
 
 export const config = {
   maxDuration: 30, // 30 seconds
   api: {
     bodyParser: {
-      sizeLimit: '4mb', // Handle slightly larger payloads if needed, though we check manually
+      sizeLimit: '4mb',
     },
   },
 };
@@ -20,22 +21,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // 1. Safeguard: Check payload size (Approximate via Content-Length or JSON string length)
-    // Note: req.body is already parsed by Next.js default body parser unless disabled. 
-    // We can check JSON string length.
+    // 1. Safeguard: Check payload size
     const bodyStr = JSON.stringify(req.body);
     if (bodyStr.length > MAX_PAYLOAD_SIZE) {
          return res.status(413).json({ error: 'Payload size exceeds limit.' });
     }
 
-    const { payload, headers, timestamp, status, id, showWatermark } = req.body;
+    const { payload, headers, timestamp, status, id, showWatermark, hash, verificationUrl } = req.body;
 
     if (!payload || !headers || !timestamp || !id) {
        return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    // Generate QR Code if verification URL is present
+    let qrCodeDataUrl;
+    if (verificationUrl) {
+      try {
+        qrCodeDataUrl = await QRCode.toDataURL(verificationUrl, { margin: 1, width: 100 });
+      } catch (e) {
+        console.error('Failed to generate QR code for PDF:', e);
+      }
+    }
+
     // 2. Generate HTML
-    const html = generateHtml({ id, payload, headers, timestamp, status, showWatermark: showWatermark ?? true });
+    const html = generateHtml({ 
+      id, 
+      payload, 
+      headers, 
+      timestamp, 
+      status, 
+      showWatermark: showWatermark ?? true,
+      hash,
+      verificationUrl,
+      qrCodeDataUrl
+    });
 
     // 3. Launch Puppeteer
     const isLocal = process.env.NODE_ENV === 'development';
@@ -59,7 +78,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 10000 });
+    
+    // Set content and wait for full load with generous timeout
+    await page.setContent(html, { waitUntil: 'load', timeout: 60000 });
+    
+    // Small delay to ensure Tailwind processes
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
     const pdfBuffer = await page.pdf({
       format: 'A4',

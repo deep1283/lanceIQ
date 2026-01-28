@@ -2,7 +2,17 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { CertificateTemplate } from '@/components/CertificateTemplate';
 
-export function generateHtml(data: { id: string, payload: string, headers: Record<string, string>, timestamp: string, status: number, showWatermark?: boolean }) {
+export function generateHtml(data: { 
+  id: string, 
+  payload: string, 
+  headers: Record<string, string>, 
+  timestamp: string, 
+  status: number, 
+  showWatermark?: boolean,
+  hash?: string,
+  verificationUrl?: string,
+  qrCodeDataUrl?: string
+}) {
     const componentHtml = renderToStaticMarkup(
         <CertificateTemplate 
             id={data.id}
@@ -11,6 +21,9 @@ export function generateHtml(data: { id: string, payload: string, headers: Recor
             timestamp={data.timestamp}
             status={data.status}
             showWatermark={data.showWatermark ?? true}
+            hash={data.hash}
+            verificationUrl={data.verificationUrl}
+            qrCodeDataUrl={data.qrCodeDataUrl}
         />
     );
 
@@ -37,7 +50,7 @@ export function generateHtml(data: { id: string, payload: string, headers: Recor
             }
           </script>
           <style>
-             body { -webkit-print-color-adjust: exact; }
+             body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           </style>
         </head>
         <body>

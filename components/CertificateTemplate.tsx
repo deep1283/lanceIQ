@@ -15,6 +15,9 @@ interface CertificateTemplateProps {
   timestamp: string;
   status: number;
   showWatermark?: boolean;
+  hash?: string;
+  verificationUrl?: string;
+  qrCodeDataUrl?: string;
 }
 
 export function CertificateTemplate({
@@ -24,6 +27,9 @@ export function CertificateTemplate({
   timestamp,
   status,
   showWatermark = true,
+  hash,
+  verificationUrl,
+  qrCodeDataUrl,
 }: CertificateTemplateProps) {
   const isSuccess = status >= 200 && status < 300;
   
@@ -167,14 +173,44 @@ export function CertificateTemplate({
          </pre>
       </div>
 
-      {/* Legal Footer */}
-      <div className="absolute bottom-12 left-12 right-12 text-center border-t border-slate-200 pt-6">
-        <p className="text-[10px] font-sans text-slate-400 uppercase tracking-widest">
-           Document Generated via LanceIQ
-        </p>
-        <p className="text-[10px] font-sans text-slate-400 mt-1 max-w-lg mx-auto leading-relaxed">
-          This document is a human-readable record generated from user-provided webhook data.
-        </p>
+    {/* Footer with QR and Legal */}
+    <div className="absolute bottom-12 left-12 right-12 border-t border-slate-200 pt-6 flex items-end justify-between">
+        
+        {/* Left: QR Code & Verification */}
+        <div className="flex items-center gap-4">
+            {qrCodeDataUrl && (
+                <div className="w-24 h-24 bg-white p-1 border border-slate-200 shrink-0">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={qrCodeDataUrl} alt="Verification QR Code" className="w-full h-full" />
+                </div>
+            )}
+            <div className="text-left">
+                <p className="text-[10px] font-sans text-slate-500 uppercase tracking-wider font-bold mb-1">
+                    Scan to Verify
+                </p>
+                <p className="text-[10px] font-mono text-slate-400 mb-2 break-all">
+                    {verificationUrl?.replace('https://', '') || 'lanceiq.com/verify'}
+                </p>
+                {hash && (
+                     <div>
+                        <p className="text-[8px] font-sans text-slate-400 uppercase tracking-wider mb-0.5">SHA-256 Hash</p>
+                        <p className="text-[8px] font-mono text-slate-300 max-w-[200px] break-all leading-tight">
+                            {hash}
+                        </p>
+                     </div>
+                )}
+            </div>
+        </div>
+
+        {/* Right: Legal Text */}
+        <div className="text-right max-w-sm">
+             <p className="text-[10px] font-sans text-slate-400 uppercase tracking-widest mb-1">
+               Document Generated via LanceIQ
+            </p>
+            <p className="text-[10px] font-sans text-slate-400 leading-relaxed">
+              This document is a human-readable record generated from user-provided webhook data.
+            </p>
+        </div>
       </div>
     </div>
   );

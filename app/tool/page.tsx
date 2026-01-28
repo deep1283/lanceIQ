@@ -1,9 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import QRCode from 'qrcode';
 import { v4 as uuidv4 } from "uuid";
 import { CertificateTemplate } from "@/components/CertificateTemplate";
-import { Download, RefreshCw, AlertTriangle, CreditCard, CheckCircle, Mail } from "lucide-react";
+import { Download, RefreshCw, AlertTriangle, CreditCard, CheckCircle, Mail, User, LogIn } from "lucide-react";
+import { createClient } from "@/utils/supabase/client";
+import { saveCertificate } from "@/app/actions/certificates";
+import Link from "next/link";
 
 export default function Home() {
   const [jsonInput, setJsonInput] = useState<string>("{\n  \"event\": \"payment.succeeded\",\n  \"amount\": 2000,\n  \"currency\": \"usd\"\n}");
@@ -22,8 +26,17 @@ export default function Home() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [verifyMessage, setVerifyMessage] = useState<string | null>(null);
+  
+  // Auth state
+  const [user, setUser] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const supabase = createClient();
+  
+  // Verification State
+  const [hash, setHash] = useState<string>("");
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>("");
 
-  // Hydration fix for UUID and Timestamp
+  // Hydration fix for UUID and Timestamp + Auth check
   useEffect(() => {
     setTimestamp(new Date().toISOString());
     setReportId(uuidv4());
@@ -34,11 +47,59 @@ export default function Home() {
       setIsPro(true);
       setVerifyEmail(proEmail);
     }
+    
+    // Check auth state
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+      setAuthLoading(false);
+    };
+    checkAuth();
+    
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    
+    return () => subscription.unsubscribe();
   }, []);
+
+  // Generate Hash and QR Code
+  useEffect(() => {
+    const generateVerificationData = async () => {
+      try {
+        // 1. Generate SHA-256 Hash
+        const msgBuffer = new TextEncoder().encode(jsonInput);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        setHash(hashHex);
+
+        // 2. Generate QR Code
+        // In production, this would be https://lanceiq.com/verify/${reportId}
+        // For local dev, we can use localhost or just the production URL structure
+        const verifyUrl = `https://lanceiq.com/verify/${reportId}`;
+        const qrUrl = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 100 });
+        setQrCodeDataUrl(qrUrl);
+      } catch (e) {
+        console.error("Error generating verification data:", e);
+      }
+    };
+
+    generateVerificationData();
+  }, [jsonInput, reportId]);
 
   const handleDownload = async () => {
     setIsGenerating(true);
     setError(null);
+
+    // Generate fresh credentials for this new certificate
+    const newReportId = uuidv4();
+    const newTimestamp = new Date().toISOString();
+    
+    // Update state to match (so preview updates if they stay on page)
+    setReportId(newReportId);
+    setTimestamp(newTimestamp);
 
     try {
       // Parse headers
@@ -53,10 +114,13 @@ export default function Home() {
       const data = {
         payload: jsonInput,
         headers: parsedHeaders,
-        timestamp,
+        timestamp: newTimestamp, // Use new timestamp
         status,
-        id: reportId,
-        showWatermark: !isPro
+        id: newReportId, // Use new ID
+        showWatermark: !isPro,
+        hash, // Note: This hash is based on the CURRENT render. If jsonInput hasn't changed, hash is same. Validation logic uses this.
+        // API will generate its own QR code to ensure consistency in PDF environment
+        verificationUrl: `https://lanceiq.com/verify/${newReportId}`
       };
 
       const res = await fetch('/api/pdf', {
@@ -78,10 +142,28 @@ export default function Home() {
          throw new Error('Generated PDF is empty or invalid.');
       }
       
+      // Save to database if user is logged in
+      if (user) {
+        try {
+          const parsedPayload = JSON.parse(jsonInput);
+          // Use the real SHA-256 hash we generated
+          await saveCertificate({
+            report_id: newReportId, // Use new ID
+            payload: parsedPayload,
+            headers: parsedHeaders,
+            payload_hash: hash,
+            is_pro: isPro,
+          });
+        } catch (saveErr) {
+          console.error('Failed to save certificate:', saveErr);
+          // Don't block download if save fails
+        }
+      }
+      
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `webhook-proof-${reportId}.pdf`;
+      a.download = `webhook-proof-${newReportId}.pdf`;
       a.click();
     } catch (err) {
       setError("Failed to generate PDF. Please try again.");
@@ -278,6 +360,44 @@ export default function Home() {
                         {error}
                     </div>
                 )}
+                
+                {/* Login prompt for guests */}
+                {!user && !authLoading && (
+                  <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <User className="w-4 h-4 text-slate-500" />
+                        <span className="text-sm text-slate-600">Log in to save your certificates</span>
+                      </div>
+                      <Link
+                        href="/login"
+                        className="flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                      >
+                        <LogIn className="w-3 h-3" />
+                        Log In
+                      </Link>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Logged in indicator */}
+                {user && (
+                  <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-green-600" />
+                        <span className="text-sm text-green-700">Logged in — certificates will be saved</span>
+                      </div>
+                      <Link
+                        href="/dashboard"
+                        className="text-sm text-green-700 hover:text-green-800 font-medium underline"
+                      >
+                        View History
+                      </Link>
+                    </div>
+                  </div>
+                )}
+                
                 <p className="text-xs text-slate-400 text-center mt-3">
                     {isPro ? 'PRO: Generating watermark-free certificates.' : 'Free tier includes a watermark.'}
                 </p>
@@ -298,6 +418,9 @@ export default function Home() {
                 timestamp={timestamp}
                 status={status}
                 showWatermark={!isPro}
+                hash={hash}
+                verificationUrl={`https://lanceiq.com/verify/${reportId}`}
+                qrCodeDataUrl={qrCodeDataUrl}
             />
         </div>
       </div>
