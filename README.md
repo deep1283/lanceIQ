@@ -4,7 +4,11 @@
 
 LanceIQ creates official-looking PDF certificates documenting webhook deliveries. Perfect for audits, compliance, dispute resolution, and record-keeping.
 
-![LanceIQ Screenshot](./public/assets/screenshot.png)
+![LanceIQ Input Form](./public/assets/input%20form.png)
+
+![LanceIQ PDF Certificate](./public/assets/pdf1.png)
+
+![LanceIQ Verification Page](./public/assets/verification-page.png)
 
 ## Features
 
@@ -101,10 +105,6 @@ Contributions are welcome! Please read our contributing guidelines before submit
 
 This project is licensed under the AGPL-3.0 License - see the [LICENSE](LICENSE) file for details.
 
-## Related
 
-- **[WebhookFix](https://webhookfix.com)** — Automated webhook monitoring & reliability platform. If you're generating certificates frequently, WebhookFix can automate the entire process.
 
----
-
-Built with ❤️ by the LanceIQ team
+Built with ❤️ by Deep Mishra
