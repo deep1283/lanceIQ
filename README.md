@@ -49,7 +49,8 @@ Visit [lanceiq.com](https://lanceiq.com) — no setup required.
      payload jsonb,
      headers jsonb,
      hash text,
-     is_pro boolean default false
+    payload_hash text,
+    is_pro boolean default false
    );
 
    alter table public.certificates enable row level security;
@@ -82,6 +83,7 @@ Visit [lanceiq.com](https://lanceiq.com) — no setup required.
 |----------|----------|-------------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Your Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anonymous key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | For public certificate verification |
 | `DODO_PAYMENTS_API_KEY` | No | For watermark removal payments |
 | `DODO_PAYMENTS_WEBHOOK_SECRET` | No | Dodo webhook verification |
 
@@ -105,4 +107,4 @@ This project is licensed under the AGPL-3.0 License - see the [LICENSE](LICENSE)
 
 ---
 
-Built with ❤️ by [Your Name](https://twitter.com/yourhandle)
+Built with ❤️ by the LanceIQ team
