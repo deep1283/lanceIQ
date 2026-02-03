@@ -1,14 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium-min';
+import chromium from '@sparticuz/chromium';
 import { generateHtml } from '@/lib/generate-html';
 import QRCode from 'qrcode';
 
-// External Chromium binary URL - must match the chromium-min package version
-const CHROMIUM_TAR_URL = 'https://github.com/Sparticuz/chromium/releases/download/v131.0.0/chromium-v131.0.0-pack.tar';
-
 export const config = {
-  maxDuration: 30, // 30 seconds
+  maxDuration: 60, // 60 seconds for chromium startup
   api: {
     bodyParser: {
       sizeLimit: '4mb',
@@ -73,26 +70,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
               : '/usr/bin/google-chrome');
         browser = await puppeteer.launch({
-            args: [], // Local chrome doesn't need sparticuz args
+            args: [],
             defaultViewport: { width: 1920, height: 1080 },
             executablePath: execPath, 
             headless: true,
         });
     } else {
-        // Production: Use chromium-min with external binary
-        // Explicit args for serverless environment (Vercel)
+        // Production: Use @sparticuz/chromium with bundled binary
+        // Required args for AWS Lambda / Vercel serverless
         browser = await puppeteer.launch({
-            args: [
-              ...chromium.args,
-              '--no-sandbox',
-              '--disable-setuid-sandbox',
-              '--disable-dev-shm-usage',
-              '--disable-gpu',
-              '--single-process',
-              '--no-zygote',
-            ],
+            args: chromium.args,
             defaultViewport: { width: 1920, height: 1080 },
-            executablePath: await chromium.executablePath(CHROMIUM_TAR_URL),
+            executablePath: await chromium.executablePath(),
             headless: true,
         });
     }
