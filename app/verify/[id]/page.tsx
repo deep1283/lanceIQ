@@ -1,5 +1,5 @@
 
-import { CheckCircle, XCircle, Shield, Calendar, Activity, Hash, FileText } from "lucide-react";
+import { CheckCircle, XCircle, Shield, Calendar, Activity, Hash } from "lucide-react";
 import { getCertificateForVerification } from "@/app/actions/certificates";
 import Link from "next/link";
 import { format } from "date-fns";

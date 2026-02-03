@@ -18,13 +18,13 @@ const blogPosts = {
         <p className="mb-6 text-lg leading-relaxed text-slate-700">
           In the modern API economy, webhooks are the nervous system of your infrastructure. They trigger payments, ship orders, and sync user data. But what happens when an auditor asks for proof that a specific event occurred?
         </p>
-        <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">The "He Said, She Said" Problem</h2>
+        <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">The &quot;He Said, She Said&quot; Problem</h2>
         <p className="mb-6 text-slate-700">
-          Without verifiable logs, disputes between services become a game of finger-pointing. "We sent the webhook," says Stripe. "We never got it," says your server logs. A standardized Webhook Delivery Certificate acts as a neutral third-party record, capturing the headers, payload, and cryptographic signature in a format that business teams (and auditors) can understand.
+          Without verifiable logs, disputes between services become a game of finger-pointing. &quot;We sent the webhook,&quot; says Stripe. &quot;We never got it,&quot; says your server logs. A standardized Webhook Delivery Certificate acts as a neutral third-party record, capturing the headers, payload, and cryptographic signature in a format that business teams (and auditors) can understand.
         </p>
         <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">SOC2 and GDPR Requirements</h2>
         <p className="mb-6 text-slate-700">
-          Compliance frameworks increasingly demand "non-repudiation" — the ability to prove that a transaction took place. Storing raw JSON logs is often insufficient because they are easily mutable. A generated PDF certificate, especially one that is cryptographically signed or hashed, provides a much stronger artifact for your compliance trail.
+          Compliance frameworks increasingly demand &quot;non-repudiation&quot; — the ability to prove that a transaction took place. Storing raw JSON logs is often insufficient because they are easily mutable. A generated PDF certificate, especially one that is cryptographically signed or hashed, provides a much stronger artifact for your compliance trail.
         </p>
       </>
     )
@@ -37,11 +37,11 @@ const blogPosts = {
     content: (
       <>
         <p className="mb-6 text-lg leading-relaxed text-slate-700">
-          Stripe's developer experience is world-class, but debugging failed webhooks can still be a nightmare. Is it a signature mismatch? A timeout? A malformed payload?
+          Stripe&apos;s developer experience is world-class, but debugging failed webhooks can still be a nightmare. Is it a signature mismatch? A timeout? A malformed payload?
         </p>
         <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">Visualizing the Invisible</h2>
         <p className="mb-6 text-slate-700">
-          The hardest part of debugging webhooks is their ephemeral nature. They happen, and then they're gone. By converting a webhook payload into a visual document, you can inspect the `Stripe-Signature` header, break down the timestamp (`t=...`), and verify the v1 signature (`v1=...`) manually if needed.
+          The hardest part of debugging webhooks is their ephemeral nature. They happen, and then they&apos;re gone. By converting a webhook payload into a visual document, you can inspect the `Stripe-Signature` header, break down the timestamp (`t=...`), and verify the v1 signature (`v1=...`) manually if needed.
         </p>
         <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">Common Pitfalls</h2>
         <ul className="list-disc list-inside space-y-2 mb-6 text-slate-700">
@@ -67,7 +67,7 @@ const blogPosts = {
         </p>
         <h2 className="text-2xl font-bold text-slate-900 mt-8 mb-4">Why Documentation is Key</h2>
         <p className="mb-6 text-slate-700">
-          When a security incident occurs, being able to produce a certificate showing "This request had a valid signature at 10:00 AM" is invaluable. It proves that you performed due diligence in accepting incoming data streams.
+          When a security incident occurs, being able to produce a certificate showing &quot;This request had a valid signature at 10:00 AM&quot; is invaluable. It proves that you performed due diligence in accepting incoming data streams.
         </p>
       </>
     )

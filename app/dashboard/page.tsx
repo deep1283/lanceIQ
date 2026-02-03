@@ -12,7 +12,7 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  const { data: certificates, error } = await supabase
+  const { data: certificates } = await supabase
     .from("certificates")
     .select("*")
     .order("created_at", { ascending: false })

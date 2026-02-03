@@ -35,6 +35,7 @@ function SuccessContent() {
             setError("Could not verify payment. Please try verifying with your email on the home page.");
           }
         } catch (err) {
+          console.error(err);
           setError("Verification failed. Please try verifying with your email on the home page.");
         }
       } else if (status !== "succeeded") {

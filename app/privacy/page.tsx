@@ -16,14 +16,14 @@ export default function PrivacyPolicy() {
 
           <div className="prose prose-slate max-w-none text-slate-700">
             <section className="mb-8">
-              <h2 className="text-xl font-bold text-slate-900 mb-4">1. No Data Storage</h2>
+              <h2 className="text-xl font-bold text-slate-900 mb-4">1. Data Processing</h2>
               <p className="mb-4">
-                At LanceIQ, we have a strict <strong>Zero-Persistence Policy</strong>. We do not store, save, or archive any of the webhook data you process through our tool.
+                At LanceIQ, we have a strict <strong>Zero-Persistence Policy</strong> for guest users. While your data is sent to our server for PDF generation, we do not store, save, or archive any of it.
               </p>
               <ul className="list-disc list-inside space-y-2 ml-4">
-                <li><strong>Payloads:</strong> Your JSON payloads are processed in memory solely for the purpose of generating the PDF and are immediately discarded.</li>
+                <li><strong>Payloads:</strong> Your JSON payloads are sent to our server, processed in memory to generate the PDF, and immediately discarded.</li>
                 <li><strong>Headers:</strong> Headers and sensitive keys are never logged to a database.</li>
-                <li><strong>Timestamps:</strong> Used only for the generated document.</li>
+                <li><strong>Logged-in Users:</strong> If you choose to save a certificate to your account, we store a hash and metadata for verification purposes.</li>
               </ul>
             </section>
 
@@ -37,7 +37,7 @@ export default function PrivacyPolicy() {
             <section className="mb-8">
               <h2 className="text-xl font-bold text-slate-900 mb-4">3. Local Storage</h2>
               <p className="mb-4">
-                We use your browser's Local Storage mechanism to save your "Pro" status so you don't have to verify your email every time you visit. This data stays on your device.
+                We use your browser&apos;s Local Storage mechanism to save your Pro status so you don&apos;t have to verify your email every time you visit. This data stays on your device.
               </p>
             </section>
 

@@ -5,21 +5,28 @@ import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
+import type { User as SupabaseUser } from "@supabase/supabase-js";
 // Using string path for public assets since standard imports might be tricky without configured aliases
 // or if the files are just in public. Next.js serves public folder at root.
 
 const Navbar: React.FC = () => {
-  const [user, setUser] = React.useState<any>(null);
-  const supabase = createClient();
+  const [user, setUser] = React.useState<SupabaseUser | null>(null);
+  const supabase = React.useMemo(() => createClient(), []);
   const router = useRouter();
 
   React.useEffect(() => {
+    const setInitialUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    setInitialUser();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [supabase]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();

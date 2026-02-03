@@ -2,7 +2,6 @@
 
 import { createClient } from "@/utils/supabase/client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Loader2, Mail, CheckCircle } from "lucide-react";
 import Navbar from "@/components/Navbar";
 
@@ -11,7 +10,6 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const router = useRouter();
   const supabase = createClient();
 
   const handleMagicLink = async (e: React.FormEvent) => {

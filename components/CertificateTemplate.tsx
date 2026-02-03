@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle, AlertCircle, Clock, Server, FileJson, Shield } from 'lucide-react';
+import { CheckCircle, Clock, Server, FileJson, Shield } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -45,7 +45,7 @@ export function CertificateTemplate({
   let formattedPayload = payload;
   try {
     formattedPayload = JSON.stringify(JSON.parse(payload), null, 2);
-  } catch (e) {
+  } catch {
     // Keep as raw if invalid json
   }
 
@@ -176,30 +176,44 @@ export function CertificateTemplate({
     {/* Footer with QR and Legal */}
     <div className="absolute bottom-12 left-12 right-12 border-t border-slate-200 pt-6 flex items-end justify-between">
         
-        {/* Left: QR Code & Verification */}
+        {/* Left: QR Code & Verification (only for logged-in users) OR Hash-only (for guests) */}
         <div className="flex items-center gap-4">
-            {qrCodeDataUrl && (
-                <div className="w-24 h-24 bg-white p-1 border border-slate-200 shrink-0">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={qrCodeDataUrl} alt="Verification QR Code" className="w-full h-full" />
+            {qrCodeDataUrl && verificationUrl ? (
+                <>
+                    <div className="w-24 h-24 bg-white p-1 border border-slate-200 shrink-0">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={qrCodeDataUrl} alt="Verification QR Code" className="w-full h-full" />
+                    </div>
+                    <div className="text-left">
+                        <p className="text-[10px] font-sans text-slate-500 uppercase tracking-wider font-bold mb-1">
+                            Scan to Verify
+                        </p>
+                        <p className="text-[10px] font-mono text-slate-400 mb-2 break-all">
+                            {verificationUrl.replace('https://', '')}
+                        </p>
+                        {hash && (
+                            <div>
+                                <p className="text-[8px] font-sans text-slate-400 uppercase tracking-wider mb-0.5">SHA-256 Hash</p>
+                                <p className="text-[8px] font-mono text-slate-300 max-w-[200px] break-all leading-tight">
+                                    {hash}
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                </>
+            ) : (
+                /* Guest certificates: Show hash only, no QR */
+                <div className="text-left">
+                    <p className="text-[10px] font-sans text-slate-500 uppercase tracking-wider font-bold mb-1">
+                        Payload Fingerprint
+                    </p>
+                    {hash && (
+                        <p className="text-[10px] font-mono text-slate-400 max-w-[300px] break-all leading-tight">
+                            SHA-256: {hash}
+                        </p>
+                    )}
                 </div>
             )}
-            <div className="text-left">
-                <p className="text-[10px] font-sans text-slate-500 uppercase tracking-wider font-bold mb-1">
-                    Scan to Verify
-                </p>
-                <p className="text-[10px] font-mono text-slate-400 mb-2 break-all">
-                    {verificationUrl?.replace('https://', '') || 'lanceiq.com/verify'}
-                </p>
-                {hash && (
-                     <div>
-                        <p className="text-[8px] font-sans text-slate-400 uppercase tracking-wider mb-0.5">SHA-256 Hash</p>
-                        <p className="text-[8px] font-mono text-slate-300 max-w-[200px] break-all leading-tight">
-                            {hash}
-                        </p>
-                     </div>
-                )}
-            </div>
         </div>
 
         {/* Right: Legal Text */}

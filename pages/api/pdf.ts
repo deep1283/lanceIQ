@@ -61,7 +61,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     let browser;
     if (isLocal) {
-        const execPath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+        // Use CHROME_PATH env var, or fallback to common paths
+        const execPath =
+          process.env.CHROME_PATH ??
+          (process.platform === 'darwin'
+            ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+            : process.platform === 'win32'
+              ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+              : '/usr/bin/google-chrome');
         browser = await puppeteer.launch({
             args: [], // Local chrome doesn't need sparticuz args
             defaultViewport: { width: 1920, height: 1080 },
@@ -82,7 +89,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Set content and wait for full load with generous timeout
     await page.setContent(html, { waitUntil: 'load', timeout: 60000 });
     
-    // Small delay to ensure Tailwind processes
+    // Small delay to ensure fonts/layout settle before PDF render
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     const pdfBuffer = await page.pdf({
@@ -99,8 +106,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.setHeader('Content-Disposition', `attachment; filename="webhook-proof-${id}.pdf"`);
     res.status(200).end(pdfBuffer);
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('PDF Generation Error:', error);
-    res.status(500).json({ error: 'Failed to generate PDF', details: error.message });
+    res.status(500).json({ error: 'Failed to generate PDF', details: message });
   }
 }

@@ -18,14 +18,14 @@ export default function TermsAndConditions() {
             <section className="mb-8">
               <h2 className="text-xl font-bold text-slate-900 mb-4">1. Welcome to LanceIQ</h2>
               <p className="mb-4">
-                Thank you for choosing LanceIQ. By using our service, you agree to these terms. We've designed them to be fair and transparent, ensuring a positive experience for everyone.
+                Thank you for choosing LanceIQ. By using our service, you agree to these terms. We&apos;ve designed them to be fair and transparent, ensuring a positive experience for everyone.
               </p>
             </section>
 
             <section className="mb-8">
               <h2 className="text-xl font-bold text-slate-900 mb-4">2. How Our Service Works</h2>
               <p className="mb-4">
-                LanceIQ helps you generate professional-grade PDF certificates for your webhook events. We provide this tool "as is" to help you document and organize your technical records efficiently.
+                LanceIQ helps you generate professional-grade PDF certificates for your webhook events. We provide this tool &quot;as is&quot; to help you document and organize your technical records efficiently.
               </p>
             </section>
 
@@ -46,7 +46,7 @@ export default function TermsAndConditions() {
             <section className="mb-8">
               <h2 className="text-xl font-bold text-slate-900 mb-4">5. Service Reliability</h2>
               <p className="mb-4">
-                We are committed to providing a secure and reliable experience. However, like any online service, technical issues can occasionally occur. The service is provided on an "as is" and "as available" basis. While we do our best to ensure smooth operation, we are not liable for unforeseen interruptions or service outages beyond our reasonable control.
+                We are committed to providing a secure and reliable experience. However, like any online service, technical issues can occasionally occur. The service is provided on an &quot;as is&quot; and &quot;as available&quot; basis. While we do our best to ensure smooth operation, we are not liable for unforeseen interruptions or service outages beyond our reasonable control.
               </p>
             </section>
 

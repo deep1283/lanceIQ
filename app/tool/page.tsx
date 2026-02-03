@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import QRCode from 'qrcode';
 import { v4 as uuidv4 } from "uuid";
 import { CertificateTemplate } from "@/components/CertificateTemplate";
-import { Download, RefreshCw, AlertTriangle, CreditCard, CheckCircle, Mail, User, LogIn } from "lucide-react";
+import { Download, RefreshCw, AlertTriangle, CheckCircle, User, LogIn } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { saveCertificate } from "@/app/actions/certificates";
 import Link from "next/link";
+import type { User as SupabaseUser } from "@supabase/supabase-js";
 
 export default function Home() {
   const [jsonInput, setJsonInput] = useState<string>("{\n  \"event\": \"payment.succeeded\",\n  \"amount\": 2000,\n  \"currency\": \"usd\"\n}");
@@ -18,8 +19,6 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const [checkoutError, setCheckoutError] = useState<string | null>(null);
-  
   // Pro status
   const [isPro, setIsPro] = useState(false);
   const [verifyEmail, setVerifyEmail] = useState("");
@@ -28,9 +27,9 @@ export default function Home() {
   const [verifyMessage, setVerifyMessage] = useState<string | null>(null);
   
   // Auth state
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<SupabaseUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   
   // Verification State
   const [hash, setHash] = useState<string>("");
@@ -70,7 +69,7 @@ export default function Home() {
     });
     
     return () => subscription.unsubscribe();
-  }, []);
+  }, [supabase]);
 
   // Generate Hash and QR Code
   useEffect(() => {
@@ -127,8 +126,9 @@ export default function Home() {
         id: newReportId, // Use new ID
         showWatermark: !isPro,
         hash, // Note: This hash is based on the CURRENT render. If jsonInput hasn't changed, hash is same. Validation logic uses this.
-        // API will generate its own QR code to ensure consistency in PDF environment
-        verificationUrl: `https://lanceiq.com/verify/${newReportId}`
+        // Only include verification URL if user is logged in (certificate will be saved)
+        // Guests get hash-only certificates without QR since verification won't work without DB record
+        ...(user && { verificationUrl: `https://lanceiq.com/verify/${newReportId}` })
       };
 
       const res = await fetch('/api/pdf', {
@@ -173,7 +173,8 @@ export default function Home() {
       a.href = url;
       a.download = `webhook-proof-${newReportId}.pdf`;
       a.click();
-    } catch (err) {
+    } catch (e) {
+      console.error(e);
       setError("Failed to generate PDF. Please try again.");
     } finally {
       setIsGenerating(false);
@@ -187,34 +188,6 @@ export default function Home() {
           parsedHeadersPreview[key.trim()] = values.join(':').trim();
       }
   });
-
-  const handleBuy = async () => {
-    setCheckoutError(null);
-    if (!verifyEmail || !verifyEmail.includes('@')) {
-      setVerifyMessage("Please enter a valid email address first.");
-      // Focus the input if possible, or just rely on the message
-      return;
-    }
-    
-    try {
-      const res = await fetch('/api/dodo/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: verifyEmail || undefined }),
-      });
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        setCheckoutError('Failed to start checkout. Please try again.');
-        setTimeout(() => setCheckoutError(null), 5000);
-      }
-    } catch (err) {
-      console.error(err);
-      setCheckoutError('Error connecting to payment provider.');
-      setTimeout(() => setCheckoutError(null), 5000);
-    }
-  };
 
   const handleVerifyPurchase = async () => {
     if (!verifyEmail) {
@@ -242,7 +215,8 @@ export default function Home() {
       } else {
         setVerifyMessage(data.message || "No purchase found for this email");
       }
-    } catch (err) {
+    } catch (e) {
+      console.error(e);
       setVerifyMessage("Failed to verify. Please try again.");
     } finally {
       setIsVerifying(false);
@@ -392,6 +366,7 @@ export default function Home() {
                         Log In
                       </Link>
                     </div>
+                    <p className="text-xs text-slate-400 mt-2">Sign in to enable QR code verification on your certificates</p>
                   </div>
                 )}
                 
@@ -434,7 +409,7 @@ export default function Home() {
                 status={status}
                 showWatermark={!isPro}
                 hash={hash}
-                verificationUrl={`https://lanceiq.com/verify/${reportId}`}
+                verificationUrl={user ? `https://lanceiq.com/verify/${reportId}` : undefined}
                 qrCodeDataUrl={qrCodeDataUrl}
             />
         </div>
