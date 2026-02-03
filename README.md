@@ -16,7 +16,7 @@ LanceIQ creates official-looking PDF certificates documenting webhook deliveries
 ## Features
 
 - 📄 **Instant PDF Generation** — Paste JSON, get a professional certificate
-- 🔒 **Privacy First** — Guest data is processed server-side to generate PDFs but never stored
+- 🔒 **Privacy First** — Guest data is processed entirely in your browser and never sent to our servers
 - 🏢 **Enterprise Ready** — Save certificates to your account for future reference
 - ⚡ **Fast & Simple** — No complex setup, works immediately
 - 🎨 **Professional Design** — Clean, audit-ready document format

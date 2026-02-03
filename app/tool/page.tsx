@@ -108,6 +108,9 @@ export default function Home() {
     setReportId(newReportId);
     setTimestamp(newTimestamp);
 
+    let pdfContainer: HTMLDivElement | null = null;
+    let root: ReturnType<(typeof import('react-dom/client'))['createRoot']> | null = null;
+
     try {
       // Parse headers
       const parsedHeaders: Record<string, string> = {};
@@ -129,9 +132,9 @@ export default function Home() {
       }
 
       // Create a hidden div for PDF generation - no fixed dimensions, let content determine size
-      const pdfContainer = document.createElement('div');
+      pdfContainer = document.createElement('div');
       pdfContainer.id = 'pdf-container';
-      pdfContainer.style.cssText = 'position: absolute; left: -9999px; background: white; padding: 20px;';
+      pdfContainer.style.cssText = 'position: absolute; left: -9999px; top: 0; background: white; padding: 0; margin: 0;';
       document.body.appendChild(pdfContainer);
 
       // Import dependencies dynamically
@@ -144,7 +147,7 @@ export default function Home() {
       const { CertificateTemplate } = await import('@/components/CertificateTemplate');
 
       // Render certificate to container
-      const root = createRoot(pdfContainer);
+      root = createRoot(pdfContainer);
       root.render(
         React.createElement(CertificateTemplate, {
           id: newReportId,
@@ -159,38 +162,72 @@ export default function Home() {
         })
       );
 
-      // Wait for render to complete
-      await new Promise(resolve => setTimeout(resolve, 800));
+      const waitForCertificateEl = async () => {
+        const timeoutMs = 2500;
+        const start = performance.now();
+        // React render is async; poll until it exists (or timeout)
+        while (performance.now() - start < timeoutMs) {
+          const el = pdfContainer?.querySelector('#certificate-root') as HTMLElement | null;
+          if (el) return el;
+          await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        }
+        return null;
+      };
 
-      // Get actual content dimensions
-      const contentWidth = pdfContainer.scrollWidth;
-      const contentHeight = pdfContainer.scrollHeight;
+      const certificateEl = await waitForCertificateEl();
+      if (!certificateEl) {
+        throw new Error('Certificate render failed');
+      }
+
+      // Wait for fonts and images to load before capturing
+      await Promise.all([
+        document.fonts.ready,
+        ...Array.from(certificateEl.querySelectorAll('img')).map((img) =>
+          img.complete
+            ? Promise.resolve()
+            : new Promise((resolve) => {
+                img.onload = resolve;
+                img.onerror = resolve;
+              })
+        ),
+        new Promise((resolve) => setTimeout(resolve, 100)),
+      ]);
 
       // Capture to canvas with html2canvas-pro (supports modern CSS)
-      const canvas = await html2canvas(pdfContainer, {
+      const canvas = await html2canvas(certificateEl, {
         scale: 2,
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
-        windowWidth: contentWidth,
-        windowHeight: contentHeight,
       });
 
-      // Convert canvas to PDF - use actual content size
+      // Convert canvas to A4 PDF (mm) for consistent print sizing
       const pdf = new jsPDF({
-        orientation: contentWidth > contentHeight ? 'landscape' : 'portrait',
-        unit: 'px',
-        format: [canvas.width / 2, canvas.height / 2], // Divide by scale factor
-        hotfixes: ['px_scaling'],
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
       });
-      
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
-      pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width / 2, canvas.height / 2);
-      pdf.save(`webhook-proof-${newReportId}.pdf`);
 
-      // Cleanup
-      root.unmount();
-      document.body.removeChild(pdfContainer);
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      const imgProps = pdf.getImageProperties(imgData);
+      const imgRatio = imgProps.width / imgProps.height;
+      const pageRatio = pageWidth / pageHeight;
+
+      let renderWidth = pageWidth;
+      let renderHeight = pageHeight;
+      if (imgRatio > pageRatio) {
+        renderHeight = renderWidth / imgRatio;
+      } else {
+        renderWidth = renderHeight * imgRatio;
+      }
+
+      const x = (pageWidth - renderWidth) / 2;
+      const y = (pageHeight - renderHeight) / 2;
+      pdf.addImage(imgData, 'JPEG', x, y, renderWidth, renderHeight);
+      pdf.save(`webhook-proof-${newReportId}.pdf`);
       
       // Save to database if user is logged in
       if (user) {
@@ -211,6 +248,14 @@ export default function Home() {
       console.error('PDF Generation Error:', e);
       setError("Failed to generate PDF. Please try again.");
     } finally {
+      try {
+        root?.unmount();
+      } catch {
+        // ignore
+      }
+      if (pdfContainer?.parentNode) {
+        pdfContainer.parentNode.removeChild(pdfContainer);
+      }
       setIsGenerating(false);
     }
   };
