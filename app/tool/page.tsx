@@ -41,11 +41,19 @@ export default function Home() {
     setTimestamp(new Date().toISOString());
     setReportId(uuidv4());
     
-    // Check if user has purchased (from localStorage)
-    const proEmail = localStorage.getItem('lanceiq_pro_email');
-    if (proEmail) {
+    // 🎉 LAUNCH PROMO: Free watermark-free until Feb 6, 2026
+    const PROMO_END_DATE = new Date('2026-02-06T23:59:59Z');
+    const isPromoActive = new Date() < PROMO_END_DATE;
+    
+    if (isPromoActive) {
       setIsPro(true);
-      setVerifyEmail(proEmail);
+    } else {
+      // Check if user has purchased (from localStorage)
+      const proEmail = localStorage.getItem('lanceiq_pro_email');
+      if (proEmail) {
+        setIsPro(true);
+        setVerifyEmail(proEmail);
+      }
     }
     
     // Check auth state
@@ -316,9 +324,17 @@ export default function Home() {
                     {isGenerating ? 'Generating...' : isPro ? 'Download PDF (No Watermark)' : 'Download PDF (With Watermark)'}
                 </button>
 
+                {/* 🎉 LAUNCH PROMO BANNER */}
+                <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
+                  <p className="text-sm text-green-700 font-medium text-center">
+                    🎉 Launch Week Special: Watermark-free for everyone until Feb 6!
+                  </p>
+                </div>
+
+                {/* PAYMENT UI - COMMENTED OUT UNTIL DODO VERIFICATION IS COMPLETE
                 {!isPro && (
                   <div className="mt-4 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg border border-indigo-100">
-                    <p className="text-sm text-slate-700 mb-3 font-medium">Remove watermark forever for just $9</p>
+                    <p className="text-sm text-slate-700 mb-3 font-medium">Remove watermark forever for just $9.99</p>
                     
                     <input
                       type="email"
@@ -336,7 +352,7 @@ export default function Home() {
                         className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition-colors disabled:opacity-50"
                     >
                         <CreditCard className="w-4 h-4" />
-                        Remove Watermark - $9
+                        Remove Watermark - $9.99
                     </button>
                     {checkoutError && (
                         <p className="text-sm text-red-600 font-medium mt-2 text-center">{checkoutError}</p>
@@ -351,6 +367,7 @@ export default function Home() {
                     </button>
                   </div>
                 )}
+                END PAYMENT UI */}
 
                 {error && (
                     <div className="flex items-center gap-2 mt-3 text-red-600 text-sm bg-red-50 p-2 rounded">

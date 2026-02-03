@@ -1,6 +1,13 @@
 import { dodo } from '@/lib/dodo';
 import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+// Use service role for webhook (no user context)
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function POST(request: NextRequest) {
   const signature = (await headers()).get('webhook-signature');
@@ -21,12 +28,32 @@ export async function POST(request: NextRequest) {
 
     console.log('Received Dodo Payments Webhook:', event.type);
 
-
-    // Handle the event
+    // Handle payment success
     if (event.type === 'payment.succeeded') {
       const session = event.data;
       console.log('Payment succeeded for session:', session.payment_id);
-      // Fulfill the purchase here (e.g., generate certificate, send email)
+      
+      // Extract customer email from the event
+      const customerEmail = session.customer?.email;
+      
+      if (customerEmail) {
+        // Store in pro_users table
+        const { error } = await supabaseAdmin
+          .from('pro_users')
+          .upsert(
+            { 
+              email: customerEmail.toLowerCase().trim(),
+              payment_id: session.payment_id 
+            },
+            { onConflict: 'email' }
+          );
+        
+        if (error) {
+          console.error('Failed to store pro user:', error);
+        } else {
+          console.log('Pro user stored:', customerEmail);
+        }
+      }
     }
 
     return NextResponse.json({ received: true });
