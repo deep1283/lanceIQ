@@ -44,7 +44,7 @@ export default function PrivacyPolicy() {
             
 
             <section>
-              <h2 className="text-xl font-bold text-slate-900 mb-4">5. Contact Us</h2>
+              <h2 className="text-xl font-bold text-slate-900 mb-4">4. Contact Us</h2>
               <p>
                 If you have any questions about this Privacy Policy, please contact us at deepmishra1283@gmail.com
               </p>
