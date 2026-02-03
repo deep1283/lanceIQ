@@ -1,8 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
+import chromium from '@sparticuz/chromium-min';
 import { generateHtml } from '@/lib/generate-html';
 import QRCode from 'qrcode';
+
+// External Chromium binary URL - must match the chromium-min package version
+const CHROMIUM_TAR_URL = 'https://github.com/Sparticuz/chromium/releases/download/v131.0.0/chromium-v131.0.0-pack.tar';
 
 export const config = {
   maxDuration: 30, // 30 seconds
@@ -76,10 +79,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             headless: true,
         });
     } else {
+        // Production: Use chromium-min with external binary
         browser = await puppeteer.launch({
             args: chromium.args,
             defaultViewport: { width: 1920, height: 1080 },
-            executablePath: await chromium.executablePath(),
+            executablePath: await chromium.executablePath(CHROMIUM_TAR_URL),
             headless: true,
         });
     }
