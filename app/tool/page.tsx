@@ -341,9 +341,7 @@ export default function Home() {
                     {checkoutError && (
                         <p className="text-sm text-red-600 font-medium mt-2 text-center">{checkoutError}</p>
                     )}
-                    {!verifyEmail && (
-                      <p className="text-xs text-slate-500 mt-2 text-center">We'll send your Pro key to this email.</p>
-                    )}
+
                     <button
                         onClick={() => setShowVerifyModal(true)}
                         className="w-full flex items-center justify-center gap-2 text-indigo-600 hover:text-indigo-700 py-2 text-sm font-medium mt-2"
