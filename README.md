@@ -1,5 +1,8 @@
 # LanceIQ
 
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![Live Demo](https://img.shields.io/badge/demo-lanceiq.com-green)](https://lanceiq.com)
+
 **Generate professional Webhook Delivery Certificates in seconds.**
 
 LanceIQ creates official-looking PDF certificates documenting webhook deliveries. Perfect for audits, compliance, dispute resolution, and record-keeping.
@@ -75,7 +78,7 @@ Visit [lanceiq.com](https://lanceiq.com) — no setup required.
 
 ## Tech Stack
 
-- **Framework**: Next.js 14 (App Router)
+- **Framework**: Next.js 16 (App Router)
 - **Styling**: Tailwind CSS
 - **Auth & Database**: Supabase
 - **PDF Generation**: Puppeteer
