@@ -80,8 +80,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
     } else {
         // Production: Use chromium-min with external binary
+        // Explicit args for serverless environment (Vercel)
         browser = await puppeteer.launch({
-            args: chromium.args,
+            args: [
+              ...chromium.args,
+              '--no-sandbox',
+              '--disable-setuid-sandbox',
+              '--disable-dev-shm-usage',
+              '--disable-gpu',
+              '--single-process',
+              '--no-zygote',
+            ],
             defaultViewport: { width: 1920, height: 1080 },
             executablePath: await chromium.executablePath(CHROMIUM_TAR_URL),
             headless: true,
