@@ -118,45 +118,86 @@ export default function Home() {
         }
       });
 
-      const data = {
-        payload: jsonInput,
-        headers: parsedHeaders,
-        timestamp: newTimestamp, // Use new timestamp
-        status,
-        id: newReportId, // Use new ID
-        showWatermark: !isPro,
-        hash, // Note: This hash is based on the CURRENT render. If jsonInput hasn't changed, hash is same. Validation logic uses this.
-        // Only include verification URL if user is logged in (certificate will be saved)
-        // Guests get hash-only certificates without QR since verification won't work without DB record
-        ...(user && { verificationUrl: `https://lanceiq.com/verify/${newReportId}` })
-      };
+      // Generate QR code if user is logged in
+      let qrCodeDataUrl: string | undefined;
+      if (user) {
+        try {
+          qrCodeDataUrl = await QRCode.toDataURL(`https://lanceiq.com/verify/${newReportId}`, { margin: 1, width: 100 });
+        } catch (e) {
+          console.error('Failed to generate QR code:', e);
+        }
+      }
 
-      const res = await fetch('/api/pdf', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+      // Create a hidden div for PDF generation - no fixed dimensions, let content determine size
+      const pdfContainer = document.createElement('div');
+      pdfContainer.id = 'pdf-container';
+      pdfContainer.style.cssText = 'position: absolute; left: -9999px; background: white; padding: 20px;';
+      document.body.appendChild(pdfContainer);
+
+      // Import dependencies dynamically
+      const { default: html2canvas } = await import('html2canvas-pro');
+      const { default: jsPDF } = await import('jspdf');
+      
+      // Render certificate using React DOM
+      const { createRoot } = await import('react-dom/client');
+      const React = await import('react');
+      const { CertificateTemplate } = await import('@/components/CertificateTemplate');
+
+      // Render certificate to container
+      const root = createRoot(pdfContainer);
+      root.render(
+        React.createElement(CertificateTemplate, {
+          id: newReportId,
+          payload: jsonInput,
+          headers: parsedHeaders,
+          timestamp: newTimestamp,
+          status,
+          showWatermark: !isPro,
+          hash,
+          verificationUrl: user ? `https://lanceiq.com/verify/${newReportId}` : undefined,
+          qrCodeDataUrl,
+        })
+      );
+
+      // Wait for render to complete
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      // Get actual content dimensions
+      const contentWidth = pdfContainer.scrollWidth;
+      const contentHeight = pdfContainer.scrollHeight;
+
+      // Capture to canvas with html2canvas-pro (supports modern CSS)
+      const canvas = await html2canvas(pdfContainer, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        windowWidth: contentWidth,
+        windowHeight: contentHeight,
       });
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('API Error:', errData);
-        throw new Error(errData.error || 'Failed to generate PDF');
-      }
-
-      const blob = await res.blob();
+      // Convert canvas to PDF - use actual content size
+      const pdf = new jsPDF({
+        orientation: contentWidth > contentHeight ? 'landscape' : 'portrait',
+        unit: 'px',
+        format: [canvas.width / 2, canvas.height / 2], // Divide by scale factor
+        hotfixes: ['px_scaling'],
+      });
       
-      if (blob.size < 100) {
-         console.error('Blob too small, likely error');
-         throw new Error('Generated PDF is empty or invalid.');
-      }
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width / 2, canvas.height / 2);
+      pdf.save(`webhook-proof-${newReportId}.pdf`);
+
+      // Cleanup
+      root.unmount();
+      document.body.removeChild(pdfContainer);
       
       // Save to database if user is logged in
       if (user) {
         try {
           const parsedPayload = JSON.parse(jsonInput);
-          // Use the real SHA-256 hash we generated
           await saveCertificate({
-            report_id: newReportId, // Use new ID
+            report_id: newReportId,
             payload: parsedPayload,
             headers: parsedHeaders,
             payload_hash: hash,
@@ -164,17 +205,10 @@ export default function Home() {
           });
         } catch (saveErr) {
           console.error('Failed to save certificate:', saveErr);
-          // Don't block download if save fails
         }
       }
-      
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `webhook-proof-${newReportId}.pdf`;
-      a.click();
     } catch (e) {
-      console.error(e);
+      console.error('PDF Generation Error:', e);
       setError("Failed to generate PDF. Please try again.");
     } finally {
       setIsGenerating(false);
