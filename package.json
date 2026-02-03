@@ -1,7 +1,22 @@
 {
-  "name": "webhook-proof",
+  "name": "lanceiq",
   "version": "0.1.0",
+  "description": "Generate professional Webhook Delivery Certificates in seconds",
   "private": true,
+  "license": "AGPL-3.0",
+  "author": "Deep Mishra",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/deep1283/lanceIQ"
+  },
+  "homepage": "https://lanceiq.com",
+  "keywords": [
+    "webhook",
+    "certificate",
+    "pdf",
+    "delivery-proof",
+    "audit"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",

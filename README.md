@@ -27,8 +27,8 @@ Visit [lanceiq.com](https://lanceiq.com) — no setup required.
 
 1. **Clone the repo**
    ```bash
-   git clone https://github.com/yourusername/lanceiq.git
-   cd lanceiq
+   git clone https://github.com/deep1283/lanceIQ.git
+   cd lanceIQ
    ```
 
 2. **Install dependencies**
