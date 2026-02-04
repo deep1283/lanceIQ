@@ -81,7 +81,7 @@ Visit [lanceiq.com](https://lanceiq.com) — no setup required.
 - **Framework**: Next.js 16 (App Router)
 - **Styling**: Tailwind CSS
 - **Auth & Database**: Supabase
-- **PDF Generation**: Puppeteer
+- **PDF Generation**: `html2canvas-pro` + `jsPDF` (in-browser)
 - **Payments**: Dodo Payments (optional)
 
 ## Configuration
