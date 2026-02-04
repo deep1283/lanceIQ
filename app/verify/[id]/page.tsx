@@ -1,8 +1,8 @@
-
-import { CheckCircle, XCircle, Shield, Calendar, Activity, Hash } from "lucide-react";
+import { XCircle, Shield, Calendar, Activity, Hash, ShieldCheck, ShieldAlert, AlertTriangle } from "lucide-react";
 import { getCertificateForVerification } from "@/app/actions/certificates";
 import Link from "next/link";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 export const metadata = {
   title: "Verify Certificate | LanceIQ",
@@ -47,6 +47,32 @@ export default async function VerifyPage({ params }: { params: Promise<{ id: str
   const payloadPreview = isPayloadLong 
     ? payloadString.split('\n').slice(0, 10).join('\n') + '\n\n... (content hidden for privacy)' 
     : payloadString;
+  
+  const signatureStatus: 'verified' | 'failed' | 'not_verified' =
+    cert.signature_status === 'verified'
+      ? 'verified'
+      : cert.signature_status === 'failed'
+        ? 'failed'
+        : 'not_verified';
+
+  const badge =
+    signatureStatus === 'verified'
+      ? {
+          className: "bg-green-100 text-green-700 ring-green-200/50",
+          icon: <ShieldCheck className="w-4 h-4" />,
+          label: "Signature Verified",
+        }
+      : signatureStatus === 'failed'
+        ? {
+            className: "bg-red-100 text-red-700 ring-red-200/50",
+            icon: <ShieldAlert className="w-4 h-4" />,
+            label: "Signature Failed",
+          }
+        : {
+            className: "bg-yellow-100 text-yellow-800 ring-yellow-200/50",
+            icon: <AlertTriangle className="w-4 h-4" />,
+            label: "Not Verified",
+          };
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] font-sans selection:bg-indigo-100 selection:text-indigo-900">
@@ -54,13 +80,16 @@ export default async function VerifyPage({ params }: { params: Promise<{ id: str
         
         {/* Header Badge */}
         <div className="flex flex-col items-center justify-center mb-12 text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-full text-sm font-semibold mb-6 shadow-sm ring-1 ring-green-200/50">
-            <CheckCircle className="w-4 h-4" />
-            <span>Valid Verification Record</span>
+          <div className={cn(
+            "inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold mb-6 shadow-sm ring-1",
+            badge.className
+          )}>
+            {badge.icon}
+            <span>{badge.label}</span>
           </div>
-          <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4 tracking-tight">Verified by LanceIQ</h1>
+          <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4 tracking-tight">LanceIQ Verification</h1>
           <p className="text-slate-500 max-w-lg mx-auto">
-            This document serves as a permanent, immutable record of a digital webhook event delivery.
+            This page shows the stored certificate data and (when available) a server-computed signature verification result.
           </p>
         </div>
 
@@ -90,26 +119,50 @@ export default async function VerifyPage({ params }: { params: Promise<{ id: str
                 </div>
               </div>
 
+              {/* Integrity Status */}
               <div className="flex items-start gap-4">
                 <div className="p-2 bg-green-50 rounded-lg text-green-600">
                   <Activity className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Status</p>
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Integrity</p>
                   <div className="flex items-center gap-2">
                      <span className="inline-block w-2 h-2 rounded-full bg-green-500" />
-                     <p className="font-mono text-sm text-slate-700">Record Verified</p>
+                     <p className="font-mono text-sm text-slate-700">Record Stored</p>
                   </div>
                 </div>
               </div>
 
+               {/* Signature Status */}
                <div className="flex items-start gap-4">
-                <div className="p-2 bg-slate-100 rounded-lg text-slate-600">
-                  <Shield className="w-5 h-5" />
+                <div className={cn(
+                  "p-2 rounded-lg",
+                  signatureStatus === 'verified'
+                    ? "bg-green-50 text-green-600"
+                    : signatureStatus === 'failed'
+                      ? "bg-red-50 text-red-600"
+                      : "bg-yellow-50 text-yellow-700"
+                )}>
+                  {signatureStatus === 'verified' ? (
+                    <ShieldCheck className="w-5 h-5" />
+                  ) : signatureStatus === 'failed' ? (
+                    <ShieldAlert className="w-5 h-5" />
+                  ) : (
+                    <Shield className="w-5 h-5" />
+                  )}
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Security</p>
-                  <p className="font-mono text-sm text-slate-700">SHA-256 Signed</p>
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Origin Signature</p>
+                  <p className={cn(
+                    "font-mono text-sm",
+                    signatureStatus === 'verified'
+                      ? "text-green-700 font-semibold"
+                      : signatureStatus === 'failed'
+                        ? "text-red-700 font-semibold"
+                        : "text-slate-500"
+                  )}>
+                    {signatureStatus === 'verified' ? "Verified" : signatureStatus === 'failed' ? "Failed" : "Not Verified"}
+                  </p>
                 </div>
               </div>
             </div>
@@ -122,6 +175,38 @@ export default async function VerifyPage({ params }: { params: Promise<{ id: str
               Cryptographic Proof
             </h3>
             
+            {/* Signature Verification Details - Prominent if Verified */}
+            {cert.signature_status === 'verified' && (
+              <div className="bg-green-50 rounded-xl p-6 border border-green-200 mb-6">
+                <div className="flex items-center gap-3 mb-3">
+                   <ShieldCheck className="w-5 h-5 text-green-700" />
+                   <h4 className="font-bold text-green-900">Origin Verified by LanceIQ</h4>
+                </div>
+                <p className="text-sm text-green-800 mb-3 leading-relaxed">
+                   This payload was cryptographically verified against the provider&apos;s signature using the secret key provided by the host. 
+                </p>
+                 <div className="bg-white/80 p-3 rounded-lg text-xs font-mono text-green-800 space-y-1">
+                    <p>Method: {cert.verification_method}</p>
+                    <p>Verified At: {cert.verified_at ? format(new Date(cert.verified_at), "PPpp") + " UTC" : "Unknown"}</p>
+                    {cert.signature_secret_hint && <p>Key Hint: {cert.signature_secret_hint}</p>}
+                 </div>
+              </div>
+            )}
+
+            {/* Failed Verification Warning */}
+            {cert.signature_status === 'failed' && (
+               <div className="bg-red-50 rounded-xl p-6 border border-red-200 mb-6">
+                 <div className="flex items-center gap-3 mb-3">
+                    <ShieldAlert className="w-5 h-5 text-red-700" />
+                    <h4 className="font-bold text-red-900">Verification Failed</h4>
+                 </div>
+                 <p className="text-sm text-red-800">
+                    Warning: The signature provided did NOT match the payload. This record may have been tampered with or generated with incorrect credentials.
+                 </p>
+               </div>
+            )}
+
+            {/* Standard Integrity Hash */}
             <div className="bg-slate-50 rounded-xl p-6 border border-slate-200 mb-8">
               <div className="mb-4">
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Payload Hash (SHA-256)</p>

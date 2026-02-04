@@ -1,0 +1,39 @@
+/**
+ * Simple in-memory rate limiter using a Map with time-based reset.
+ * Suitable for serverless functions (Phase 1) where exact precision isn't critical.
+ */
+
+interface Options {
+  interval: number; // milliseconds
+  uniqueTokenPerInterval: number; // Max number of unique tokens (IPs) to track
+}
+
+export function rateLimit(options: Options) {
+  const tokenCache = new Map<string, number[]>();
+  let lastCleanup = Date.now();
+
+  return {
+    check: (limit: number, token: string) =>
+      new Promise<void>((resolve, reject) => {
+        const now = Date.now();
+        
+        // Cleanup periodically
+        if (now - lastCleanup > options.interval) {
+          tokenCache.clear();
+          lastCleanup = now;
+        }
+
+        const timestamps = tokenCache.get(token) || [];
+        // Filter out old timestamps
+        const validTimestamps = timestamps.filter(t => now - t < options.interval);
+        
+        if (validTimestamps.length >= limit) {
+          reject();
+        } else {
+          validTimestamps.push(now);
+          tokenCache.set(token, validTimestamps);
+          resolve();
+        }
+      }),
+  };
+}

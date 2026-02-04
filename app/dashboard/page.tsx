@@ -1,7 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { FileText, Download, Plus, Calendar, CheckCircle, XCircle } from "lucide-react";
+import { FileText, Download, Plus, Calendar, CheckCircle, ShieldCheck, ShieldAlert, AlertTriangle } from "lucide-react";
 import Navbar from "@/components/Navbar";
 
 export default async function DashboardPage() {
@@ -85,6 +85,9 @@ export default async function DashboardPage() {
                     Date
                   </th>
                   <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    Signature
+                  </th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     Type
                   </th>
                   <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -110,14 +113,33 @@ export default async function DashboardPage() {
                       </div>
                     </td>
                     <td className="py-3 px-4">
+                        {cert.signature_status === 'verified' && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-50 text-green-700 text-xs font-medium rounded-full border border-green-200" title={`Verified with ${cert.verification_method}`}>
+                                <ShieldCheck className="w-3 h-3" />
+                                Verified
+                            </span>
+                        )}
+                        {cert.signature_status === 'failed' && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-50 text-red-700 text-xs font-medium rounded-full border border-red-200" title={cert.verification_error || 'Verification Failed'}>
+                                <ShieldAlert className="w-3 h-3" />
+                                Failed
+                            </span>
+                        )}
+                        {(cert.signature_status === 'not_verified' || !cert.signature_status) && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-600 text-xs font-medium rounded-full border border-slate-200" title="No signature verification performed">
+                                <AlertTriangle className="w-3 h-3 text-slate-400" />
+                                Unverified
+                            </span>
+                        )}
+                    </td>
+                    <td className="py-3 px-4">
                       {cert.is_pro ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-50 text-indigo-700 text-xs font-medium rounded-full border border-indigo-100">
                           <CheckCircle className="w-3 h-3" />
                           Pro
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-600 text-xs font-medium rounded-full">
-                          <XCircle className="w-3 h-3" />
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-slate-50 text-slate-600 text-xs font-medium rounded-full border border-slate-200">
                           Free
                         </span>
                       )}
@@ -125,10 +147,10 @@ export default async function DashboardPage() {
                     <td className="py-3 px-4 text-right">
                       <Link
                         href={`/tool?id=${cert.report_id}`}
-                        className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700 text-sm font-medium"
+                        className="inline-flex items-center gap-1 text-slate-600 hover:text-indigo-600 text-sm font-medium transition-colors"
                       >
                         <Download className="w-3 h-3" />
-                        Re-generate
+                        Open
                       </Link>
                     </td>
                   </tr>

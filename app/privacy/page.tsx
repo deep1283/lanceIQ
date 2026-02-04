@@ -18,12 +18,12 @@ export default function PrivacyPolicy() {
             <section className="mb-8">
               <h2 className="text-xl font-bold text-slate-900 mb-4">1. Data Processing</h2>
               <p className="mb-4">
-                At LanceIQ, we have a strict <strong>Zero-Persistence Policy</strong> for guest users. Your data never leaves your browser — PDF generation happens entirely client-side.
+                At LanceIQ, we prioritize your data privacy.
               </p>
               <ul className="list-disc list-inside space-y-2 ml-4">
-                <li><strong>Payloads:</strong> Your JSON payloads are processed entirely in your browser to generate the PDF — they are never sent to our servers.</li>
-                <li><strong>Headers:</strong> Headers and sensitive keys never leave your device.</li>
-                <li><strong>Logged-in Users:</strong> If you choose to save a certificate to your account, we store the payload, headers, and cryptographic hash for verification purposes.</li>
+                <li><strong>PDF Generation:</strong> For guest users, PDF generation happens entirely client-side. Your data never typically leaves your browser.</li>
+                <li><strong>Signature Verification:</strong> If you use the Signature Verification feature, your payload, headers, and secret are sent securely to our servers for processing. This data is processed in-memory to verify the cryptographic signature and is <strong>never stored or logged</strong> for guest users.</li>
+                <li><strong>Logged-in Users:</strong> If you choose to save a certificate to your account, we store the payload, headers, verification status, and cryptographic hashes to provide a permanent, verifiable record.</li>
               </ul>
             </section>
 

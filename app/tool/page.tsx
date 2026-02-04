@@ -4,11 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import QRCode from 'qrcode';
 import { v4 as uuidv4 } from "uuid";
 import { CertificateTemplate } from "@/components/CertificateTemplate";
-import { Download, RefreshCw, AlertTriangle, CheckCircle, User, LogIn } from "lucide-react";
+import { Download, RefreshCw, AlertTriangle, CheckCircle, User, LogIn, Lock, ShieldCheck } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { saveCertificate } from "@/app/actions/certificates";
 import Link from "next/link";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
+import { VerifySignatureModal } from "@/components/VerifySignatureModal";
+import type { VerificationApiResponse } from "@/lib/signature-verification";
 
 export default function Home() {
   const [jsonInput, setJsonInput] = useState<string>("{\n  \"event\": \"payment.succeeded\",\n  \"amount\": 2000,\n  \"currency\": \"usd\"\n}");
@@ -34,6 +36,10 @@ export default function Home() {
   // Verification State
   const [hash, setHash] = useState<string>("");
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>("");
+
+  // Signature Verification State (BYOS Phase 1)
+  const [showSigVerifyModal, setShowSigVerifyModal] = useState(false);
+  const [verificationResult, setVerificationResult] = useState<VerificationApiResponse | null>(null);
 
   // Hydration fix for UUID and Timestamp + Auth check
   useEffect(() => {
@@ -151,14 +157,23 @@ export default function Home() {
       root.render(
         React.createElement(CertificateTemplate, {
           id: newReportId,
+          date: newTimestamp, // Corrected prop name based on recent update
           payload: jsonInput,
           headers: parsedHeaders,
-          timestamp: newTimestamp,
           status,
+          payloadHash: hash,
+          
           showWatermark: !isPro,
-          hash,
           verificationUrl: user ? `https://lanceiq.com/verify/${newReportId}` : undefined,
           qrCodeDataUrl,
+
+          // Signature Verification Props
+          signatureStatus: verificationResult?.status,
+          verifiedAt: verificationResult?.verifiedAt ?? undefined,
+          verificationMethod: verificationResult?.method,
+          verificationError: verificationResult?.error,
+          secretHint: verificationResult?.secretHint,
+          toleranceUsedSec: verificationResult?.toleranceUsedSec,
         })
       );
 
@@ -239,6 +254,7 @@ export default function Home() {
             headers: parsedHeaders,
             payload_hash: hash,
             is_pro: isPro,
+            verificationToken: verificationResult?.verificationToken,
           });
         } catch (saveErr) {
           console.error('Failed to save certificate:', saveErr);
@@ -340,6 +356,42 @@ export default function Home() {
                 placeholder="Content-Type: application/json"
               />
               <p className="text-xs text-slate-400 mt-1">One header per line. Key: Value</p>
+            </div>
+
+            {/* Signature Verification Triggers */}
+            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+              <div className="flex items-center justify-between">
+                 <div>
+                   <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                     <Lock className="w-4 h-4 text-slate-500" />
+                     Signature Verification
+                   </h3>
+                   <p className="text-xs text-slate-500 mt-1">
+                     Verify authenticity with your webhook secret.
+                   </p>
+                 </div>
+                 
+                 {verificationResult?.status === 'verified' ? (
+                   <div className="flex items-center gap-2 text-green-700 bg-green-100 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
+                     <ShieldCheck className="w-3.5 h-3.5" />
+                     VERIFIED
+                   </div>
+                 ) : (
+                   <button
+                     onClick={() => setShowSigVerifyModal(true)}
+                     className="px-3 py-1.5 bg-white border border-slate-300 shadow-sm text-slate-700 text-xs font-medium rounded-md hover:bg-slate-50 transition-colors"
+                   >
+                     Verify Signature...
+                   </button>
+                 )}
+              </div>
+              
+              {verificationResult?.status === 'failed' && (
+                <p className="text-xs text-red-600 mt-2 font-medium flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" />
+                  Last attempt failed: {verificationResult.error}
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -482,19 +534,47 @@ export default function Home() {
         <div className="relative w-full max-w-[210mm] aspect-[210/297] shadow-2xl origin-top transition-transform duration-300 transform scale-50 md:scale-75 lg:scale-90 bg-white shrink-0">
             <CertificateTemplate 
                 id={reportId}
+                date={timestamp}
                 payload={jsonInput}
                 headers={parsedHeadersPreview}
-                timestamp={timestamp}
                 status={status}
+                payloadHash={hash}
+                
                 showWatermark={!isPro}
-                hash={hash}
                 verificationUrl={user ? `https://lanceiq.com/verify/${reportId}` : undefined}
                 qrCodeDataUrl={qrCodeDataUrl}
+
+                // Signature Verification Props
+                signatureStatus={verificationResult?.status}
+                // For preview, we use local time if verified, or just show current state
+                verifiedAt={verificationResult?.verifiedAt ?? undefined}
+                verificationMethod={verificationResult?.method}
+                verificationError={verificationResult?.error}
+                secretHint={verificationResult?.secretHint}
+                toleranceUsedSec={verificationResult?.toleranceUsedSec}
             />
         </div>
       </div>
 
       {/* Verify Modal */}
+      <VerifySignatureModal 
+        isOpen={showSigVerifyModal}
+        onClose={() => setShowSigVerifyModal(false)}
+        rawBody={jsonInput}
+        headers={parsedHeadersPreview}
+        // Ideally pass certificateId if saved, but for new generation flow we verify first then save
+        // If user is saved, we have reportId.
+        // We can pass reportId. API will update DB if it matches this reportId for this user.
+        reportId={reportId} 
+        onVerified={(res) => {
+          setVerificationResult(res);
+          // If successful, we might want to close modal automatically or let user close
+          // Let's keep it open for a moment or close it? 
+          // Result is shown in modal. Let user close.
+        }}
+      />
+
+      {/* Verify Purchase Modal (Existing) */}
       {showVerifyModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl">
