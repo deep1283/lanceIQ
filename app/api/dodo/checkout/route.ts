@@ -1,30 +1,50 @@
-import { dodo } from '@/lib/dodo';
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/utils/supabase/server';
+import { createCheckoutSession } from '@/lib/dodo';
 
-export async function POST(request: NextRequest) {
+export async function GET(req: NextRequest) {
+  const supabase = await createClient();
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return NextResponse.redirect(new URL('/login', req.url));
+  }
+
+  const { searchParams } = new URL(req.url);
+  const workspaceId = searchParams.get('workspace_id');
+  
+  if (!workspaceId) {
+    return NextResponse.json({ error: 'Missing workspace_id' }, { status: 400 });
+  }
+
+  // Verify workspace ownership/membership
+  const { data: isMember } = await supabase
+    .from('workspace_members')
+    .select('role')
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (!isMember) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
-    const body = await request.json().catch(() => ({}));
-    const email = body.email || 'customer@example.com';
-    const name = body.name || 'Customer';
+    const returnUrl = `${process.env.SITE_URL || 'http://localhost:3000'}/dashboard/settings?payment=success`;
+    
+    // Use user email for billing
+    const email = user.email!;
 
-    const session = await dodo.checkoutSessions.create({
-      customer: {
-        email,
-        name,
-      },
-      product_cart: [
-        {
-          product_id: process.env.DODO_PRODUCT_ID || 'prd_test_123', // Your Dodo product ID
-          quantity: 1,
-        },
-      ],
-      return_url: `${request.nextUrl.origin}/success`,
+    const checkoutUrl = await createCheckoutSession({
+      workspaceId,
+      userId: user.id,
+      email,
+      returnUrl
     });
 
-    return NextResponse.json({ url: session.checkout_url });
+    return NextResponse.redirect(checkoutUrl);
   } catch (error) {
-    console.error('Dodo Payments Checkout Error:', error);
-    return NextResponse.json({ error: 'Failed to create checkout session' }, { status: 500 });
+    console.error('Checkout Error:', error);
+    return NextResponse.json({ error: 'Failed to initiate checkout' }, { status: 500 });
   }
 }
-

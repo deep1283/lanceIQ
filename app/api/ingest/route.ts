@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const { data: workspace, error: wsError } = await supabase
       .from('workspaces')
-      .select('id, name, provider, store_raw_body, raw_body_retention_days, encrypted_secret')
+      .select('id, name, provider, store_raw_body, raw_body_retention_days, encrypted_secret, plan, subscription_status, subscription_current_period_end')
       .eq('api_key_hash', keyHash)
       .single();
 
@@ -155,8 +155,11 @@ export async function POST(req: NextRequest) {
       console.error('History Log Error:', historyError);
     }
 
+    const canAlert = canSendAlerts(workspace);
+
     // 8. Smart Alerts (critical only, deduped + cooldown)
     if (
+      canAlert &&
       !isDuplicate &&
       verificationResult.status === 'failed' &&
       isCriticalReason(verificationResult.reason)
@@ -188,6 +191,17 @@ export async function POST(req: NextRequest) {
     console.error('Unhandled API Error:', globalErr);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
+}
+
+function canSendAlerts(workspace: { plan?: string | null; subscription_status?: string | null; subscription_current_period_end?: string | null }) {
+  const plan = workspace.plan;
+  if (plan !== 'pro' && plan !== 'enterprise') return false;
+  const status = workspace.subscription_status;
+  if (status === 'active' || status === 'past_due') return true;
+  if (workspace.subscription_current_period_end) {
+    return new Date(workspace.subscription_current_period_end).getTime() > Date.now();
+  }
+  return false;
 }
 
 function getApiKeyFromHeaders(req: NextRequest): string | null {

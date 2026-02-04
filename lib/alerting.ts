@@ -41,6 +41,7 @@ export async function maybeSendCriticalEmailAlert(opts: {
   const { redis, setting, workspaceName, provider, reason, eventId } = opts;
 
   if (!setting.enabled || setting.channel !== "email") return;
+  if (!setting.destination) return;
   if (!isCriticalReason(reason)) return;
   if (!redis) return;
 

@@ -61,7 +61,13 @@ const Navbar: React.FC = () => {
               Sign Out
             </button>
             <Link
-              href="/tool"
+              href="/dashboard/settings"
+              className="text-zinc-400 hover:text-white text-sm transition-colors"
+            >
+              Settings
+            </Link>
+            <Link
+              href="/dashboard"
               className="bg-[#5425B0] rounded-full text-white px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold hover:scale-105 transition-transform duration-300 hover:cursor-pointer"
             >
               DASHBOARD

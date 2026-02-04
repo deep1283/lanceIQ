@@ -90,7 +90,7 @@ export async function createWorkspace(data: {
     return { error: 'Failed to assign ownership.' };
   }
 
-  // 3. Default alert setting (email)
+  // 3. Default alert setting (email) - only useful after upgrade
   const defaultEmail = user.data.user.email;
   if (defaultEmail) {
     const { error: alertError } = await supabase
@@ -99,7 +99,7 @@ export async function createWorkspace(data: {
         workspace_id: workspace.id,
         channel: 'email',
         destination: defaultEmail,
-        enabled: true,
+        enabled: false,
         critical_fail_count: 3,
         window_minutes: 10,
         cooldown_minutes: 30,
