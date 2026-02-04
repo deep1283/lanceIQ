@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import dotenv from 'dotenv';
 import path from 'path';
 import { encrypt, decrypt } from '../lib/encryption';
-import { computeRawBodySha256, verifySignature } from '../lib/signature-verification';
+
 
 // Load env
 dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
@@ -77,7 +77,7 @@ async function main() {
   console.log('\n3. Sending Webhook (No X-LanceIQ-Secret header)...');
   
   const payload = JSON.stringify({ event: 'test.charge.succeeded', amount: 100 });
-  const rawBodySha256 = computeRawBodySha256(payload); // Helper just calculates hash, doesn't verify
+  // Removed unused rawBodySha256 calculation
   
   // Generate STRIPE signature using the stored secret
   // Stripe format: t=timestamp,v1=signature
