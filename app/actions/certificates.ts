@@ -81,7 +81,7 @@ export async function saveCertificate(data: CertificateData) {
     payload_hash: data.payload_hash, 
     hash: data.payload_hash,
     raw_body_sha256: data.payload_hash,
-    canonical_json_sha256: canonicalHash,
+    canonical_json_sha256: canonicalHash ?? null,
     
     // Provider details
     provider: provider !== 'unknown' ? provider : null,

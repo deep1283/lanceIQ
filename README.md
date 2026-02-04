@@ -93,6 +93,20 @@ Visit [lanceiq.com](https://lanceiq.com) — no setup required.
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | For public certificate verification |
 | `DODO_PAYMENTS_API_KEY` | No | For watermark removal payments |
 | `DODO_PAYMENTS_WEBHOOK_SECRET` | No | Dodo webhook verification |
+| `API_KEY_HASH_SECRET` | Yes (Phase 2 ingest) | HMAC secret used to hash workspace API keys |
+| `ENCRYPTION_MASTER_KEY` | No (Phase 3 secrets) | 32-byte hex key for encrypting stored webhook secrets |
+| `CRON_SECRET` | No | Protects cron endpoints like raw body cleanup |
+
+## Raw Body Retention Cleanup
+
+If you enable `store_raw_body`, the app sets `raw_body_expires_at` and expects an automated cleanup.
+
+MVP-friendly option (recommended): call the cron endpoint periodically:
+- `POST /api/cron/cleanup-raw-bodies`
+- Header: `Authorization: Bearer $CRON_SECRET`
+
+DB option: run the SQL migration `supabase/migrations/20260204143000_cleanup_raw_bodies.sql` and schedule:
+- `select public.cleanup_expired_raw_bodies();`
 
 ## Contributing
 

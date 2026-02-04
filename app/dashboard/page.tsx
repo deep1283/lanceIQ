@@ -1,8 +1,9 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { FileText, Download, Plus, Calendar, CheckCircle, ShieldCheck, ShieldAlert, AlertTriangle } from "lucide-react";
+import { FileText, Download, Calendar, CheckCircle, ShieldCheck, ShieldAlert, AlertTriangle, Plus } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import { DashboardClient } from "@/components/DashboardClient";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -29,24 +30,7 @@ export default async function DashboardPage() {
   return (
     <main className="min-h-screen bg-slate-50">
       <Navbar />
-      <div className="pt-24 pb-12 px-4 max-w-5xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Your Certificates</h1>
-            <p className="text-slate-500 text-sm mt-1">
-              View and download your generated webhook proofs
-            </p>
-          </div>
-          <Link
-            href="/tool"
-            className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Generate New
-          </Link>
-        </div>
-
+      <DashboardClient>
         {/* Stats */}
         <div className="grid grid-cols-2 gap-4 mb-8">
           <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
@@ -159,7 +143,7 @@ export default async function DashboardPage() {
             </table>
           </div>
         )}
-      </div>
+      </DashboardClient>
     </main>
   );
 }
