@@ -88,6 +88,7 @@ export function verifyVerificationToken(token: string): VerificationTokenPayload
     "mismatch",
     "malformed_signature",
     "timestamp_expired",
+    "duplicate",
   ];
   if (reason && !allowedReasons.includes(reason)) {
     throw new Error("Verification token has invalid reason");

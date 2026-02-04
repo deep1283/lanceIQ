@@ -8,7 +8,8 @@ export type StatusReason =
   | 'unsupported_provider' 
   | 'mismatch' 
   | 'malformed_signature' 
-  | 'timestamp_expired';
+  | 'timestamp_expired'
+  | 'duplicate';
 
 export interface VerificationResult {
   status: 'verified' | 'failed' | 'not_verified';

@@ -96,6 +96,11 @@ Visit [lanceiq.com](https://lanceiq.com) — no setup required.
 | `API_KEY_HASH_SECRET` | Yes (Phase 2 ingest) | HMAC secret used to hash workspace API keys |
 | `ENCRYPTION_MASTER_KEY` | No (Phase 3 secrets) | 32-byte hex key for encrypting stored webhook secrets |
 | `CRON_SECRET` | No | Protects cron endpoints like raw body cleanup |
+| `UPSTASH_REDIS_REST_URL` | No (Phase 4 alerts) | Upstash Redis URL for shared rate limiting/dedup |
+| `UPSTASH_REDIS_REST_TOKEN` | No (Phase 4 alerts) | Upstash Redis token |
+| `RESEND_API_KEY` | No (Phase 4 alerts) | Resend API key for email alerts |
+| `RESEND_FROM_EMAIL` | No | Alert sender address (default: onboarding@resend.dev) |
+| `SITE_URL` | No | Base URL used in alert links |
 
 ## Raw Body Retention Cleanup
 

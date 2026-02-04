@@ -90,6 +90,27 @@ export async function createWorkspace(data: {
     return { error: 'Failed to assign ownership.' };
   }
 
+  // 3. Default alert setting (email)
+  const defaultEmail = user.data.user.email;
+  if (defaultEmail) {
+    const { error: alertError } = await supabase
+      .from('workspace_alert_settings')
+      .insert({
+        workspace_id: workspace.id,
+        channel: 'email',
+        destination: defaultEmail,
+        enabled: true,
+        critical_fail_count: 3,
+        window_minutes: 10,
+        cooldown_minutes: 30,
+        created_by: creatorId,
+      });
+
+    if (alertError) {
+      console.error('Create Alert Setting Error:', alertError);
+    }
+  }
+
   revalidatePath('/dashboard');
   
   // Return the raw key ONLY here. It is never stored.

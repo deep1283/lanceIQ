@@ -1,20 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { hashApiKey } from '@/lib/api-key';
-import { verifySignature, type Provider, detectProvider, computeRawBodySha256, type VerificationResult } from '@/lib/signature-verification';
+import { verifySignature, type Provider, detectProvider, computeRawBodySha256, type VerificationResult, extractEventId } from '@/lib/signature-verification';
 import { decrypt } from '@/lib/encryption';
+import { checkRateLimit, getRedisClient, markAndCheckDuplicate } from '@/lib/ingest-helpers';
+import { isCriticalReason, maybeSendCriticalEmailAlert, type AlertSetting } from '@/lib/alerting';
 
 // Note: Using service role key for ingestion to bypass RLS for inserts
 // and to query workspaces by hash.
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Best-effort in-memory rate limit for MVP.
-// NOTE: Not reliable across serverless instances or cold starts.
-// For production/enterprise, swap to Redis/Upstash.
-const rateLimitMap = new Map<string, { count: number; windowStart: number }>();
-const LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
-const LIMIT_MAX_REQUESTS = 60; // 60 reqs/min per key
+const DEDUP_EVENT_TTL_SEC = 24 * 60 * 60; // 24h
+const DEDUP_HASH_TTL_SEC = 6 * 60 * 60; // 6h
 
 export async function POST(
   req: NextRequest, 
@@ -66,21 +64,12 @@ export async function POST(
     }
 
     // 2. Rate Limiting (Per Key)
-    const now = Date.now();
-    const limitState = rateLimitMap.get(keyHash) || { count: 0, windowStart: now };
-    
-    if (now - limitState.windowStart > LIMIT_WINDOW_MS) {
-      // Reset window
-      rateLimitMap.set(keyHash, { count: 1, windowStart: now });
-    } else {
-      if (limitState.count >= LIMIT_MAX_REQUESTS) {
-        return NextResponse.json(
-          { error: 'Rate limit exceeded' }, 
-          { status: 429, headers: { 'Retry-After': '60' } }
-        );
-      }
-      limitState.count++;
-      rateLimitMap.set(keyHash, limitState);
+    const rateLimit = await checkRateLimit(`ingest:${keyHash}`);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded' },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSec ?? 60) } }
+      );
     }
 
     // 3. Lookup Workspace
@@ -88,7 +77,7 @@ export async function POST(
     // Note: ensure we select everything needed, including encrypted_secret
     const { data: workspace, error: wsError } = await supabase
       .from('workspaces')
-      .select('id, provider, store_raw_body, raw_body_retention_days, encrypted_secret')
+      .select('id, name, provider, store_raw_body, raw_body_retention_days, encrypted_secret')
       .eq('api_key_hash', keyHash)
       .single();
 
@@ -106,6 +95,9 @@ export async function POST(
 
     const rawBodySha256 = computeRawBodySha256(rawBody);
     const reqHeaders = new Headers(req.headers);
+    const sanitizedHeaders = sanitizeHeaders(reqHeaders);
+    const detectedProvider = detectProvider(sanitizedHeaders);
+    const extractedEventId = extractEventId(detectedProvider, rawBody);
     
     // 5. Signature Verification (BYOS or Stored)
     let secret = reqHeaders.get('x-lanceiq-secret'); // BYOS has priority
@@ -119,15 +111,22 @@ export async function POST(
       }
     }
 
+    const redis = getRedisClient();
+    const dedupKey = extractedEventId
+      ? `dedup:${workspace.id}:${detectedProvider}:${extractedEventId}`
+      : `dedup:${workspace.id}:hash:${rawBodySha256}`;
+    const dedupTtl = extractedEventId ? DEDUP_EVENT_TTL_SEC : DEDUP_HASH_TTL_SEC;
+    const isDuplicate = await markAndCheckDuplicate(redis, dedupKey, dedupTtl);
+
     let verificationResult: VerificationResult = { 
       status: 'not_verified', 
-      reason: 'missing_secret',
-      providerEventId: undefined 
+      reason: isDuplicate ? 'duplicate' : 'missing_secret',
+      providerEventId: extractedEventId ?? undefined 
     };
 
-    const sanitizedHeaders = sanitizeHeaders(reqHeaders);
+    let verifiedProvider: Provider = detectedProvider;
 
-    if (secret) {
+    if (secret && !isDuplicate) {
       // Verify!
       const configuredProvider = workspace.provider as string | null | undefined;
       const providerToVerify: Provider =
@@ -135,6 +134,7 @@ export async function POST(
           ? configuredProvider
           : detectProvider(sanitizedHeaders);
 
+      verifiedProvider = providerToVerify;
       verificationResult = verifySignature(providerToVerify, rawBody, sanitizedHeaders, secret);
     }
 
@@ -142,6 +142,8 @@ export async function POST(
     const expiresAt = workspace.store_raw_body 
       ? new Date(Date.now() + (workspace.raw_body_retention_days || 7) * 24 * 60 * 60 * 1000) 
       : null;
+
+    const providerEventId = verificationResult.providerEventId || extractedEventId;
 
     const { data: event, error: insertError } = await supabase
       .from('ingested_events')
@@ -152,10 +154,11 @@ export async function POST(
         raw_body_sha256: rawBodySha256,
         raw_body: workspace.store_raw_body ? rawBody : null,
         raw_body_expires_at: expiresAt ? expiresAt.toISOString() : null,
-        detected_provider: detectProvider(sanitizedHeaders),
+        detected_provider: detectedProvider,
         signature_status: verificationResult.status,
         signature_reason: verificationResult.reason,
-        provider_event_id: verificationResult.providerEventId
+        provider_event_id: providerEventId,
+        is_duplicate: isDuplicate
       })
       .select('id')
       .single();
@@ -180,6 +183,34 @@ export async function POST(
       
     if (historyError) {
         console.error('History Log Error:', historyError);
+    }
+
+    // 8. Smart Alerts (critical only, deduped + cooldown)
+    if (
+      !isDuplicate &&
+      verificationResult.status === 'failed' &&
+      isCriticalReason(verificationResult.reason)
+    ) {
+      const { data: alertSettings } = await supabase
+        .from('workspace_alert_settings')
+        .select('id, workspace_id, channel, destination, enabled, critical_fail_count, window_minutes, cooldown_minutes')
+        .eq('workspace_id', workspace.id)
+        .eq('enabled', true);
+
+      if (alertSettings && alertSettings.length) {
+        await Promise.all(
+          (alertSettings as AlertSetting[]).map((setting) =>
+            maybeSendCriticalEmailAlert({
+              redis,
+              setting,
+              workspaceName: workspace.name ?? 'Workspace',
+              provider: verifiedProvider,
+              reason: verificationResult.reason || 'mismatch',
+              eventId: event.id,
+            })
+          )
+        );
+      }
     }
 
     return NextResponse.json({ status: 'stored', verified: verificationResult.status }, { status: 200 });
