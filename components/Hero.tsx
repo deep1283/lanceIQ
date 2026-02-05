@@ -124,15 +124,7 @@ const Hero: React.FC = () => {
         </div>
 
         <div className="relative z-10 text-center px-4 sm:px-10 max-w-5xl mx-auto">
-          <motion.div
-             initial={{ opacity: 0, scale: 0.9 }}
-             animate={{ opacity: 1, scale: 1 }}
-             transition={{ duration: 0.5 }}
-             className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 backdrop-blur-md text-sm text-purple-300 mb-6"
-          >
-             <Terminal className="w-4 h-4" />
-             <span>Developer-First Verification</span>
-          </motion.div>
+
 
           <motion.h1
             className="text-white text-5xl sm:text-7xl md:text-8xl font-bold tracking-tight mb-6"
@@ -166,16 +158,7 @@ const Hero: React.FC = () => {
                 Generate Proof Now
                 </motion.button>
             </Link>
-            <Link href="#features">
-                <motion.button
-                className="rounded-full py-4 px-8 text-base font-semibold text-white border border-white/20 hover:bg-white/10 transition-all duration-300 backdrop-blur-sm"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.7 }}
-                >
-                How It Works
-                </motion.button>
-            </Link>
+
           </div>
         </div>
       </div>
