@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyWebhookSignature } from '@/lib/dodo';
+import { logAuditAction, AUDIT_ACTIONS } from '@/utils/audit';
 
 // Use Service Role for admin updates
 const supabase = createClient(
@@ -35,8 +36,12 @@ export async function POST(req: NextRequest) {
     // Common fields: data.subscription_id, data.customer_id, data.status
     
     if (type === 'subscription.created') {
+      if (!workspaceId) {
+        throw new Error('Missing workspace_id in metadata');
+      }
+      const resolvedWorkspaceId = workspaceId;
       await supabase.from('subscriptions').upsert({
-        workspace_id: workspaceId,
+        workspace_id: resolvedWorkspaceId,
         dodo_subscription_id: data.subscription_id,
         customer_id: data.customer_id,
         billing_email: data.customer?.email,
@@ -55,7 +60,19 @@ export async function POST(req: NextRequest) {
             subscription_current_period_end: toIsoDate(data.current_period_end),
             billing_customer_id: data.customer_id
         })
-        .eq('id', workspaceId);
+        .eq('id', resolvedWorkspaceId);
+
+      await logAuditAction({
+        workspaceId: resolvedWorkspaceId,
+        action: AUDIT_ACTIONS.PLAN_CHANGED,
+        targetResource: 'subscriptions',
+        details: {
+          subscription_id: data.subscription_id,
+          status: normalizeWorkspaceStatus(data.status) ?? 'active',
+          plan: 'pro',
+          current_period_end: toIsoDate(data.current_period_end),
+        },
+      });
 
     } else if (type === 'subscription.updated') {
        // Find workspace by subscription_id
@@ -89,6 +106,18 @@ export async function POST(req: NextRequest) {
            subscription_current_period_end: periodEndIso,
            plan
          }).eq('id', sub.workspace_id);
+
+         await logAuditAction({
+           workspaceId: sub.workspace_id,
+           action: AUDIT_ACTIONS.PLAN_CHANGED,
+           targetResource: 'subscriptions',
+           details: {
+             subscription_id: data.subscription_id,
+             status: workspaceStatus,
+             plan,
+             current_period_end: periodEndIso,
+           },
+         });
        } else if (workspaceId) {
          // If we don't have a subscription record yet, create it from update payload.
          const subscriptionStatus = normalizeSubscriptionStatus(data.status) ?? 'active';
@@ -119,6 +148,18 @@ export async function POST(req: NextRequest) {
            subscription_current_period_end: periodEndIso,
            plan
          }).eq('id', workspaceId);
+
+         await logAuditAction({
+           workspaceId,
+           action: AUDIT_ACTIONS.PLAN_CHANGED,
+           targetResource: 'subscriptions',
+           details: {
+             subscription_id: data.subscription_id,
+             status: workspaceStatus,
+             plan,
+             current_period_end: periodEndIso,
+           },
+         });
        }
 
     } else if (type === 'payment.failed') {
@@ -132,6 +173,17 @@ export async function POST(req: NextRequest) {
           await supabase.from('subscriptions').update({ status: 'past_due' }).eq('dodo_subscription_id', data.subscription_id);
           await supabase.from('workspaces').update({ subscription_status: 'past_due' }).eq('id', sub.workspace_id);
           // Plan stays 'pro' (Grace Period)
+
+          await logAuditAction({
+            workspaceId: sub.workspace_id,
+            action: AUDIT_ACTIONS.PLAN_CHANGED,
+            targetResource: 'subscriptions',
+            details: {
+              subscription_id: data.subscription_id,
+              status: 'past_due',
+              plan: 'pro',
+            },
+          });
        }
     }
 

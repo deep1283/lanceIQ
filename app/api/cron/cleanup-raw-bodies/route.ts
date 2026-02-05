@@ -39,6 +39,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Cleanup failed" }, { status: 500 });
   }
 
-  return NextResponse.json({ cleaned: data?.length ?? 0 }, { status: 200 });
-}
+  let auditCleaned = 0;
+  const { data: auditData, error: auditError } = await supabase.rpc("cleanup_expired_audit_logs");
+  if (auditError) {
+    console.error("Audit log cleanup failed:", auditError);
+  } else if (typeof auditData === "number") {
+    auditCleaned = auditData;
+  }
 
+  return NextResponse.json(
+    { cleaned_raw_bodies: data?.length ?? 0, cleaned_audit_logs: auditCleaned },
+    { status: 200 }
+  );
+}

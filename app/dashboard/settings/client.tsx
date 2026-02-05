@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/utils/supabase/client';
+import { updateAlertSettings } from '@/app/actions/alert-settings';
 
 interface Workspace {
   id: string;
@@ -14,24 +14,37 @@ interface Workspace {
 
 interface AlertSetting {
   id?: string;
-  channel: 'email' | 'slack';
+  channel: 'email' | 'slack' | 'webhook'; // Updated to match DB check constraint
   destination: string;
   enabled: boolean;
   window_minutes: number;
   critical_fail_count: number;
+  updated_at?: string;
+}
+
+interface AuditLog {
+  id: string;
+  action: string;
+  actor_id: string | null;
+  target_resource: string | null;
+  details: Record<string, unknown> | null;
+  created_at: string;
 }
 
 export default function SettingsClient({ 
   workspace, 
-  initialSettings 
+  initialSettings,
+  initialAuditLogs
 }: { 
   workspace: Workspace, 
-  initialSettings: AlertSetting | null 
+  initialSettings: AlertSetting | null,
+  initialAuditLogs: AuditLog[]
 }) {
   const router = useRouter();
-  const supabase = createClient();
   const isPro = workspace.plan === 'pro' || workspace.plan === 'enterprise';
   const isPastDue = workspace.subscription_status === 'past_due';
+
+  const [activeTab, setActiveTab] = useState<'alerts' | 'audit'>('alerts');
 
   const [settings, setSettings] = useState<AlertSetting>(initialSettings || {
     channel: 'email',
@@ -47,18 +60,22 @@ export default function SettingsClient({
     if (!isPro && !isPastDue) return; // Strict gating
     setSaving(true);
 
-    const { data: { user } } = await supabase.auth.getUser();
-    
     const payload = {
       workspace_id: workspace.id,
       ...settings,
-      cooldown_minutes: 30, // hardcoded for now
-      created_by: user?.id
+      window_minutes: Number(settings.window_minutes),
+      critical_fail_count: Number(settings.critical_fail_count)
     };
 
-    // Upsert logic
-    await supabase.from('workspace_alert_settings').upsert(payload);
+    const result = await updateAlertSettings(payload);
+
+    if (result.error) {
+      alert(result.error); // Simple error handling for now
+    }
+    
     setSaving(false);
+    // Router refresh happens in server action via revalidatePath, 
+    // but calling it here again doesn't hurt to sync client cache if needed.
     router.refresh();
   }
 
@@ -118,89 +135,170 @@ export default function SettingsClient({
         )}
       </div>
 
-      {/* 2. Alert Settings (Gated) */}
-      <div className="relative">
-        <div className={`bg-zinc-900 border border-zinc-800 rounded-xl p-6 ${!isPro && 'opacity-50 pointer-events-none blur-[1px]'}`}>
-          <h2 className="text-xl font-semibold text-white mb-6">Smart Alerts</h2>
-          
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-zinc-400 mb-2">Destination (Email)</label>
-              <input 
-                type="email" 
-                value={settings.destination}
-                onChange={(e) => setSettings({...settings, destination: e.target.value})}
-                placeholder="alerts@company.com"
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-4 py-2.5 text-zinc-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-              />
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-               <div>
-                 <label className="block text-sm font-medium text-zinc-400 mb-2">Threshold (Failures)</label>
-                 <select 
-                   value={settings.critical_fail_count}
-                   onChange={(e) => setSettings({...settings, critical_fail_count: Number(e.target.value)})}
-                   className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-4 py-2.5 text-zinc-200"
-                 >
-                   <option value="1">1 Failure</option>
-                   <option value="3">3 Failures (Recommended)</option>
-                   <option value="5">5 Failures</option>
-                   <option value="10">10 Failures</option>
-                 </select>
-               </div>
-               <div>
-                  <label className="block text-sm font-medium text-zinc-400 mb-2">Time Window</label>
-                  <select 
-                   value={settings.window_minutes}
-                   onChange={(e) => setSettings({...settings, window_minutes: Number(e.target.value)})}
-                   className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-4 py-2.5 text-zinc-200"
-                 >
-                   <option value="5">5 Minutes</option>
-                   <option value="10">10 Minutes</option>
-                   <option value="30">30 Minutes</option>
-                   <option value="60">1 Hour</option>
-                 </select>
-               </div>
-            </div>
+      {/* Tab Navigation */}
+      <div className="flex space-x-6 border-b border-zinc-800 mb-8">
+        <button
+          onClick={() => setActiveTab('alerts')}
+          className={`pb-3 text-sm font-medium transition-colors border-b-2 ${
+            activeTab === 'alerts' 
+              ? 'border-blue-500 text-blue-400' 
+              : 'border-transparent text-zinc-400 hover:text-zinc-200'
+          }`}
+        >
+          Smart Alerts
+        </button>
+        <button
+          onClick={() => setActiveTab('audit')}
+          className={`pb-3 text-sm font-medium transition-colors border-b-2 ${
+            activeTab === 'audit' 
+              ? 'border-blue-500 text-blue-400' 
+              : 'border-transparent text-zinc-400 hover:text-zinc-200'
+          }`}
+        >
+          Audit Logs
+        </button>
+      </div>
 
-            <div className="flex items-center justify-between pt-4">
-               <div className="flex items-center gap-3">
+      {/* Tab Content */}
+      {activeTab === 'alerts' ? (
+        <div className="relative">
+          <div className={`bg-zinc-900 border border-zinc-800 rounded-xl p-6 ${!isPro && 'opacity-50 pointer-events-none blur-[1px]'}`}>
+            <h2 className="text-xl font-semibold text-white mb-6">Smart Alerts</h2>
+            
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-zinc-400 mb-2">Destination (Email)</label>
+                <input 
+                  type="email" 
+                  value={settings.destination}
+                  onChange={(e) => setSettings({...settings, destination: e.target.value})}
+                  placeholder="alerts@company.com"
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-4 py-2.5 text-zinc-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                 <div>
+                   <label className="block text-sm font-medium text-zinc-400 mb-2">Threshold (Failures)</label>
+                   <select 
+                     value={settings.critical_fail_count}
+                     onChange={(e) => setSettings({...settings, critical_fail_count: Number(e.target.value)})}
+                     className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-4 py-2.5 text-zinc-200"
+                   >
+                     <option value="1">1 Failure</option>
+                     <option value="3">3 Failures (Recommended)</option>
+                     <option value="5">5 Failures</option>
+                     <option value="10">10 Failures</option>
+                   </select>
+                 </div>
+                 <div>
+                    <label className="block text-sm font-medium text-zinc-400 mb-2">Time Window</label>
+                    <select 
+                     value={settings.window_minutes}
+                     onChange={(e) => setSettings({...settings, window_minutes: Number(e.target.value)})}
+                     className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-4 py-2.5 text-zinc-200"
+                   >
+                     <option value="5">5 Minutes</option>
+                     <option value="10">10 Minutes</option>
+                     <option value="30">30 Minutes</option>
+                     <option value="60">1 Hour</option>
+                   </select>
+                 </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-4">
+                 <div className="flex items-center gap-3">
+                   <button 
+                      onClick={() => setSettings({...settings, enabled: !settings.enabled})}
+                      className={`w-11 h-6 rounded-full transition-colors relative ${settings.enabled ? 'bg-green-500' : 'bg-zinc-700'}`}
+                   >
+                      <span className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${settings.enabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                   </button>
+                   <span className="text-zinc-400 text-sm">Alerts Enabled</span>
+                 </div>
+                 
                  <button 
-                    onClick={() => setSettings({...settings, enabled: !settings.enabled})}
-                    className={`w-11 h-6 rounded-full transition-colors relative ${settings.enabled ? 'bg-green-500' : 'bg-zinc-700'}`}
+                   onClick={handleSave}
+                   disabled={saving}
+                   className="bg-zinc-100 hover:bg-white text-zinc-900 px-6 py-2 rounded-md font-medium transition-colors disabled:opacity-50"
                  >
-                    <span className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${settings.enabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                   {saving ? 'Saving...' : 'Save Changes'}
                  </button>
-                 <span className="text-zinc-400 text-sm">Alerts Enabled</span>
-               </div>
-               
-               <button 
-                 onClick={handleSave}
-                 disabled={saving}
-                 className="bg-zinc-100 hover:bg-white text-zinc-900 px-6 py-2 rounded-md font-medium transition-colors disabled:opacity-50"
-               >
-                 {saving ? 'Saving...' : 'Save Changes'}
-               </button>
+              </div>
             </div>
+          </div>
+          
+          {!isPro && (
+            <div className="absolute inset-0 flex items-center justify-center z-10">
+              <div className="bg-zinc-950/90 border border-zinc-800 p-8 rounded-xl text-center backdrop-blur-sm max-w-sm mx-4">
+                <div className="w-12 h-12 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">Smart Alerts are Locked</h3>
+                <p className="text-zinc-400 mb-6 text-sm">Upgrade to the Enterprise plan to enable real-time critical alerts via Email & Slack.</p>
+                <a href={`/api/dodo/checkout?workspace_id=${workspace.id}`} className="block w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-md transition-colors">
+                  Unlock for $19/mo
+                </a>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Audit Logs Tab */
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-sm">
+          <div className="p-6 border-b border-zinc-800 flex justify-between items-center">
+             <div>
+               <h2 className="text-xl font-semibold text-white mb-1">Audit Log</h2>
+               <p className="text-zinc-400 text-sm">Track all critical actions in your workspace.</p>
+             </div>
+             {/* Simple export button placeholder */}
+             <button className="text-sm text-zinc-400 hover:text-white transition-colors flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                Export CSV
+             </button>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-zinc-950/50 border-b border-zinc-800">
+                <tr>
+                   <th className="px-6 py-4 font-medium text-zinc-400">Action</th>
+                   <th className="px-6 py-4 font-medium text-zinc-400">Actor</th>
+                   <th className="px-6 py-4 font-medium text-zinc-400">Resource</th>
+                   <th className="px-6 py-4 font-medium text-zinc-400">Details</th>
+                   <th className="px-6 py-4 font-medium text-zinc-400 text-right">Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-800">
+                {initialAuditLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center text-zinc-500">
+                      No audit events recorded yet.
+                    </td>
+                  </tr>
+                ) : (
+                  initialAuditLogs.map((log) => (
+                    <tr key={log.id} className="hover:bg-zinc-800/30 transition-colors">
+                      <td className="px-6 py-4 font-mono text-zinc-300">{log.action}</td>
+                      <td className="px-6 py-4 text-zinc-300">
+                         {/* We only have actor_id, ideally we'd join with users or show ID snippet */}
+                         <span className="bg-zinc-800 px-2 py-1 rounded text-xs">{log.actor_id ? log.actor_id.slice(0, 8) + '...' : 'System'}</span>
+                      </td>
+                      <td className="px-6 py-4 text-zinc-400">{log.target_resource || '-'}</td>
+                      <td className="px-6 py-4 text-zinc-400 max-w-xs truncate">
+                        {JSON.stringify(log.details)}
+                      </td>
+                      <td className="px-6 py-4 text-right text-zinc-500 whitespace-nowrap">
+                        {new Date(log.created_at).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
-        
-        {!isPro && (
-          <div className="absolute inset-0 flex items-center justify-center z-10">
-            <div className="bg-zinc-950/90 border border-zinc-800 p-8 rounded-xl text-center backdrop-blur-sm max-w-sm mx-4">
-              <div className="w-12 h-12 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-              </div>
-              <h3 className="text-xl font-bold text-white mb-2">Smart Alerts are Locked</h3>
-              <p className="text-zinc-400 mb-6 text-sm">Upgrade to the Enterprise plan to enable real-time critical alerts via Email & Slack.</p>
-              <a href={`/api/dodo/checkout?workspace_id=${workspace.id}`} className="block w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-md transition-colors">
-                Unlock for $19/mo
-              </a>
-            </div>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }

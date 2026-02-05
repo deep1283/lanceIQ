@@ -1,6 +1,7 @@
 import { Resend } from "resend";
 import type { Redis } from "@upstash/redis";
 import { acquireCooldown, incrementWindowCounter } from "@/lib/ingest-helpers";
+import { logAlertDelivery } from "@/utils/alerts";
 
 export type AlertChannel = "email" | "slack" | "webhook";
 
@@ -78,13 +79,33 @@ export async function maybeSendCriticalEmailAlert(opts: {
   ].filter(Boolean);
 
   try {
-    await resend.emails.send({
+    const response = await resend.emails.send({
       from,
       to: setting.destination,
       subject,
       text: lines.join("\n"),
     });
+    const providerMessageId =
+      (response as { data?: { id?: string } }).data?.id ||
+      (response as { id?: string }).id ||
+      undefined;
+
+    await logAlertDelivery({
+      workspaceId: setting.workspace_id,
+      alertSettingId: setting.id,
+      channel: "email",
+      status: "sent",
+      responsePayload: typeof response === "object" && response ? (response as Record<string, unknown>) : { response },
+      providerMessageId,
+    });
   } catch (err) {
     console.error("Alert email failed:", err);
+    await logAlertDelivery({
+      workspaceId: setting.workspace_id,
+      alertSettingId: setting.id,
+      channel: "email",
+      status: "failed",
+      lastError: err instanceof Error ? err.message : String(err),
+    });
   }
 }

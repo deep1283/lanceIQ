@@ -43,10 +43,19 @@ export default async function SettingsPage() {
     .eq('workspace_id', workspace.id)
     .maybeSingle();
 
+  // Get audit logs (Limit 50 for now)
+  const { data: auditLogs } = await supabase
+    .from('audit_logs')
+    .select('*')
+    .eq('workspace_id', workspace.id)
+    .order('created_at', { ascending: false })
+    .limit(50);
+
   return (
     <SettingsClient 
       workspace={workspace} 
       initialSettings={alertSettings} 
+      initialAuditLogs={auditLogs || []}
     />
   );
 }
