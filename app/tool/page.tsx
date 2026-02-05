@@ -11,6 +11,7 @@ import Link from "next/link";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { VerifySignatureModal } from "@/components/VerifySignatureModal";
 import type { VerificationApiResponse } from "@/lib/signature-verification";
+import AppNavbar from "@/components/AppNavbar";
 
 export default function Home() {
   const [jsonInput, setJsonInput] = useState<string>("{\n  \"event\": \"payment.succeeded\",\n  \"amount\": 2000,\n  \"currency\": \"usd\"\n}");
@@ -319,7 +320,9 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col md:flex-row font-sans">
+    <div className="min-h-screen bg-slate-100 font-sans pt-16">
+      <AppNavbar />
+      <div className="flex flex-col md:flex-row h-[calc(100vh-4rem)]">
       {/* LEFT: Input Form */}
       <div className="w-full md:w-1/2 p-6 md:p-12 overflow-y-auto border-r border-slate-200 bg-white z-10 shadow-sm">
         <div className="max-w-xl mx-auto space-y-8">
@@ -609,10 +612,11 @@ export default function Home() {
               >
                 {isVerifying ? 'Verifying...' : 'Verify'}
               </button>
-            </div>
           </div>
         </div>
+      </div>
       )}
+      </div>
     </div>
   );
 }

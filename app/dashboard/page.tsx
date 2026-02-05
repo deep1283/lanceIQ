@@ -32,6 +32,15 @@ export default async function DashboardPage() {
       <Navbar />
       <DashboardClient>
         {/* Stats */}
+        <div className="flex items-center justify-between mb-6">
+          <Link 
+            href="/tool"
+            className="flex items-center gap-2 text-slate-600 hover:text-indigo-600 transition-colors text-sm font-medium"
+          >
+            ← Back to Generator
+          </Link>
+        </div>
+
         <div className="grid grid-cols-2 gap-4 mb-8">
           <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
             <p className="text-sm text-slate-500">Total Certificates</p>
