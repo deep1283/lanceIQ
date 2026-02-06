@@ -34,6 +34,7 @@ export default function Home() {
   
   // Plan status
   const [isPro, setIsPro] = useState(false);
+  const [currentPlan, setCurrentPlan] = useState<string>("free");
   const [isWatermarkFree, setIsWatermarkFree] = useState(false);
   const [canVerify, setCanVerify] = useState(false);
   const [isPromoActive, setIsPromoActive] = useState(false);
@@ -60,15 +61,17 @@ export default function Home() {
     setIsPromoActive(promoActive);
 
     try {
-      const { isPro: dbPro, plan: currentPlan } = await checkProStatus();
+      const { isPro: dbPro, plan: planTier } = await checkProStatus();
       const watermarkFree = promoActive || dbPro;
       setIsPro(dbPro);
+      setCurrentPlan(planTier);
       setIsWatermarkFree(watermarkFree);
-      setCanVerify(currentPlan !== 'free');
+      setCanVerify(planTier !== 'free');
       return watermarkFree;
     } catch (err) {
       console.error("Failed to sync pro status:", err);
       setIsPro(false);
+      setCurrentPlan('free');
       setIsWatermarkFree(promoActive);
       setCanVerify(false);
       return promoActive;
@@ -445,7 +448,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-100 font-sans pt-16">
-      <AppNavbar user={user} />
+      <AppNavbar user={user} plan={currentPlan} />
       <div className="flex flex-col md:flex-row h-[calc(100vh-4rem)]">
       {/* LEFT: Input Form */}
       <div className="w-full md:w-1/2 p-6 md:p-12 overflow-y-auto border-r border-slate-200 bg-white z-10 shadow-sm">
