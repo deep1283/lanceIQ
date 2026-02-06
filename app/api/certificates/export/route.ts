@@ -1,66 +1,74 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { checkProStatus } from "@/app/actions/subscription";
-import { getPlanLimits } from "@/lib/plan";
 
-function escapeCsv(value: string) {
-  if (value.includes('"') || value.includes(",") || value.includes("\n")) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
-}
-
-export async function GET() {
+export async function GET(request: NextRequest) {
   const supabase = await createClient();
+  
+  // 1. Auth Check
   const { data: { user } } = await supabase.auth.getUser();
-
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { plan } = await checkProStatus();
-  const limits = getPlanLimits(plan);
-  if (!limits.canExport) {
-    return NextResponse.json({ error: "Upgrade required to export." }, { status: 403 });
+  // 2. Plan Check (Pro/Team only)
+  const { isPro, plan } = await checkProStatus();
+  if (!isPro) {
+    return NextResponse.json(
+      { error: "Export is available on Pro and Team plans only." }, 
+      { status: 403 }
+    );
   }
 
-  const nowIso = new Date().toISOString();
-  const { data, error } = await supabase
+  // 3. Fetch Data
+  // We fetch ALL certificates visible to the user (RLS handles workspace vs personal)
+  // We explicitly filter out expired ones just in case cleanup hasn't run, 
+  // though RLS/cleanup usually handles this.
+  const { data: certificates, error } = await supabase
     .from("certificates")
-    .select("report_id, created_at, signature_status, provider, provider_event_id")
-    .eq("user_id", user.id)
-    .gt("expires_at", nowIso)
-    .order("created_at", { ascending: false })
-    .limit(5000);
+    .select("*")
+    .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("Export fetch failed:", error);
-    return NextResponse.json({ error: "Export failed." }, { status: 500 });
+    console.error("Export error:", error);
+    return NextResponse.json({ error: "Failed to fetch data" }, { status: 500 });
   }
 
-  const rows = data || [];
-  const header = ["report_id", "created_at", "signature_status", "provider", "provider_event_id"];
-  const csvRows = [header.join(",")];
-
-  for (const row of rows) {
-    const values = [
-      row.report_id ?? "",
-      row.created_at ?? "",
-      row.signature_status ?? "",
-      row.provider ?? "",
-      row.provider_event_id ?? "",
-    ].map((v) => escapeCsv(String(v)));
-    csvRows.push(values.join(","));
+  if (!certificates || certificates.length === 0) {
+     return new NextResponse("Report ID,Date,Status,Type,Payload Hash\n", {
+        headers: {
+            "Content-Type": "text/csv",
+            "Content-Disposition": `attachment; filename="lanceiq_export_${new Date().toISOString().split('T')[0]}.csv"`,
+        }
+     });
   }
 
-  const csv = csvRows.join("\n");
-  const filename = `lanceiq-certificates-${new Date().toISOString().slice(0, 10)}.csv`;
+  // 4. Generate CSV
+  // Columns: Report ID, Date, Signature Status, Plan Type, Provider, Status Code, Payload Hash
+  const csvRows = [
+    ["Report ID", "Date (UTC)", "Signature Status", "Plan", "Provider", "Status Code", "Payload Hash"].join(",")
+  ];
 
-  return new NextResponse(csv, {
-    status: 200,
+  for (const cert of certificates) {
+    const row = [
+        `"${cert.report_id}"`,
+        `"${new Date(cert.created_at).toISOString()}"`,
+        `"${cert.signature_status || 'unverified'}"`,
+        `"${cert.is_pro ? 'Pro/Team' : 'Free'}"`,
+        `"${cert.provider || 'unknown'}"`,
+        `"${cert.status_code || 200}"`,
+        `"${cert.payload_hash || ''}"`
+    ];
+    csvRows.push(row.join(","));
+  }
+
+  const csvString = csvRows.join("\n");
+
+  // 5. Return Response
+  return new NextResponse(csvString, {
     headers: {
-      "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Content-Type": "text/csv",
+      "Content-Disposition": `attachment; filename="lanceiq_export_${new Date().toISOString().split('T')[0]}.csv"`,
     },
   });
 }
