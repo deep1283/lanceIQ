@@ -19,8 +19,8 @@ const PROMO_END_LOCAL = new Date(2026, 1, 6, 23, 59, 59, 999);
 
 export default function Home() {
   const searchParams = useSearchParams();
-  const certificateId = searchParams.get('id');
-  const autoDownload = searchParams.get('download') === '1';
+  const certificateId = searchParams?.get('id');
+  const autoDownload = searchParams?.get('download') === '1';
   const [jsonInput, setJsonInput] = useState<string>("{\n  \"event\": \"payment.succeeded\",\n  \"amount\": 2000,\n  \"currency\": \"usd\"\n}");
   const [headersInput, setHeadersInput] = useState<string>("Stripe-Signature: t=123,v1=...\nContent-Type: application/json");
   const [status, setStatus] = useState<number>(200);
@@ -558,7 +558,7 @@ export default function Home() {
              
              <div className="pt-6">
                 <button
-                    onClick={handleDownload}
+                    onClick={() => handleDownload()}
                     disabled={isGenerating}
                     className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-lg font-medium transition-colors disabled:opacity-50"
                 >

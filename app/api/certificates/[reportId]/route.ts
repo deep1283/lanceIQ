@@ -1,50 +1,36 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 
 export async function GET(
-  _request: Request,
-  { params }: { params: { reportId: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ reportId: string }> }
 ) {
+  const { reportId } = await params;
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { data, error } = await supabase
+  // Fetch certificate securely (RLS ensures user owns it or is in workspace)
+  // Also enforce EXPIRY logic
+  const { data: certificate, error } = await supabase
     .from('certificates')
-    .select(
-      [
-        'report_id',
-        'created_at',
-        'payload',
-        'headers',
-        'payload_hash',
-        'hash',
-        'raw_body_sha256',
-        'signature_status',
-        'signature_status_reason',
-        'verified_at',
-        'verification_method',
-        'verification_error',
-        'signature_secret_hint',
-        'stripe_timestamp_tolerance_sec',
-        'provider',
-        'expires_at',
-      ].join(',')
-    )
-    .eq('report_id', params.reportId)
-    .eq('user_id', user.id)
+    .select('*')
+    .eq('id', reportId)
     .single();
 
-  if (error || !data) {
+  if (error || !certificate) {
     return NextResponse.json({ error: 'Certificate not found' }, { status: 404 });
   }
 
-  if (data.expires_at && new Date(data.expires_at).getTime() <= Date.now()) {
-    return NextResponse.json({ error: 'Certificate expired' }, { status: 410 });
+  // Check Expiration
+  // Note: RLS might handle visibility, but explicit check is safer for "download" flow
+  // to prevent accessing old data if not allowed.
+  if (certificate.expires_at && new Date(certificate.expires_at) < new Date()) {
+    return NextResponse.json({ error: 'Certificate has expired according to your data retention plan.' }, { status: 410 });
   }
 
-  return NextResponse.json({ certificate: data });
+  return NextResponse.json({ certificate });
 }
