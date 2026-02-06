@@ -244,7 +244,7 @@ export default async function VerifyPage({ params }: { params: Promise<{ id: str
            {/* Footer */}
           <div className="bg-slate-50 p-6 text-center border-t border-slate-100">
              <Link href="/" className="text-sm font-medium text-indigo-600 hover:text-indigo-700 hover:underline">
-               Generate your own proof with LanceIQ &rarr;
+               Generate your own certificate with LanceIQ &rarr;
              </Link>
           </div>
         </div>

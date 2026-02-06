@@ -21,7 +21,7 @@ const CodeTerminal = () => {
             "> Signature Status: [VALID] ✅",
             "> Generating Proof Certificate...",
             "> Certificate ID: cert_89234x9",
-            "> [SUCCESS] PDF Generated & Stored Securely."
+            "> [SUCCESS] PDF Generated & Saved to Workspace."
         ];
         
         let timeoutId: NodeJS.Timeout;
@@ -132,7 +132,7 @@ const Hero: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.8 }}
           >
-            Proof of <br className="hidden sm:block"/>
+            Records of <br className="hidden sm:block"/>
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 animate-gradient-x">
               Webhook Delivery
             </span>
@@ -155,7 +155,7 @@ const Hero: React.FC = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.6 }}
                 >
-                Generate Proof Now
+                Generate Certificate Now
                 </motion.button>
             </Link>
 
@@ -201,7 +201,7 @@ const Hero: React.FC = () => {
              >
                 <Lock className="w-10 h-10 text-pink-400 mx-auto mb-4" />
                 <h3 className="text-2xl font-bold mb-2">Private by Default</h3>
-                <p className="text-gray-400 text-sm">Guest generation is designed to stay in your browser. Sign in only if you want saved history and proof links.</p>
+                <p className="text-gray-400 text-sm">Guest generation is designed to stay in your browser. Sign in only if you want saved history and verification links.</p>
              </motion.div>
         </div>
       </section>

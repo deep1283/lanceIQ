@@ -42,7 +42,7 @@ export default function OpenGraphImage() {
             maxWidth: 900,
           }}
         >
-          Webhook delivery proof you can trust
+          Webhook delivery records you can trust
         </div>
         <div
           style={{
@@ -52,7 +52,7 @@ export default function OpenGraphImage() {
             maxWidth: 900,
           }}
         >
-          Verifiable PDF certificates with hashes and optional signature checks.
+          PDF certificates with hashes and optional signature checks.
         </div>
         <div
           style={{

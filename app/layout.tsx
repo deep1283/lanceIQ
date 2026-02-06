@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     default: "LanceIQ – Professional Webhook Delivery Certificates",
     template: "%s | LanceIQ"
   },
-  description: "Turn ephemeral webhook events into permanent, verifiable PDF records. The standard for webhook documentation and compliance.",
+  description: "Turn ephemeral webhook events into long-lived, verifiable PDF records. Designed for webhook documentation and compliance workflows.",
   openGraph: {
     type: 'website',
     locale: 'en_US',

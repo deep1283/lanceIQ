@@ -15,11 +15,11 @@ const steps = [
   {
     title: "Verify the signature (optional)",
     description:
-      "Provide your webhook secret and the system is designed to validate authenticity server-side with HMAC checks.",
+      "Provide your webhook secret and the system is designed to validate authenticity server-side.",
     icon: <ShieldCheck className="w-6 h-6" />,
   },
   {
-    title: "Generate and share proof",
+    title: "Generate and share records",
     description:
       "Download a professional PDF and, if signed in, include a QR-based verification link for audit trails.",
     icon: <QrCode className="w-6 h-6" />,
@@ -46,7 +46,7 @@ const HowItWorks: React.FC = () => {
             transition={{ delay: 0.1 }}
             className="text-lg text-gray-400 max-w-2xl mx-auto"
           >
-            From raw webhook data to audit-ready proof in minutes.
+            From raw webhook data to audit-ready records in minutes.
           </motion.p>
         </div>
 

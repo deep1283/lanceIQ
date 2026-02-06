@@ -12,7 +12,7 @@ interface FAQItem {
 const faqs: FAQItem[] = [
   {
     question: "What is a Webhook Delivery Certificate?",
-    answer: "A Webhook Delivery Certificate is a human-readable, professional document that proves a specific webhook event occurred. It captures the payload, headers, timestamp, and security signatures (like Stripe-Signature) to serve as verifiable evidence for clients, compliance teams, or dispute resolution."
+    answer: "A Webhook Delivery Certificate is a human-readable, professional document designed to record a webhook event. It captures the payload, headers, timestamp, and security signatures (like Stripe-Signature) to provide shareable evidence for clients, compliance teams, or dispute resolution."
   },
   {
     question: "How does LanceIQ verify webhook authenticity?",

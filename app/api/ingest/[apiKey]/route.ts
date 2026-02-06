@@ -23,7 +23,7 @@ export async function POST(
     
     // Support multiple auth methods:
     // 1. URL path: /api/ingest/[apiKey] (for provider webhooks)
-    // 2. Header: Authorization: Bearer <key> (enterprise/direct)
+    // 2. Header: Authorization: Bearer <key> (team/direct)
     // 3. Header: X-LanceIQ-Api-Key: <key>
     let apiKey = pathApiKey;
     
@@ -226,7 +226,7 @@ export async function POST(
 
 function canSendAlerts(workspace: { plan?: string | null; subscription_status?: string | null; subscription_current_period_end?: string | null }) {
   const plan = workspace.plan;
-  if (plan !== 'pro' && plan !== 'enterprise') return false;
+  if (plan !== 'pro' && plan !== 'team') return false;
   const status = workspace.subscription_status;
   if (status === 'active' || status === 'past_due') return true;
   if (workspace.subscription_current_period_end) {

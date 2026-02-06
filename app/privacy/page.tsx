@@ -23,23 +23,23 @@ export default function PrivacyPolicy() {
                 At LanceIQ, we prioritize your data privacy.
               </p>
               <ul className="list-disc list-inside space-y-2 ml-4">
-                <li><strong>PDF Generation:</strong> For guest users, PDF generation is designed to happen client-side. We do not persist your payload for guest sessions.</li>
-                <li><strong>Signature Verification:</strong> If you use Signature Verification, your payload, headers, and secret are sent to our servers to compute the verification result. We are designed to avoid storing raw secrets, and guest verification data is not persisted.</li>
-                <li><strong>Logged-in Users:</strong> If you save a certificate, we store the payload, headers, hashes, and verification status to provide history and proof links.</li>
+                <li><strong>PDF Generation:</strong> For guest users, PDF generation is designed to happen client-side. Payloads are not designed to be persisted for guest sessions.</li>
+                <li><strong>Signature Verification:</strong> If you use Signature Verification, your payload, headers, and secret are sent to our servers to compute a verification result. We are designed to avoid storing raw secrets, and guest verification data is designed not to be persisted.</li>
+                <li><strong>Logged-in Users:</strong> If you save a certificate, we store the payload, headers, hashes, and verification status to provide history and verification links.</li>
               </ul>
             </section>
 
             <section className="mb-8">
               <h2 className="text-xl font-bold text-slate-900 mb-4">2. Payment Information</h2>
               <p className="mb-4">
-                Payments are processed by our third-party provider, <strong>Dodo Payments</strong>. We do not store your credit card information or billing details on our servers.
+                Payments are processed by our third-party provider, <strong>Dodo Payments</strong>. We are designed not to store your credit card information or billing details on our servers.
               </p>
             </section>
 
             <section className="mb-8">
-              <h2 className="text-xl font-bold text-slate-900 mb-4">3. Local Storage</h2>
+              <h2 className="text-xl font-bold text-slate-900 mb-4">3. Browser Storage</h2>
               <p className="mb-4">
-                We use your browser&apos;s Local Storage to remember your Pro verification email so you do not have to re-verify it on every visit. This data stays on your device.
+                We may use browser storage for non-sensitive preferences. Subscription access is tied to your account in our database.
               </p>
             </section>
 

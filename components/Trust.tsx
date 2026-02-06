@@ -9,25 +9,25 @@ const items = [
   {
     title: "Hash-based integrity",
     description:
-      "Designed to compute SHA-256 hashes of raw payloads and canonical JSON to make certificates tamper-evident.",
+      "Designed to compute payload hashes and store verification metadata to make certificates tamper-evident.",
     icon: <Hash className="w-5 h-5" />,
   },
   {
     title: "Optional signature checks",
     description:
-      "Designed to verify Stripe and Razorpay signatures server-side when you provide your secret.",
+      "Designed to verify provider signatures server-side when you provide your secret.",
     icon: <ShieldCheck className="w-5 h-5" />,
   },
   {
     title: "Scoped access control",
     description:
-      "Designed to scope saved certificates to your account using Supabase row-level security.",
+      "Designed to scope saved certificates to your account using access controls.",
     icon: <Lock className="w-5 h-5" />,
   },
   {
     title: "Reliable infrastructure",
     description:
-      "Built on Vercel and Supabase and designed for dependable uptime.",
+      "Built on Vercel and Supabase and designed for reliable operation.",
     icon: <Server className="w-5 h-5" />,
   },
 ];
@@ -43,7 +43,7 @@ const Trust: React.FC = () => {
             viewport={{ once: true }}
             className="text-4xl md:text-5xl font-bold mb-4"
           >
-            Built for Audit-Grade Proof
+            Built for Audit-Ready Records
           </motion.h2>
           <motion.p
             initial={{ opacity: 0 }}

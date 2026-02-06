@@ -12,7 +12,7 @@ export default function ContactPage() {
             Contact Us
           </h1>
           <p className="text-gray-400 text-lg">
-            Have questions about enterprise plans or need support? Reach out directly.
+            Have questions about team plans or need support? Reach out directly.
           </p>
 
           <div className="grid gap-6 mt-12 w-full max-w-md mx-auto">

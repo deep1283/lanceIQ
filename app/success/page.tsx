@@ -13,6 +13,7 @@ function SuccessContent() {
   const [isVerifying, setIsVerifying] = useState(true);
   const [verified, setVerified] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [needsLogin, setNeedsLogin] = useState(false);
 
   useEffect(() => {
     const verifyPayment = async () => {
@@ -26,13 +27,19 @@ function SuccessContent() {
           });
           
           const data = await res.json();
-          
-          if (data.paid && data.email) {
-            // Save to localStorage to unlock Pro
-            localStorage.setItem("lanceiq_pro_email", data.email);
-            setVerified(true);
+          if (!res.ok) {
+            throw new Error(data?.error || "Failed to verify payment.");
+          }
+
+          if (data.paid) {
+            if (data.appliedToWorkspaces && data.appliedToWorkspaces > 0) {
+              setVerified(true);
+            } else {
+              setNeedsLogin(true);
+              setError("Payment verified. Please log in to apply Pro to your workspace.");
+            }
           } else {
-            setError("Could not verify payment. Please try verifying with your email on the home page.");
+            setError(data.message || "Could not verify payment. Please try verifying with your email on the home page.");
           }
         } catch (err) {
           console.error(err);
@@ -85,10 +92,10 @@ function SuccessContent() {
               {error || "Please verify your purchase on the home page using your email."}
             </p>
             <Link
-              href="/tool"
+              href={needsLogin ? "/login" : "/"}
               className="inline-block bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-lg font-medium transition-colors"
             >
-              Return to Home
+              {needsLogin ? "Log In to Activate" : "Return to Home"}
             </Link>
           </>
         )}

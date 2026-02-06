@@ -1,6 +1,7 @@
-import { dodo } from '@/lib/dodo';
+import { dodo, resolvePlanFromProductId } from '@/lib/dodo';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createClient as createServerClient } from '@/utils/supabase/server';
 
 // Use service role for verification
 const supabaseAdmin = createClient(
@@ -10,7 +11,7 @@ const supabaseAdmin = createClient(
 
 export async function POST(request: NextRequest) {
   try {
-    const { email } = await request.json();
+    const { email, workspaceId } = await request.json();
 
     if (!email || typeof email !== 'string') {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 });
@@ -25,11 +26,62 @@ export async function POST(request: NextRequest) {
       .eq('email', normalizedEmail)
       .single();
 
+    const supabaseAuth = await createServerClient();
+    const { data: { user } } = await supabaseAuth.auth.getUser();
+
+    const applyPlanToWorkspaces = async (plan: 'pro' | 'team' = 'pro', customerId?: string) => {
+      if (!user) return 0;
+
+      let workspaceIds: string[] = [];
+
+      if (workspaceId) {
+        const { data: membership } = await supabaseAdmin
+          .from('workspace_members')
+          .select('workspace_id')
+          .eq('workspace_id', workspaceId)
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (membership?.workspace_id) {
+          workspaceIds = [workspaceId];
+        }
+      }
+
+      if (workspaceIds.length === 0) {
+        const { data: memberships } = await supabaseAdmin
+          .from('workspace_members')
+          .select('workspace_id')
+          .eq('user_id', user.id);
+
+        workspaceIds = memberships?.map((m) => m.workspace_id) ?? [];
+      }
+
+      if (workspaceIds.length === 0) return 0;
+
+      const updatePayload: Record<string, unknown> = {
+        plan,
+        subscription_status: 'active',
+      };
+
+      if (customerId) {
+        updatePayload.billing_customer_id = customerId;
+      }
+
+      await supabaseAdmin
+        .from('workspaces')
+        .update(updatePayload)
+        .in('id', workspaceIds);
+
+      return workspaceIds.length;
+    };
+
     if (proUser) {
+      const appliedToWorkspaces = await applyPlanToWorkspaces('pro');
       return NextResponse.json({ 
         paid: true, 
         message: 'Payment verified! Watermark removed.',
-        source: 'database'
+        source: 'database',
+        appliedToWorkspaces
       });
     }
 
@@ -55,10 +107,18 @@ export async function POST(request: NextRequest) {
           { onConflict: 'email' }
         );
 
+      const resolvedPlan = resolvePlanFromProductId((payments.items[0] as { product_id?: string }).product_id);
+      const plan = resolvedPlan ?? 'pro';
+      if (!resolvedPlan) {
+        console.warn('Unknown Dodo product_id for verify:', (payments.items[0] as { product_id?: string }).product_id);
+      }
+      const appliedToWorkspaces = await applyPlanToWorkspaces(plan, customer.customer_id);
+
       return NextResponse.json({ 
         paid: true, 
         message: 'Payment verified! Watermark removed.',
-        source: 'dodo_api'
+        source: 'dodo_api',
+        appliedToWorkspaces
       });
     }
 

@@ -30,11 +30,11 @@ export default function SecurityPage() {
               <ul className="space-y-3 text-slate-600">
                 <li className="flex items-start">
                   <span className="mr-2 text-green-500">✓</span>
-                  <span><strong>In Transit:</strong> The system is designed to use HTTPS/TLS to protect data between your browser and our servers.</span>
+                  <span><strong>In Transit:</strong> The system is designed to use HTTPS to protect data between your browser and our servers.</span>
                 </li>
                 <li className="flex items-start">
                   <span className="mr-2 text-green-500">✓</span>
-                  <span><strong>At Rest:</strong> Stored certificates are hosted in Supabase with provider-managed encryption at rest.</span>
+                  <span><strong>At Rest:</strong> Stored certificates are hosted in Supabase and are designed to be protected by provider security controls.</span>
                 </li>
                 <li className="flex items-start">
                   <span className="mr-2 text-green-500">✓</span>
@@ -52,15 +52,11 @@ export default function SecurityPage() {
               <ul className="space-y-3 text-slate-600">
                 <li className="flex items-start">
                   <span className="mr-2 text-green-500">✓</span>
-                  <span><strong>Account Scoping:</strong> Saved certificates are designed to be tied to your account and protected by row-level security.</span>
+                  <span><strong>Account Scoping:</strong> Saved certificates are designed to be tied to your account and protected by database access controls.</span>
                 </li>
                 <li className="flex items-start">
                   <span className="mr-2 text-green-500">✓</span>
                   <span><strong>Integrity Proof:</strong> Each certificate is designed to store hashes and verification metadata.</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="mr-2 text-green-500">✓</span>
-                  <span><strong>Abuse Protection:</strong> Verification endpoints are designed to be rate-limited to reduce abuse.</span>
                 </li>
               </ul>
             </div>
@@ -75,12 +71,12 @@ export default function SecurityPage() {
               <h2 className="text-2xl font-bold text-slate-900">Infrastructure</h2>
             </div>
             <p className="text-slate-600 mb-6">
-              We run on vetted infrastructure providers and are designed to follow a least-privilege approach for data access.
+              We run on established infrastructure providers and are designed to follow a least-privilege approach for data access.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                <div>
                   <h3 className="font-semibold text-slate-900 mb-2">Cloud Providers</h3>
-                  <p className="text-slate-600">We leverage Vercel and Supabase for hosting and database services, designed for high availability and physical security.</p>
+                  <p className="text-slate-600">We use Vercel and Supabase for hosting and database services, and design for operational resilience.</p>
                </div>
                <div>
                   <h3 className="font-semibold text-slate-900 mb-2">Data Processing</h3>

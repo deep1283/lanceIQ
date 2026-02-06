@@ -11,12 +11,12 @@ const BlogPreview = dynamic(() => import('../components/BlogPreview'));
 const Footer = dynamic(() => import('../components/Footer'));
 
 export const metadata: Metadata = {
-  title: 'LanceIQ – Webhook Delivery Proof & Verification Certificates',
-  description: 'Generate verifiable PDF certificates for webhook events with hashes, optional signature checks, and QR-based proof links. Built for audits, disputes, and client reporting.',
-  keywords: 'webhook proof, webhook delivery certificate, signature verification, audit trail, webhook pdf generator, stripe webhook proof, api event documentation',
+  title: 'LanceIQ – Webhook Delivery Certificates & Verification',
+  description: 'Generate PDF certificates for webhook events with hashes, optional signature checks, and QR-based verification links. Designed for audits, disputes, and client reporting.',
+  keywords: 'webhook delivery certificate, signature verification, audit trail, webhook pdf generator, stripe webhook verification, api event documentation',
   openGraph: {
-    title: 'LanceIQ – Webhook Proof & Verification',
-    description: 'Turn webhook events into permanent, verifiable PDF records with hashes, signature checks, and proof links.',
+    title: 'LanceIQ – Webhook Certificates & Verification',
+    description: 'Turn webhook events into verifiable PDF records with hashes, signature checks, and verification links.',
     type: 'website',
   },
 };
@@ -39,7 +39,7 @@ export default function Home() {
               "priceCurrency": "USD",
               "description": "Free tier available. Paid plans remove watermarks."
             },
-            "description": "Generate verifiable PDF certificates for webhook events with hashes, optional signature checks, and proof links."
+            "description": "Generate PDF certificates for webhook events with hashes, optional signature checks, and verification links."
           })
         }}
       />
