@@ -16,6 +16,7 @@ export interface CertificateData {
   headers: Record<string, string>;
   payload_hash: string;
   is_pro: boolean;
+  status_code?: number;
 
   // Server-issued token from `/api/verify-signature` (optional)
   verificationToken?: string;
@@ -101,6 +102,7 @@ export async function saveCertificate(data: CertificateData) {
     report_id: data.report_id,
     payload: data.payload,
     headers: data.headers,
+    status_code: data.status_code ?? null,
     
     // Store legacy hash and new raw_body_sha256 (mapped from payload_hash which comes from client's raw input)
     payload_hash: data.payload_hash, 

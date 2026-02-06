@@ -148,7 +148,7 @@ export default function Home() {
         setJsonInput(JSON.stringify(payload, null, 2));
         setHeadersInput(lines);
         setHash(hashValue);
-        setStatus(200);
+        setStatus(typeof cert.status_code === 'number' ? cert.status_code : 200);
         setIsExistingCertificate(true);
 
         setVerificationResult({
@@ -364,6 +364,7 @@ export default function Home() {
             headers: parsedHeaders,
             payload_hash: hash,
             is_pro: isPro,
+            status_code: status,
             verificationToken: verificationResult?.verificationToken,
           });
           if (!saveResult.success) {
