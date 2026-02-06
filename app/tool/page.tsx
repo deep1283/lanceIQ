@@ -7,6 +7,7 @@ import { CertificateTemplate } from "@/components/CertificateTemplate";
 import { Download, RefreshCw, AlertTriangle, CheckCircle, User, LogIn, Lock, ShieldCheck } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { saveCertificate } from "@/app/actions/certificates";
+import { checkProStatus } from "@/app/actions/subscription";
 import Link from "next/link";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { VerifySignatureModal } from "@/components/VerifySignatureModal";
@@ -45,21 +46,29 @@ export default function Home() {
   const [showSigVerifyModal, setShowSigVerifyModal] = useState(false);
   const [verificationResult, setVerificationResult] = useState<VerificationApiResponse | null>(null);
 
+  const syncProStatus = async () => {
+    const promoActive = Date.now() <= PROMO_END_LOCAL.getTime();
+    setIsPromoActive(promoActive);
+
+    try {
+      const { isPro: dbPro } = await checkProStatus();
+      const combined = promoActive || dbPro;
+      setIsPro(combined);
+      return combined;
+    } catch (err) {
+      console.error("Failed to sync pro status:", err);
+      setIsPro(promoActive);
+      return promoActive;
+    }
+  };
+
   // Hydration fix for UUID and Timestamp + Auth check
   useEffect(() => {
     setTimestamp(new Date().toISOString());
     setReportId(uuidv4());
     
     const updatePromoState = () => {
-      const promoActive = Date.now() <= PROMO_END_LOCAL.getTime();
-      setIsPromoActive(promoActive);
-
-      // Check if user has purchased (from localStorage)
-      const proEmail = localStorage.getItem('lanceiq_pro_email');
-      if (proEmail) {
-        setVerifyEmail(proEmail);
-      }
-      setIsPro(promoActive || Boolean(proEmail));
+      void syncProStatus();
     };
 
     updatePromoState();
@@ -78,8 +87,9 @@ export default function Home() {
     checkAuth();
     
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null);
+      await syncProStatus();
     });
     
     return () => {
@@ -255,7 +265,7 @@ export default function Home() {
       const x = (pageWidth - renderWidth) / 2;
       const y = (pageHeight - renderHeight) / 2;
       pdf.addImage(imgData, 'JPEG', x, y, renderWidth, renderHeight);
-      pdf.save(`webhook-proof-${newReportId}.pdf`);
+      pdf.save(`webhook-certificate-${newReportId}.pdf`);
       
       // Save to database if user is logged in
       if (user) {
@@ -316,9 +326,13 @@ export default function Home() {
       const data = await res.json();
       
       if (data.paid) {
-        setIsPro(true);
-        localStorage.setItem('lanceiq_pro_email', verifyEmail);
-        setVerifyMessage("✓ Purchase verified! Watermark removed.");
+        if (!user) {
+          setVerifyMessage("Payment verified. Please log in to unlock Pro.");
+          return;
+        }
+
+        const proNow = await syncProStatus();
+        setVerifyMessage(proNow ? "✓ Purchase verified! Pro unlocked." : "Purchase verified. Pro will activate shortly.");
         setShowVerifyModal(false);
       } else {
         setVerifyMessage(data.message || "No purchase found for this email");

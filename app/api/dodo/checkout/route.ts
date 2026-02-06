@@ -12,6 +12,8 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const workspaceId = searchParams.get('workspace_id');
+  const planParam = searchParams.get('plan');
+  const plan = planParam === 'team' ? 'team' : 'pro';
   
   if (!workspaceId) {
     return NextResponse.json({ error: 'Missing workspace_id' }, { status: 400 });
@@ -39,7 +41,8 @@ export async function GET(req: NextRequest) {
       workspaceId,
       userId: user.id,
       email,
-      returnUrl
+      returnUrl,
+      plan
     });
 
     return NextResponse.redirect(checkoutUrl);

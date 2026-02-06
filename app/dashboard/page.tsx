@@ -57,7 +57,7 @@ export default async function DashboardPage() {
           <div className="bg-white rounded-xl p-12 border border-slate-200 text-center">
             <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-slate-900 mb-2">No certificates yet</h3>
-            <p className="text-slate-500 mb-6">Generate your first webhook proof to see it here.</p>
+            <p className="text-slate-500 mb-6">Generate your first webhook certificate to see it here.</p>
             <Link
               href="/tool"
               className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"

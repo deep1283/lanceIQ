@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { verifyWebhookSignature } from '@/lib/dodo';
+import { resolvePlanFromProductId, verifyWebhookSignature } from '@/lib/dodo';
 import { logAuditAction, AUDIT_ACTIONS } from '@/utils/audit';
 
 // Use Service Role for admin updates
@@ -35,11 +35,17 @@ export async function POST(req: NextRequest) {
     // We need to map Dodo IDs to our DB
     // Common fields: data.subscription_id, data.customer_id, data.status
     
-    if (type === 'subscription.created') {
+    // Support both .created and .active (some versions of Dodo use active for initial success)
+    if (type === 'subscription.created' || type === 'subscription.active') {
       if (!workspaceId) {
         throw new Error('Missing workspace_id in metadata');
       }
       const resolvedWorkspaceId = workspaceId;
+      const resolvedPlan = resolvePlanFromProductId(data.product_id);
+      const plan = resolvedPlan ?? 'pro';
+      if (!resolvedPlan) {
+        console.warn('Unknown Dodo product_id for subscription.created:', data.product_id);
+      }
       await supabase.from('subscriptions').upsert({
         workspace_id: resolvedWorkspaceId,
         dodo_subscription_id: data.subscription_id,
@@ -55,7 +61,7 @@ export async function POST(req: NextRequest) {
       // Update Workspace
       await supabase.from('workspaces')
         .update({ 
-            plan: 'pro',
+            plan,
             subscription_status: normalizeWorkspaceStatus(data.status) ?? 'active',
             subscription_current_period_end: toIsoDate(data.current_period_end),
             billing_customer_id: data.customer_id
@@ -69,7 +75,7 @@ export async function POST(req: NextRequest) {
         details: {
           subscription_id: data.subscription_id,
           status: normalizeWorkspaceStatus(data.status) ?? 'active',
-          plan: 'pro',
+          plan,
           current_period_end: toIsoDate(data.current_period_end),
         },
       });
@@ -86,6 +92,10 @@ export async function POST(req: NextRequest) {
          const subscriptionStatus = normalizeSubscriptionStatus(data.status) ?? 'active';
          const periodEndIso = toIsoDate(data.current_period_end);
          const cancelAtPeriodEnd = Boolean(data.cancel_at_period_end);
+         const resolvedPlan = resolvePlanFromProductId(data.product_id);
+         if (!resolvedPlan) {
+           console.warn('Unknown Dodo product_id for subscription.updated:', data.product_id);
+         }
 
          await supabase.from('subscriptions').update({
            status: subscriptionStatus,
@@ -96,7 +106,7 @@ export async function POST(req: NextRequest) {
          // Sync Workspace Status
          let workspaceStatus = normalizeWorkspaceStatus(data.status) ?? 'active';
          const isWithinPeriod = isFutureIso(periodEndIso);
-         const plan = shouldBePro(workspaceStatus, isWithinPeriod) ? 'pro' : 'free';
+         const plan = shouldBePro(workspaceStatus, isWithinPeriod) ? (resolvedPlan ?? 'pro') : 'free';
          if (plan === 'free') {
            workspaceStatus = 'free';
          }
@@ -123,6 +133,10 @@ export async function POST(req: NextRequest) {
          const subscriptionStatus = normalizeSubscriptionStatus(data.status) ?? 'active';
          const periodEndIso = toIsoDate(data.current_period_end);
          const cancelAtPeriodEnd = Boolean(data.cancel_at_period_end);
+         const resolvedPlan = resolvePlanFromProductId(data.product_id);
+         if (!resolvedPlan) {
+           console.warn('Unknown Dodo product_id for subscription.updated (no sub):', data.product_id);
+         }
 
          await supabase.from('subscriptions').upsert({
            workspace_id: workspaceId,
@@ -138,7 +152,7 @@ export async function POST(req: NextRequest) {
 
          let workspaceStatus = normalizeWorkspaceStatus(data.status) ?? 'active';
          const isWithinPeriod = isFutureIso(periodEndIso);
-         const plan = shouldBePro(workspaceStatus, isWithinPeriod) ? 'pro' : 'free';
+         const plan = shouldBePro(workspaceStatus, isWithinPeriod) ? (resolvedPlan ?? 'pro') : 'free';
          if (plan === 'free') {
            workspaceStatus = 'free';
          }

@@ -65,7 +65,7 @@ export default function PricingPage() {
             Transparent Pricing
           </h1>
           <p className="text-lg text-slate-400 max-w-2xl mx-auto">
-            Start free, upgrade when you need audit-grade certificates and long-term history.
+            Start free, upgrade when you need audit-ready certificates and long-term history.
           </p>
         </div>
 

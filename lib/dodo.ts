@@ -8,6 +8,7 @@ const DODO_API_URL = process.env.DODO_PAYMENTS_MODE === 'live'
 const DODO_API_KEY = process.env.DODO_PAYMENTS_API_KEY!;
 const DODO_WEBHOOK_SECRET = process.env.DODO_PAYMENTS_WEBHOOK_SECRET!;
 const DODO_PRODUCT_ID = process.env.DODO_PRODUCT_ID!;
+const DODO_TEAM_PRODUCT_ID = process.env.DODO_TEAM_PRODUCT_ID;
 
 if (!DODO_API_KEY || !DODO_WEBHOOK_SECRET || !DODO_PRODUCT_ID) {
   console.warn('⚠️ Missing Dodo Payments environment variables');
@@ -38,10 +39,16 @@ export interface CheckoutSessionParams {
   userId: string;
   email: string;
   returnUrl: string;
+  plan?: 'pro' | 'team';
 }
 
 export async function createCheckoutSession(params: CheckoutSessionParams) {
-  const { workspaceId, userId, email, returnUrl } = params;
+  const { workspaceId, userId, email, returnUrl, plan = 'pro' } = params;
+
+  const productId = plan === 'team' ? DODO_TEAM_PRODUCT_ID : DODO_PRODUCT_ID;
+  if (!productId) {
+    throw new Error(`Missing Dodo product ID for plan: ${plan}`);
+  }
 
   try {
     const response = await fetch(`${DODO_API_URL}/checkout/sessions`, {
@@ -51,7 +58,7 @@ export async function createCheckoutSession(params: CheckoutSessionParams) {
         'Authorization': `Bearer ${DODO_API_KEY}`
       },
       body: JSON.stringify({
-        product_id: DODO_PRODUCT_ID,
+        product_id: productId,
         quantity: 1,
         payment_link: true, // Generate a payment link
         customer: {
@@ -77,6 +84,13 @@ export async function createCheckoutSession(params: CheckoutSessionParams) {
     console.error('Create Checkout Session Failed:', error);
     throw error;
   }
+}
+
+export function resolvePlanFromProductId(productId?: string | null): 'pro' | 'team' | null {
+  if (!productId) return null;
+  if (DODO_TEAM_PRODUCT_ID && productId === DODO_TEAM_PRODUCT_ID) return 'team';
+  if (productId === DODO_PRODUCT_ID) return 'pro';
+  return null;
 }
 
 export function verifyWebhookSignature(
