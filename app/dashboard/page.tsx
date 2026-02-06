@@ -154,13 +154,22 @@ export default async function DashboardPage() {
                       )}
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <Link
-                        href={`/tool?id=${cert.report_id}`}
-                        className="inline-flex items-center gap-1 text-slate-600 hover:text-indigo-600 text-sm font-medium transition-colors"
-                      >
-                        <Download className="w-3 h-3" />
-                        Open
-                      </Link>
+                      <div className="inline-flex items-center gap-3">
+                        <Link
+                          href={`/tool?id=${cert.report_id}`}
+                          className="inline-flex items-center gap-1 text-slate-600 hover:text-indigo-600 text-sm font-medium transition-colors"
+                        >
+                          <Download className="w-3 h-3" />
+                          Open
+                        </Link>
+                        <a
+                          href={`/tool?id=${cert.report_id}&download=1`}
+                          className="inline-flex items-center gap-1 text-slate-600 hover:text-indigo-600 text-sm font-medium transition-colors"
+                        >
+                          <Download className="w-3 h-3" />
+                          PDF
+                        </a>
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -54,14 +54,21 @@ export default async function SettingsPage() {
 
   // Get audit logs (Team only)
   let auditLogs: AuditLog[] | null = null;
+  let members: any[] | null = null;
+
   if (workspace.plan === 'team') {
-    const { data } = await supabase
+    const { data: logsData } = await supabase
       .from('audit_logs')
       .select('*')
       .eq('workspace_id', workspace.id)
       .order('created_at', { ascending: false })
       .limit(50);
-    auditLogs = data || [];
+    auditLogs = logsData || [];
+
+    // Fetch members using RPC
+    const { data: membersData } = await supabase
+      .rpc('get_workspace_members', { lookup_workspace_id: workspace.id });
+    members = membersData || [];
   }
 
   return (
@@ -69,6 +76,8 @@ export default async function SettingsPage() {
       workspace={workspace} 
       initialSettings={alertSettings} 
       initialAuditLogs={auditLogs || []}
+      initialMembers={members || []}
+      currentUserId={user.id}
     />
   );
 }

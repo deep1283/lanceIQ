@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateAlertSettings } from '@/app/actions/alert-settings';
+import { inviteMember, removeMember } from '@/app/actions/members';
 
 interface Workspace {
   id: string;
@@ -31,14 +32,25 @@ interface AuditLog {
   created_at: string;
 }
 
+interface Member {
+  user_id: string;
+  email: string;
+  role: 'owner' | 'admin' | 'member';
+  joined_at: string;
+}
+
 export default function SettingsClient({ 
   workspace, 
   initialSettings,
-  initialAuditLogs
+  initialAuditLogs,
+  initialMembers,
+  currentUserId
 }: { 
   workspace: Workspace, 
   initialSettings: AlertSetting | null,
-  initialAuditLogs: AuditLog[]
+  initialAuditLogs: AuditLog[],
+  initialMembers: Member[],
+  currentUserId: string
 }) {
   const router = useRouter();
   const isPaid = workspace.plan !== 'free';
@@ -46,7 +58,7 @@ export default function SettingsClient({
   const isPastDue = workspace.subscription_status === 'past_due';
   const canUseAlerts = isTeam && (workspace.subscription_status === 'active' || isPastDue);
 
-  const [activeTab, setActiveTab] = useState<'alerts' | 'audit'>('alerts');
+  const [activeTab, setActiveTab] = useState<'alerts' | 'audit' | 'members'>('alerts');
 
   const [settings, setSettings] = useState<AlertSetting>(initialSettings || {
     channel: 'email',
@@ -56,6 +68,11 @@ export default function SettingsClient({
     critical_fail_count: 3
   });
   
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviting, setInviting] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
+
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
@@ -76,9 +93,39 @@ export default function SettingsClient({
     }
     
     setSaving(false);
-    // Router refresh happens in server action via revalidatePath, 
-    // but calling it here again doesn't hurt to sync client cache if needed.
+    // Router refresh happens in server action via revalidatePath
     router.refresh();
+  }
+
+  async function handleInvite(e: React.FormEvent) {
+    e.preventDefault();
+    if (!inviteEmail) return;
+    
+    setInviting(true);
+    setInviteError(null);
+    setInviteSuccess(null);
+
+    const result = await inviteMember(inviteEmail, workspace.id);
+
+    if (result.error) {
+      setInviteError(result.error);
+    } else {
+      setInviteSuccess("Member added successfully!");
+      setInviteEmail('');
+      router.refresh();
+    }
+    setInviting(false);
+  }
+
+  async function handleRemove(userId: string) {
+    if (!confirm("Are you sure you want to remove this member?")) return;
+    
+    const result = await removeMember(userId, workspace.id);
+    if (result.error) {
+      alert(result.error);
+    } else {
+      router.refresh();
+    }
   }
 
   return (
@@ -104,7 +151,7 @@ export default function SettingsClient({
           <div>
             <p className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Data Retention</p>
             <p className="text-2xl font-mono text-white">
-              {workspace.plan === 'free' ? '24 Hours' : workspace.plan === 'team' ? '30 Days' : '7 Days'}
+              {workspace.plan === 'free' ? '24 Hours' : workspace.plan === 'team' ? '3 Years' : '1 Year'}
             </p>
           </div>
           <div>
@@ -119,7 +166,7 @@ export default function SettingsClient({
           <div className="mt-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg p-6 text-white flex justify-between items-center shadow-lg">
              <div>
                <h3 className="font-bold text-lg">Upgrade to Team ($79/mo)</h3>
-               <p className="text-blue-100 text-sm mt-1">Unlock 30-day retention and Smart Alerts.</p>
+               <p className="text-blue-100 text-sm mt-1">Unlock 3-year retention, Audit Logs, and Multi-user access.</p>
              </div>
              <a 
                href={`/api/dodo/checkout?workspace_id=${workspace.id}&plan=team`}
@@ -158,6 +205,16 @@ export default function SettingsClient({
           }`}
         >
           Audit Logs
+        </button>
+        <button
+          onClick={() => setActiveTab('members')}
+          className={`pb-3 text-sm font-medium transition-colors border-b-2 ${
+            activeTab === 'members' 
+              ? 'border-blue-500 text-blue-400' 
+              : 'border-transparent text-zinc-400 hover:text-zinc-200'
+          }`}
+        >
+          Team Members
         </button>
       </div>
 
@@ -245,7 +302,7 @@ export default function SettingsClient({
             </div>
           )}
         </div>
-      ) : (
+      ) : activeTab === 'audit' ? (
         /* Audit Logs Tab */
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-sm relative">
           <div className="p-6 border-b border-zinc-800 flex justify-between items-center">
@@ -314,6 +371,99 @@ export default function SettingsClient({
               </div>
             </div>
           )}
+        </div>
+      ) : (
+        /* Team Members Tab */
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm relative">
+           <h2 className="text-xl font-semibold text-white mb-6">Team Members</h2>
+           
+           {!isTeam && (
+             <div className="absolute inset-0 flex items-center justify-center z-10 bg-zinc-950/90 rounded-xl backdrop-blur-sm">
+                <div className="text-center p-8 border border-zinc-800 rounded-xl bg-zinc-950 max-w-sm">
+                   <h3 className="text-xl font-bold text-white mb-2">Team Management Locked</h3>
+                   <p className="text-zinc-400 mb-6 text-sm">Collaborate with your team by upgrading to the Team plan.</p>
+                   <a href={`/api/dodo/checkout?workspace_id=${workspace.id}&plan=team`} className="block w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-md transition-colors">
+                      Unlock for $79/mo
+                   </a>
+                </div>
+             </div>
+           )}
+
+           <div className={`${!isTeam && 'opacity-20 pointer-events-none'}`}>
+             {/* Invite Form */}
+             <div className="mb-8 bg-zinc-950 p-4 rounded-lg border border-zinc-800">
+               <h3 className="text-sm font-medium text-zinc-300 mb-4">Invite New Member</h3>
+               <form onSubmit={handleInvite} className="flex gap-3">
+                 <input 
+                   type="email" 
+                   value={inviteEmail}
+                   onChange={(e) => setInviteEmail(e.target.value)}
+                   placeholder="colleague@example.com"
+                   required
+                   className="flex-1 bg-zinc-900 border border-zinc-700 rounded-md px-4 py-2 text-zinc-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                 />
+                 <button 
+                   type="submit" 
+                   disabled={inviting}
+                   className="bg-zinc-100 hover:bg-white text-zinc-900 px-4 py-2 rounded-md font-medium transition-colors disabled:opacity-50"
+                 >
+                   {inviting ? 'Adding...' : 'Add Member'}
+                 </button>
+               </form>
+               {inviteError && <p className="text-red-400 text-sm mt-2">{inviteError}</p>}
+               {inviteSuccess && <p className="text-green-400 text-sm mt-2">{inviteSuccess}</p>}
+               <p className="text-xs text-zinc-500 mt-2">
+                 Note: The user must already be signed up for LanceIQ.
+               </p>
+             </div>
+
+             {/* Member List */}
+             <div className="overflow-hidden border border-zinc-800 rounded-lg">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-zinc-950 text-zinc-400">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">Email</th>
+                      <th className="px-4 py-3 font-medium">Role</th>
+                      <th className="px-4 py-3 font-medium">Joined</th>
+                      <th className="px-4 py-3 font-medium text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800">
+                    {initialMembers.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-8 text-center text-zinc-500">
+                          No other members found.
+                        </td>
+                      </tr>
+                    ) : (
+                      initialMembers.map((member) => (
+                        <tr key={member.user_id} className="hover:bg-zinc-800/30">
+                          <td className="px-4 py-3 text-zinc-200">{member.email}</td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                              member.role === 'owner' ? 'bg-purple-900/30 text-purple-400' : 'bg-zinc-800 text-zinc-300'
+                            }`}>
+                              {member.role}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-zinc-500">{new Date(member.joined_at).toLocaleDateString()}</td>
+                          <td className="px-4 py-3 text-right">
+                            {member.user_id !== currentUserId && (
+                              <button 
+                                onClick={() => handleRemove(member.user_id)}
+                                className="text-red-400 hover:text-red-300 text-xs font-medium"
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+             </div>
+           </div>
         </div>
       )}
     </div>

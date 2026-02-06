@@ -60,7 +60,7 @@ async function sendEmailAlert(opts: {
   const { setting, workspaceName, provider, reason, eventId } = opts;
 
   const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return { ok: false, error: "Missing RESEND_API_KEY" };
+  if (!apiKey) return { ok: false as const, error: "Missing RESEND_API_KEY" };
 
   const resend = new Resend(apiKey);
   const siteUrl = getSiteUrl();
@@ -86,9 +86,10 @@ async function sendEmailAlert(opts: {
       (response as { data?: { id?: string } }).data?.id ||
       (response as { id?: string }).id ||
       undefined;
-    return { ok: true, response, providerMessageId };
+    // Cast response to satisfy Record<string, unknown>
+    return { ok: true as const, response: response as unknown as Record<string, unknown>, providerMessageId };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    return { ok: false as const, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -131,11 +132,11 @@ async function sendWebhookAlert(opts: {
     });
     if (!response.ok) {
       const text = await response.text();
-      return { ok: false, error: `Webhook failed: ${response.status} ${text}` };
+      return { ok: false as const, error: `Webhook failed: ${response.status} ${text}` };
     }
-    return { ok: true, response: { status: response.status } };
+    return { ok: true as const, response: { status: response.status } };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    return { ok: false as const, error: err instanceof Error ? err.message : String(err) };
   }
 }
 

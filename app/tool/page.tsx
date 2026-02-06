@@ -9,6 +9,7 @@ import { createClient } from "@/utils/supabase/client";
 import { saveCertificate } from "@/app/actions/certificates";
 import { checkProStatus } from "@/app/actions/subscription";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { VerifySignatureModal } from "@/components/VerifySignatureModal";
 import type { VerificationApiResponse } from "@/lib/signature-verification";
@@ -17,12 +18,18 @@ import AppNavbar from "@/components/AppNavbar";
 const PROMO_END_LOCAL = new Date(2026, 1, 6, 23, 59, 59, 999);
 
 export default function Home() {
+  const searchParams = useSearchParams();
+  const certificateId = searchParams.get('id');
+  const autoDownload = searchParams.get('download') === '1';
   const [jsonInput, setJsonInput] = useState<string>("{\n  \"event\": \"payment.succeeded\",\n  \"amount\": 2000,\n  \"currency\": \"usd\"\n}");
   const [headersInput, setHeadersInput] = useState<string>("Stripe-Signature: t=123,v1=...\nContent-Type: application/json");
   const [status, setStatus] = useState<number>(200);
   const [timestamp, setTimestamp] = useState<string>("");
   const [reportId, setReportId] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoadingCertificate, setIsLoadingCertificate] = useState(false);
+  const [isExistingCertificate, setIsExistingCertificate] = useState(false);
+  const [autoDownloaded, setAutoDownloaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   // Plan status
@@ -70,8 +77,10 @@ export default function Home() {
 
   // Hydration fix for UUID and Timestamp + Auth check
   useEffect(() => {
-    setTimestamp(new Date().toISOString());
-    setReportId(uuidv4());
+    if (!certificateId) {
+      setTimestamp(new Date().toISOString());
+      setReportId(uuidv4());
+    }
     
     const updatePromoState = () => {
       void syncProStatus();
@@ -104,44 +113,116 @@ export default function Home() {
         window.clearTimeout(promoTimeout);
       }
     };
-  }, [supabase]);
+  }, [supabase, certificateId]);
+
+  useEffect(() => {
+    if (!certificateId) {
+      setIsExistingCertificate(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingCertificate(true);
+    setError(null);
+
+    fetch(`/api/certificates/${certificateId}`)
+      .then(async (res) => {
+        if (!res.ok) {
+          const payload = await res.json().catch(() => ({}));
+          throw new Error(payload.error || "Unable to load certificate.");
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (cancelled) return;
+        const cert = data.certificate;
+        const headers = (cert.headers ?? {}) as Record<string, string>;
+        const payload = cert.payload ?? {};
+        const hashValue = cert.raw_body_sha256 || cert.payload_hash || cert.hash || "";
+        const lines = Object.entries(headers)
+          .map(([key, value]) => `${key}: ${value}`)
+          .join("\n");
+
+        setReportId(cert.report_id);
+        setTimestamp(cert.created_at);
+        setJsonInput(JSON.stringify(payload, null, 2));
+        setHeadersInput(lines);
+        setHash(hashValue);
+        setStatus(200);
+        setIsExistingCertificate(true);
+
+        setVerificationResult({
+          status: cert.signature_status ?? 'not_verified',
+          reason: cert.signature_status_reason ?? undefined,
+          method: cert.verification_method ?? undefined,
+          error: cert.verification_error ?? undefined,
+          secretHint: cert.signature_secret_hint ?? undefined,
+          toleranceUsedSec: cert.stripe_timestamp_tolerance_sec ?? undefined,
+          provider: cert.provider ?? 'unknown',
+          verifiedAt: cert.verified_at ?? null,
+          rawBodySha256: hashValue || '',
+        });
+      })
+      .catch((err: Error) => {
+        if (cancelled) return;
+        setError(err.message || "Unable to load certificate.");
+        setIsExistingCertificate(false);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setIsLoadingCertificate(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [certificateId]);
 
   // Generate Hash and QR Code
   useEffect(() => {
     const generateVerificationData = async () => {
       try {
-        // 1. Generate SHA-256 Hash
-        const msgBuffer = new TextEncoder().encode(jsonInput);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-        setHash(hashHex);
+        if (!isExistingCertificate) {
+          // 1. Generate SHA-256 Hash
+          const msgBuffer = new TextEncoder().encode(jsonInput);
+          const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+          const hashArray = Array.from(new Uint8Array(hashBuffer));
+          const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+          setHash(hashHex);
+        }
 
         // 2. Generate QR Code
         // In production, this would be https://lanceiq.com/verify/${reportId}
         // For local dev, we can use localhost or just the production URL structure
-        const verifyUrl = `https://lanceiq.com/verify/${reportId}`;
-        const qrUrl = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 100 });
-        setQrCodeDataUrl(qrUrl);
+        if (reportId) {
+          const verifyUrl = `https://lanceiq.com/verify/${reportId}`;
+          const qrUrl = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 100 });
+          setQrCodeDataUrl(qrUrl);
+        }
       } catch (e) {
         console.error("Error generating verification data:", e);
       }
     };
 
     generateVerificationData();
-  }, [jsonInput, reportId]);
+  }, [jsonInput, reportId, isExistingCertificate]);
 
-  const handleDownload = async () => {
+  const handleDownload = async (options?: { existing?: boolean }) => {
+    const useExisting = options?.existing ?? false;
     setIsGenerating(true);
     setError(null);
 
     // Generate fresh credentials for this new certificate
-    const newReportId = uuidv4();
-    const newTimestamp = new Date().toISOString();
+    const newReportId = useExisting ? reportId : uuidv4();
+    const newTimestamp = useExisting ? (timestamp || new Date().toISOString()) : new Date().toISOString();
     
     // Update state to match (so preview updates if they stay on page)
-    setReportId(newReportId);
-    setTimestamp(newTimestamp);
+    if (!useExisting) {
+      setReportId(newReportId);
+      setTimestamp(newTimestamp);
+    } else if (!timestamp) {
+      setTimestamp(newTimestamp);
+    }
 
     let pdfContainer: HTMLDivElement | null = null;
     let root: ReturnType<(typeof import('react-dom/client'))['createRoot']> | null = null;
@@ -273,8 +354,8 @@ export default function Home() {
       pdf.addImage(imgData, 'JPEG', x, y, renderWidth, renderHeight);
       pdf.save(`webhook-certificate-${newReportId}.pdf`);
       
-      // Save to database if user is logged in
-      if (user) {
+      // Save to database if user is logged in (only for new certificates)
+      if (user && !useExisting) {
         try {
           const parsedPayload = JSON.parse(jsonInput);
           const saveResult = await saveCertificate({
@@ -307,6 +388,13 @@ export default function Home() {
       setIsGenerating(false);
     }
   };
+
+  useEffect(() => {
+    if (!autoDownload || !isExistingCertificate || autoDownloaded || isLoadingCertificate) return;
+    if (!reportId || !timestamp) return;
+    setAutoDownloaded(true);
+    void handleDownload({ existing: true });
+  }, [autoDownload, isExistingCertificate, autoDownloaded, isLoadingCertificate, reportId, timestamp]);
 
   const parsedHeadersPreview: Record<string, string> = {};
   headersInput.split('\n').forEach(line => {
