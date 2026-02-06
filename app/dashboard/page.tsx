@@ -1,7 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { FileText, Download, Calendar, CheckCircle, ShieldCheck, ShieldAlert, AlertTriangle, Plus } from "lucide-react";
+import { FileText, Download, Calendar, CheckCircle, ShieldCheck, ShieldAlert, AlertTriangle, Plus, ExternalLink } from "lucide-react";
 import DashboardNavbar from "@/components/DashboardNavbar";
 import { DashboardClient } from "@/components/DashboardClient";
 import { checkProStatus } from "@/app/actions/subscription";
@@ -173,7 +173,7 @@ export default async function DashboardPage() {
                           href={`/tool?id=${cert.report_id}`}
                           className="inline-flex items-center gap-1 text-slate-600 hover:text-indigo-600 text-sm font-medium transition-colors"
                         >
-                          <Download className="w-3 h-3" />
+                          <ExternalLink className="w-3 h-3" />
                           Open
                         </Link>
                         <a

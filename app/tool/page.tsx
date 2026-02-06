@@ -30,6 +30,7 @@ export default function Home() {
   const [isLoadingCertificate, setIsLoadingCertificate] = useState(false);
   const [isExistingCertificate, setIsExistingCertificate] = useState(false);
   const [autoDownloaded, setAutoDownloaded] = useState(false);
+  const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   
   // Plan status
@@ -396,8 +397,16 @@ export default function Home() {
   useEffect(() => {
     if (!autoDownload || !isExistingCertificate || autoDownloaded || isLoadingCertificate) return;
     if (!reportId || !timestamp) return;
+    setDownloadNotice("Downloading PDF...");
     setAutoDownloaded(true);
-    void handleDownload({ existing: true });
+    void handleDownload({ existing: true }).finally(() => {
+      setTimeout(() => {
+        setDownloadNotice("Download ready. Returning to dashboard...");
+      }, 400);
+      setTimeout(() => {
+        window.location.href = "/dashboard";
+      }, 1400);
+    });
   }, [autoDownload, isExistingCertificate, autoDownloaded, isLoadingCertificate, reportId, timestamp]);
 
   const parsedHeadersPreview: Record<string, string> = {};
@@ -450,6 +459,11 @@ export default function Home() {
     <div className="min-h-screen bg-slate-100 font-sans pt-16">
       <AppNavbar user={user} plan={currentPlan} />
       <div className="flex flex-col md:flex-row h-[calc(100vh-4rem)]">
+      {downloadNotice && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white text-sm px-4 py-2 rounded-lg shadow-lg">
+          {downloadNotice}
+        </div>
+      )}
       {/* LEFT: Input Form */}
       <div className="w-full md:w-1/2 p-6 md:p-12 overflow-y-auto border-r border-slate-200 bg-white z-10 shadow-sm">
         <div className="max-w-xl mx-auto space-y-8">
