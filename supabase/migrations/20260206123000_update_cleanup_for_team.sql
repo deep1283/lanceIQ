@@ -13,18 +13,18 @@ BEGIN
       SELECT id FROM public.workspaces WHERE plan = 'free'
     );
 
-  -- 2. Pro Plan: Delete after 7 days
+  -- 2. Pro Plan: Delete after 1 year (365 days)
   DELETE FROM public.ingested_events
   WHERE 
-    received_at < (now() - INTERVAL '7 days')
+    received_at < (now() - INTERVAL '365 days')
     AND workspace_id IN (
       SELECT id FROM public.workspaces WHERE plan = 'pro'
     );
 
-  -- 3. Team Plan: Delete after 30 days
+  -- 3. Team Plan: Delete after 3 years (1095 days)
   DELETE FROM public.ingested_events
   WHERE 
-    received_at < (now() - INTERVAL '30 days')
+    received_at < (now() - INTERVAL '1095 days')
     AND workspace_id IN (
       SELECT id FROM public.workspaces WHERE plan = 'team'
     );

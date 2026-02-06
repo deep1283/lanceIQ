@@ -4,7 +4,7 @@ import { hashApiKey } from '@/lib/api-key';
 import { verifySignature, type Provider, detectProvider, computeRawBodySha256, type VerificationResult, extractEventId } from '@/lib/signature-verification';
 import { decrypt } from '@/lib/encryption';
 import { checkRateLimit, getRedisClient, markAndCheckDuplicate } from '@/lib/ingest-helpers';
-import { isCriticalReason, maybeSendCriticalEmailAlert, type AlertSetting } from '@/lib/alerting';
+import { isCriticalReason, maybeSendCriticalAlert, type AlertSetting } from '@/lib/alerting';
 
 // Header-based ingestion endpoint.
 // Use this for environments where putting secrets in the URL path is undesirable.
@@ -59,6 +59,38 @@ export async function POST(req: NextRequest) {
 
     if (wsError || !workspace) {
       return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
+    }
+
+    // 3.5. Enforce Monthly Limits (Plan Quota)
+    // Avoid heavy COUNT(*) on every request by caching or using estimates if scale is huge.
+    // For now, simple count is fine for <10k scale.
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    
+    // Check usage
+    const { count: usageCount, error: countError } = await supabase
+      .from('ingested_events')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspace.id)
+      .gte('received_at', startOfMonth);
+
+    if (!countError && usageCount !== null) {
+       // Import limits dynamically or fallback
+       const limits = {
+         free: 100,
+         pro: 2000,
+         team: 10000 
+       };
+       // Current plan or default to free
+       const plan = (workspace.plan || 'free') as 'free' | 'pro' | 'team';
+       const limit = limits[plan] || 100;
+       
+       if (usageCount >= limit) {
+          return NextResponse.json(
+            { error: `Monthly limit exceeded for ${plan} plan (${limit} certificates). Upgrade to accept more.` },
+            { status: 429 } // Too Many Requests
+          );
+       }
     }
 
     // 4. Process Payload
@@ -173,7 +205,7 @@ export async function POST(req: NextRequest) {
       if (alertSettings && alertSettings.length) {
         await Promise.all(
           (alertSettings as AlertSetting[]).map((setting) =>
-            maybeSendCriticalEmailAlert({
+            maybeSendCriticalAlert({
               redis,
               setting,
               workspaceName: workspace.name ?? 'Workspace',
@@ -195,10 +227,10 @@ export async function POST(req: NextRequest) {
 
 function canSendAlerts(workspace: { plan?: string | null; subscription_status?: string | null; subscription_current_period_end?: string | null }) {
   const plan = workspace.plan;
-  if (plan !== 'pro' && plan !== 'team') return false;
+  if (plan !== 'team') return false;
   const status = workspace.subscription_status;
   if (status === 'active' || status === 'past_due') return true;
-  if (workspace.subscription_current_period_end) {
+  if (status === 'canceled' && workspace.subscription_current_period_end) {
     return new Date(workspace.subscription_current_period_end).getTime() > Date.now();
   }
   return false;
