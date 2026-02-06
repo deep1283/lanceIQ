@@ -24,11 +24,6 @@ const AppNavbar: React.FC<AppNavbarProps> = ({ user }) => {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-slate-200 h-16 flex items-center justify-between px-6 shadow-sm">
       <Link href="/" className="flex items-center gap-2 font-bold text-xl tracking-tight text-slate-900">
-        <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-             <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </div>
         LanceIQ
       </Link>
 
