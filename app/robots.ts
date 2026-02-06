@@ -7,6 +7,6 @@ export default function robots(): MetadataRoute.Robots {
       allow: '/',
       disallow: '/api/',
     },
-    sitemap: 'https://www.lanceiq.com/sitemap.xml',
+    sitemap: 'https://lanceiq.com/sitemap.xml',
   };
 }

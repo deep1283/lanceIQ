@@ -4,6 +4,8 @@ import React from "react";
 import Navbar from "../../components/Navbar";
 import Footer from "../../components/Footer";
 
+const EFFECTIVE_DATE = "February 6, 2026";
+
 export default function DPAPage() {
   return (
     <main className="flex flex-col min-h-screen bg-slate-50">
@@ -12,7 +14,7 @@ export default function DPAPage() {
       <div className="flex-grow pt-28 pb-16 px-6">
         <div className="max-w-3xl mx-auto bg-white p-8 md:p-12 rounded-2xl shadow-sm border border-slate-200">
           <h1 className="text-3xl font-bold text-slate-900 mb-2">Data Processing Addendum</h1>
-          <p className="text-slate-500 mb-8">Effective Date: {new Date().toLocaleDateString()}</p>
+          <p className="text-slate-500 mb-8">Effective Date: {EFFECTIVE_DATE}</p>
 
           <div className="prose prose-slate max-w-none text-slate-700">
             <p>
@@ -26,7 +28,7 @@ export default function DPAPage() {
 
             <h3 className="text-lg font-bold text-slate-900 mt-6 mb-2">2. Data Subject Rights</h3>
             <p>
-              LanceIQ shall, to the extent legally permitted, promptly notify Customer if it receives a request from a Data Subject to exercise their rights (e.g., access, deletion). LanceIQ provides tools in the application interface to allow Customers to manage their data directly.
+              LanceIQ shall, to the extent legally permitted, promptly notify Customer if it receives a request from a Data Subject to exercise their rights (e.g., access, deletion). LanceIQ will assist Customers with these requests upon written instruction.
             </p>
 
             <h3 className="text-lg font-bold text-slate-900 mt-6 mb-2">3. Subprocessors</h3>

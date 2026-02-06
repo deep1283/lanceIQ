@@ -142,7 +142,7 @@ export function VerifySignatureModal({
               </button>
             </div>
             <p className="text-xs text-gray-500">
-              Your secret is processed server-side for verification and is <strong className="text-gray-700">never stored or logged</strong>.
+              Your secret is processed server-side for verification and is <strong className="text-gray-700">designed to not be stored</strong>.
             </p>
           </div>
 

@@ -13,6 +13,8 @@ import { VerifySignatureModal } from "@/components/VerifySignatureModal";
 import type { VerificationApiResponse } from "@/lib/signature-verification";
 import AppNavbar from "@/components/AppNavbar";
 
+const PROMO_END_LOCAL = new Date(2026, 1, 6, 23, 59, 59, 999);
+
 export default function Home() {
   const [jsonInput, setJsonInput] = useState<string>("{\n  \"event\": \"payment.succeeded\",\n  \"amount\": 2000,\n  \"currency\": \"usd\"\n}");
   const [headersInput, setHeadersInput] = useState<string>("Stripe-Signature: t=123,v1=...\nContent-Type: application/json");
@@ -24,6 +26,7 @@ export default function Home() {
   
   // Pro status
   const [isPro, setIsPro] = useState(false);
+  const [isPromoActive, setIsPromoActive] = useState(false);
   const [verifyEmail, setVerifyEmail] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
   const [showVerifyModal, setShowVerifyModal] = useState(false);
@@ -47,20 +50,24 @@ export default function Home() {
     setTimestamp(new Date().toISOString());
     setReportId(uuidv4());
     
-    // 🎉 LAUNCH PROMO: Free watermark-free until Feb 6, 2026
-    const PROMO_END_DATE = new Date('2026-02-06T23:59:59Z');
-    const isPromoActive = new Date() < PROMO_END_DATE;
-    
-    if (isPromoActive) {
-      setIsPro(true);
-    } else {
+    const updatePromoState = () => {
+      const promoActive = Date.now() <= PROMO_END_LOCAL.getTime();
+      setIsPromoActive(promoActive);
+
       // Check if user has purchased (from localStorage)
       const proEmail = localStorage.getItem('lanceiq_pro_email');
       if (proEmail) {
-        setIsPro(true);
         setVerifyEmail(proEmail);
       }
-    }
+      setIsPro(promoActive || Boolean(proEmail));
+    };
+
+    updatePromoState();
+
+    // Ensure UI flips when the promo window ends (local time).
+    const msUntilEnd = PROMO_END_LOCAL.getTime() - Date.now();
+    const promoTimeout =
+      msUntilEnd > 0 ? window.setTimeout(updatePromoState, msUntilEnd + 1000) : undefined;
     
     // Check auth state
     const checkAuth = async () => {
@@ -75,7 +82,12 @@ export default function Home() {
       setUser(session?.user ?? null);
     });
     
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      if (promoTimeout) {
+        window.clearTimeout(promoTimeout);
+      }
+    };
   }, [supabase]);
 
   // Generate Hash and QR Code
@@ -433,11 +445,13 @@ export default function Home() {
                 </button>
 
                 {/* 🎉 LAUNCH PROMO BANNER */}
-                <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
-                  <p className="text-sm text-green-700 font-medium text-center">
-                    🎉 Launch Week Special: Watermark-free for everyone until Feb 6!
-                  </p>
-                </div>
+                {isPromoActive && (
+                  <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
+                    <p className="text-sm text-green-700 font-medium text-center">
+                      🎉 Launch Week Special: Watermark-free for everyone through Feb 6, 2026 (local time).
+                    </p>
+                  </div>
+                )}
 
                 {/* PAYMENT UI - COMMENTED OUT UNTIL DODO VERIFICATION IS COMPLETE
                 {!isPro && (

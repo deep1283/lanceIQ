@@ -4,6 +4,8 @@ import React from "react";
 import Navbar from "../../components/Navbar";
 import Footer from "../../components/Footer";
 
+const LAST_UPDATED = "February 6, 2026";
+
 export default function SubprocessorsPage() {
   return (
     <main className="flex flex-col min-h-screen bg-slate-50">
@@ -58,7 +60,7 @@ export default function SubprocessorsPage() {
           </div>
           
           <p className="mt-8 text-sm text-slate-500 text-center">
-            Last Updated: {new Date().toLocaleDateString()}
+            Last Updated: {LAST_UPDATED}
           </p>
         </div>
       </div>

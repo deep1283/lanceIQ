@@ -11,6 +11,7 @@ const blogPosts = {
   "webhook-compliance": {
     title: "Why Webhook Documentation Matters for Compliance",
     date: "Jan 12, 2026",
+    publishedAt: "2026-01-12T00:00:00Z",
     readTime: "2 min read",
     category: "Compliance",
     content: (
@@ -32,6 +33,7 @@ const blogPosts = {
   "debugging-stripe-webhooks": {
     title: "Debugging Stripe Webhooks: A Visual Guide",
     date: "Jan 18, 2026",
+    publishedAt: "2026-01-18T00:00:00Z",
     readTime: "2 min read",
     category: "Engineering",
     content: (
@@ -54,6 +56,7 @@ const blogPosts = {
   "webhook-security-signatures": {
     title: "The Ultimate Guide to Webhook Security Signatures",
     date: "Jan 25, 2026",
+    publishedAt: "2026-01-25T00:00:00Z",
     readTime: "2 min read",
     category: "Security",
     content: (
@@ -92,7 +95,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       title: post.title,
       description: `Read about ${post.title}. ${post.category} insights for webhook management.`,
       type: 'article',
-      publishedTime: post.date,
+      publishedTime: post.publishedAt,
       authors: ['LanceIQ Team'],
     }
   }

@@ -4,17 +4,19 @@ import Navbar from '../components/Navbar';
 import Hero from '../components/Hero';
 
 const Features = dynamic(() => import('../components/Features'));
+const HowItWorks = dynamic(() => import('../components/HowItWorks'));
+const Trust = dynamic(() => import('../components/Trust'));
 const FAQ = dynamic(() => import('../components/FAQ'));
 const BlogPreview = dynamic(() => import('../components/BlogPreview'));
 const Footer = dynamic(() => import('../components/Footer'));
 
 export const metadata: Metadata = {
-  title: 'LanceIQ – Professional Webhook Delivery Certificates & API Proof',
-  description: 'Generate verify-ready PDF certificates for your webhooks. Document API events from Stripe, PayPal, and more with LanceIQ. Essential for compliance, disputes, and client reporting.',
-  keywords: 'webhook proof, connection certificate, API documentation, stripe signature verification tool, paypal webhook logs, compliance audit tools, webhook pdf generator',
+  title: 'LanceIQ – Webhook Delivery Proof & Verification Certificates',
+  description: 'Generate verifiable PDF certificates for webhook events with hashes, optional signature checks, and QR-based proof links. Built for audits, disputes, and client reporting.',
+  keywords: 'webhook proof, webhook delivery certificate, signature verification, audit trail, webhook pdf generator, stripe webhook proof, api event documentation',
   openGraph: {
-    title: 'LanceIQ – Webhook Verification & Documentation',
-    description: 'Turn ephemeral webhooks into permanent, professional PDF records. trusted by developers for compliance and client transparency.',
+    title: 'LanceIQ – Webhook Proof & Verification',
+    description: 'Turn webhook events into permanent, verifiable PDF records with hashes, signature checks, and proof links.',
     type: 'website',
   },
 };
@@ -34,15 +36,18 @@ export default function Home() {
             "offers": {
               "@type": "Offer",
               "price": "0",
-              "priceCurrency": "USD"
+              "priceCurrency": "USD",
+              "description": "Free tier available. Paid plans remove watermarks."
             },
-            "description": "Generate verifiable, professional PDF certificates for every webhook event your system processes."
+            "description": "Generate verifiable PDF certificates for webhook events with hashes, optional signature checks, and proof links."
           })
         }}
       />
       <Navbar />
       <Hero />
+      <HowItWorks />
       <Features />
+      <Trust />
       <BlogPreview />
       <FAQ />
       <Footer />

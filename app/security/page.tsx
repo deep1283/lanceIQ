@@ -21,46 +21,46 @@ export default function SecurityPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
-            {/* Encryption */}
+            {/* Data Protection */}
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-6">
                 <Lock className="w-6 h-6 text-blue-600" />
               </div>
-              <h2 className="text-2xl font-bold text-slate-900 mb-4">Encryption</h2>
+              <h2 className="text-2xl font-bold text-slate-900 mb-4">Data Protection</h2>
               <ul className="space-y-3 text-slate-600">
                 <li className="flex items-start">
                   <span className="mr-2 text-green-500">✓</span>
-                  <span><strong>At Rest:</strong> All data is encrypted at rest using AES-256 via our database provider (Supabase).</span>
+                  <span><strong>In Transit:</strong> The system is designed to use HTTPS/TLS to protect data between your browser and our servers.</span>
                 </li>
                 <li className="flex items-start">
                   <span className="mr-2 text-green-500">✓</span>
-                  <span><strong>In Transit:</strong> All data transmitted between your client and our servers is protected using TLS 1.3.</span>
+                  <span><strong>At Rest:</strong> Stored certificates are hosted in Supabase with provider-managed encryption at rest.</span>
                 </li>
                 <li className="flex items-start">
                   <span className="mr-2 text-green-500">✓</span>
-                  <span><strong>Secrets:</strong> Webhook secrets and sensitive configuration are stored using additional application-level encryption.</span>
+                  <span><strong>Secrets:</strong> Webhook secrets are designed to be processed transiently and not stored. Only a short hint plus the verification result is saved.</span>
                 </li>
               </ul>
             </div>
 
-            {/* Access Control */}
+            {/* Access and Integrity */}
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
               <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center mb-6">
                 <ShieldCheck className="w-6 h-6 text-indigo-600" />
               </div>
-              <h2 className="text-2xl font-bold text-slate-900 mb-4">Access Control</h2>
+              <h2 className="text-2xl font-bold text-slate-900 mb-4">Access and Integrity</h2>
               <ul className="space-y-3 text-slate-600">
                 <li className="flex items-start">
                   <span className="mr-2 text-green-500">✓</span>
-                  <span><strong>Role-Based Access:</strong> Granular permissions for Owners, Admins, and Members within workspaces.</span>
+                  <span><strong>Account Scoping:</strong> Saved certificates are designed to be tied to your account and protected by row-level security.</span>
                 </li>
                 <li className="flex items-start">
                   <span className="mr-2 text-green-500">✓</span>
-                  <span><strong>Audit Logs:</strong> Comprehensive audit logging for all critical workspace actions (retention: 90 days).</span>
+                  <span><strong>Integrity Proof:</strong> Each certificate is designed to store hashes and verification metadata.</span>
                 </li>
                 <li className="flex items-start">
                   <span className="mr-2 text-green-500">✓</span>
-                  <span><strong>Authentication:</strong> Secure authentication via industry-standard providers.</span>
+                  <span><strong>Abuse Protection:</strong> Verification endpoints are designed to be rate-limited to reduce abuse.</span>
                 </li>
               </ul>
             </div>
@@ -72,15 +72,15 @@ export default function SecurityPage() {
               <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center mr-4">
                 <Server className="w-6 h-6 text-slate-600" />
               </div>
-              <h2 className="text-2xl font-bold text-slate-900">Infrastructure & Compliance</h2>
+              <h2 className="text-2xl font-bold text-slate-900">Infrastructure</h2>
             </div>
             <p className="text-slate-600 mb-6">
-              Our infrastructure is hosted on world-class providers that maintain strict security certifications (SOC 2, ISO 27001).
+              We run on vetted infrastructure providers and are designed to follow a least-privilege approach for data access.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                <div>
                   <h3 className="font-semibold text-slate-900 mb-2">Cloud Providers</h3>
-                  <p className="text-slate-600">We leverage Vercel and Supabase for hosting and database services, ensuring high availability and physical security.</p>
+                  <p className="text-slate-600">We leverage Vercel and Supabase for hosting and database services, designed for high availability and physical security.</p>
                </div>
                <div>
                   <h3 className="font-semibold text-slate-900 mb-2">Data Processing</h3>

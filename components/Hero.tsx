@@ -5,7 +5,7 @@ import { motion, useScroll, useTransform, useSpring } from "framer-motion";
 import Link from "next/link";
 import DarkVeil from "./DarkVeil";
 import ElectricBorder from "./ElectricBorder";
-import { Terminal, ShieldCheck, FileCheck, Lock } from "lucide-react";
+import { ShieldCheck, FileCheck, Lock } from "lucide-react";
 
 // Coding Terminal Component to replace the dashboard image
 const CodeTerminal = () => {
@@ -74,7 +74,7 @@ const CodeTerminal = () => {
                 <motion.div 
                     animate={{ opacity: [0, 1, 0] }}
                     transition={{ repeat: Infinity, duration: 0.8 }}
-                    className="inline-block w-2 H-4 bg-gray-500 ml-1"
+                    className="inline-block w-2 h-4 bg-gray-500 ml-1"
                 >
                   _
                 </motion.div>
@@ -200,8 +200,8 @@ const Hero: React.FC = () => {
                className="p-6 rounded-2xl bg-white/5 border border-white/10 hover:border-pink-500/50 transition-colors"
              >
                 <Lock className="w-10 h-10 text-pink-400 mx-auto mb-4" />
-                <h3 className="text-2xl font-bold mb-2">Zero Data Storage</h3>
-                <p className="text-gray-400 text-sm">Your webhook data never touches our servers. Processing happens in your browser.</p>
+                <h3 className="text-2xl font-bold mb-2">Private by Default</h3>
+                <p className="text-gray-400 text-sm">Guest generation is designed to stay in your browser. Sign in only if you want saved history and proof links.</p>
              </motion.div>
         </div>
       </section>

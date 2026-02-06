@@ -16,15 +16,15 @@ const faqs: FAQItem[] = [
   },
   {
     question: "How does LanceIQ verify webhook authenticity?",
-    answer: "LanceIQ analyzes the headers provided in the webhook payload. We automatically detect and display signatures from major providers like Stripe, PayPal, Shopify, and Razorpay. While we display these for your records, the ultimate cryptographic verification happens on your server; our tool provides the visual documentation of that event."
+    answer: "Designed to detect provider-specific headers and optionally verify signatures server-side when you provide your webhook secret. For signed-in users, the verification result and hashes are stored with the certificate so it can be re-verified later."
   },
   {
     question: "Is the PDF generation truly secure?",
-    answer: "Yes. All processing happens securely. We do not store your webhook data permanently.The generation process is ephemeral, ensuring your sensitive transaction data remains private."
+    answer: "Guest generation is designed to happen in your browser. If you choose to save a certificate, we store the payload, headers, hashes, and verification status for your account. We are designed to avoid storing your raw webhook secret, only a short hint plus the verification result."
   },
   {
     question: "Why do I need a 'Pro' version?",
-    answer: "The Free version allows you to generate certificates with a watermark. The Pro version removes this watermark, giving you a pristine, white-labeled document suitable for sending to high-value clients, legal audits, or professional records. It's a one-time purchase for lifetime access."
+    answer: "The Free version includes a watermark for internal use. Pro removes the watermark so your certificates are client-ready and audit-friendly. Paid plan details are shown at checkout."
   },
   {
     question: "Can I use this for non-payment webhooks?",

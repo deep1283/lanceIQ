@@ -4,6 +4,8 @@ import React from "react";
 import Navbar from "../../components/Navbar";
 import Footer from "../../components/Footer";
 
+const LAST_UPDATED = "February 6, 2026";
+
 export default function TermsAndConditions() {
   return (
     <main className="flex flex-col min-h-screen bg-slate-50">
@@ -12,7 +14,7 @@ export default function TermsAndConditions() {
       <div className="flex-grow pt-28 pb-16 px-6">
         <div className="max-w-3xl mx-auto bg-white p-8 md:p-12 rounded-2xl shadow-sm border border-slate-200">
           <h1 className="text-3xl font-bold text-slate-900 mb-2">Terms and Conditions</h1>
-          <p className="text-slate-500 mb-8">Last Updated: {new Date().toLocaleDateString()}</p>
+          <p className="text-slate-500 mb-8">Last Updated: {LAST_UPDATED}</p>
 
           <div className="prose prose-slate max-w-none text-slate-700">
             <section className="mb-8">
@@ -39,7 +41,7 @@ export default function TermsAndConditions() {
             <section className="mb-8">
               <h2 className="text-xl font-bold text-slate-900 mb-4">4. Payments & Satisfaction</h2>
               <p className="mb-4">
-                The Pro upgrade is a one-time purchase that immediately unlocks premium features, such as watermark removal. Because these features are available instantly, we generally cannot offer refunds. However, we encourage you to try the free tier first to make sure LanceIQ is the right fit for you.
+                Paid plans, if offered, are billed in advance and unlock premium features such as watermark removal. Pricing and billing terms are shown at checkout. Because features are delivered instantly, refunds may be limited except where required by law. We encourage you to try the free tier first to confirm fit.
               </p>
             </section>
 

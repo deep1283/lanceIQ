@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://www.lanceiq.com'),
+  metadataBase: new URL('https://lanceiq.com'),
+  alternates: {
+    canonical: 'https://lanceiq.com',
+  },
   title: {
     default: "LanceIQ – Professional Webhook Delivery Certificates",
     template: "%s | LanceIQ"
@@ -11,16 +14,8 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://www.lanceiq.com',
+    url: 'https://lanceiq.com',
     siteName: 'LanceIQ',
-    images: [
-      {
-        url: '/og.png',
-        width: 1200,
-        height: 630,
-        alt: 'LanceIQ - Webhook Proof',
-      },
-    ],
   },
   twitter: {
     card: 'summary_large_image',

@@ -113,8 +113,8 @@ const Features: React.FC = () => {
           
           {/* Regular Card */}
           <FeatureCard
-            title="Zero Retention"
-            description="Your data is processed in-memory and discarded. We never store sensitive payload information."
+            title="Verification Ready"
+            description="Designed to support optional server-side signature checks for Stripe and Razorpay, plus SHA-256 hashes stored with each certificate."
             icon={<Shield size={28} />}
             delay={0.6}
           />
