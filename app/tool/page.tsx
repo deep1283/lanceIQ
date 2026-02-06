@@ -445,7 +445,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-100 font-sans pt-16">
-      <AppNavbar />
+      <AppNavbar user={user} />
       <div className="flex flex-col md:flex-row h-[calc(100vh-4rem)]">
       {/* LEFT: Input Form */}
       <div className="w-full md:w-1/2 p-6 md:p-12 overflow-y-auto border-r border-slate-200 bg-white z-10 shadow-sm">
