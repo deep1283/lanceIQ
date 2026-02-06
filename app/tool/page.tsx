@@ -25,8 +25,10 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Pro status
+  // Plan status
   const [isPro, setIsPro] = useState(false);
+  const [isWatermarkFree, setIsWatermarkFree] = useState(false);
+  const [canVerify, setCanVerify] = useState(false);
   const [isPromoActive, setIsPromoActive] = useState(false);
   const [verifyEmail, setVerifyEmail] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
@@ -51,13 +53,17 @@ export default function Home() {
     setIsPromoActive(promoActive);
 
     try {
-      const { isPro: dbPro } = await checkProStatus();
-      const combined = promoActive || dbPro;
-      setIsPro(combined);
-      return combined;
+      const { isPro: dbPro, plan: currentPlan } = await checkProStatus();
+      const watermarkFree = promoActive || dbPro;
+      setIsPro(dbPro);
+      setIsWatermarkFree(watermarkFree);
+      setCanVerify(currentPlan !== 'free');
+      return watermarkFree;
     } catch (err) {
       console.error("Failed to sync pro status:", err);
-      setIsPro(promoActive);
+      setIsPro(false);
+      setIsWatermarkFree(promoActive);
+      setCanVerify(false);
       return promoActive;
     }
   };
@@ -186,7 +192,7 @@ export default function Home() {
           status,
           payloadHash: hash,
           
-          showWatermark: !isPro,
+          showWatermark: !isWatermarkFree,
           verificationUrl: user ? `https://lanceiq.com/verify/${newReportId}` : undefined,
           qrCodeDataUrl,
 
@@ -271,7 +277,7 @@ export default function Home() {
       if (user) {
         try {
           const parsedPayload = JSON.parse(jsonInput);
-          await saveCertificate({
+          const saveResult = await saveCertificate({
             report_id: newReportId,
             payload: parsedPayload,
             headers: parsedHeaders,
@@ -279,6 +285,9 @@ export default function Home() {
             is_pro: isPro,
             verificationToken: verificationResult?.verificationToken,
           });
+          if (!saveResult.success) {
+            setError(saveResult.error || "Failed to save certificate.");
+          }
         } catch (saveErr) {
           console.error('Failed to save certificate:', saveErr);
         }
@@ -361,6 +370,12 @@ export default function Home() {
                   PRO
                 </span>
               )}
+              {!isPro && isPromoActive && (
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-700 text-xs font-medium rounded-full">
+                  <ShieldCheck className="w-3 h-3" />
+                  PROMO
+                </span>
+              )}
             </div>
             <p className="text-slate-500 text-sm">Create an official-looking delivery record provided by you.</p>
           </div>
@@ -406,12 +421,21 @@ export default function Home() {
                      VERIFIED
                    </div>
                  ) : (
-                   <button
-                     onClick={() => setShowSigVerifyModal(true)}
-                     className="px-3 py-1.5 bg-white border border-slate-300 shadow-sm text-slate-700 text-xs font-medium rounded-md hover:bg-slate-50 transition-colors"
-                   >
-                     Verify Signature...
-                   </button>
+                   canVerify ? (
+                     <button
+                       onClick={() => setShowSigVerifyModal(true)}
+                       className="px-3 py-1.5 bg-white border border-slate-300 shadow-sm text-slate-700 text-xs font-medium rounded-md hover:bg-slate-50 transition-colors"
+                     >
+                       Verify Signature...
+                     </button>
+                   ) : (
+                     <Link
+                       href={user ? "/pricing" : "/login"}
+                       className="px-3 py-1.5 bg-white border border-slate-300 shadow-sm text-slate-700 text-xs font-medium rounded-md hover:bg-slate-50 transition-colors"
+                     >
+                       {user ? "Upgrade to Verify" : "Log In to Verify"}
+                     </Link>
+                   )
                  )}
               </div>
               
@@ -455,11 +479,11 @@ export default function Home() {
                     ) : (
                         <Download className="w-4 h-4" />
                     )}
-                    {isGenerating ? 'Generating...' : isPro ? 'Download PDF (No Watermark)' : 'Download PDF (With Watermark)'}
+                    {isGenerating ? 'Generating...' : isWatermarkFree ? 'Download PDF (No Watermark)' : 'Download PDF (With Watermark)'}
                 </button>
 
                 {/* 🎉 LAUNCH PROMO BANNER */}
-                {isPromoActive && (
+                {isPromoActive && !isPro && (
                   <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
                     <p className="text-sm text-green-700 font-medium text-center">
                       🎉 Launch Week Special: Watermark-free for everyone through Feb 6, 2026 (local time).
@@ -551,7 +575,7 @@ export default function Home() {
                 )}
                 
                 <p className="text-xs text-slate-400 text-center mt-3">
-                    {isPro ? 'PRO: Generating watermark-free certificates.' : 'Free tier includes a watermark.'}
+                    {isWatermarkFree ? 'Watermark-free certificates enabled.' : 'Free tier includes a watermark.'}
                 </p>
              </div>
           </div>
@@ -571,7 +595,7 @@ export default function Home() {
                 status={status}
                 payloadHash={hash}
                 
-                showWatermark={!isPro}
+                showWatermark={!isWatermarkFree}
                 verificationUrl={user ? `https://lanceiq.com/verify/${reportId}` : undefined}
                 qrCodeDataUrl={qrCodeDataUrl}
 
@@ -597,6 +621,8 @@ export default function Home() {
         // If user is saved, we have reportId.
         // We can pass reportId. API will update DB if it matches this reportId for this user.
         reportId={reportId} 
+        canVerify={canVerify}
+        upgradeHref={user ? "/pricing" : "/login"}
         onVerified={(res) => {
           setVerificationResult(res);
           // If successful, we might want to close modal automatically or let user close

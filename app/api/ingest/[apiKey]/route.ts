@@ -4,7 +4,7 @@ import { hashApiKey } from '@/lib/api-key';
 import { verifySignature, type Provider, detectProvider, computeRawBodySha256, type VerificationResult, extractEventId } from '@/lib/signature-verification';
 import { decrypt } from '@/lib/encryption';
 import { checkRateLimit, getRedisClient, markAndCheckDuplicate } from '@/lib/ingest-helpers';
-import { isCriticalReason, maybeSendCriticalEmailAlert, type AlertSetting } from '@/lib/alerting';
+import { isCriticalReason, maybeSendCriticalAlert, type AlertSetting } from '@/lib/alerting';
 
 // Note: Using service role key for ingestion to bypass RLS for inserts
 // and to query workspaces by hash.
@@ -203,7 +203,7 @@ export async function POST(
       if (alertSettings && alertSettings.length) {
         await Promise.all(
           (alertSettings as AlertSetting[]).map((setting) =>
-            maybeSendCriticalEmailAlert({
+            maybeSendCriticalAlert({
               redis,
               setting,
               workspaceName: workspace.name ?? 'Workspace',
@@ -226,10 +226,10 @@ export async function POST(
 
 function canSendAlerts(workspace: { plan?: string | null; subscription_status?: string | null; subscription_current_period_end?: string | null }) {
   const plan = workspace.plan;
-  if (plan !== 'pro' && plan !== 'team') return false;
+  if (plan !== 'team') return false;
   const status = workspace.subscription_status;
   if (status === 'active' || status === 'past_due') return true;
-  if (workspace.subscription_current_period_end) {
+  if (status === 'canceled' && workspace.subscription_current_period_end) {
     return new Date(workspace.subscription_current_period_end).getTime() > Date.now();
   }
   return false;

@@ -47,8 +47,16 @@ export async function POST(req: NextRequest) {
     auditCleaned = auditData;
   }
 
+  let certsCleaned = 0;
+  const { data: certData, error: certError } = await supabase.rpc("cleanup_expired_certificates");
+  if (certError) {
+    console.error("Certificate cleanup failed:", certError);
+  } else if (typeof certData === "number") {
+    certsCleaned = certData;
+  }
+
   return NextResponse.json(
-    { cleaned_raw_bodies: data?.length ?? 0, cleaned_audit_logs: auditCleaned },
+    { cleaned_raw_bodies: data?.length ?? 0, cleaned_audit_logs: auditCleaned, cleaned_certificates: certsCleaned },
     { status: 200 }
   );
 }

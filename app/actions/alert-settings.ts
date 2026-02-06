@@ -59,10 +59,11 @@ export async function updateAlertSettings(data: AlertSettingsUpdate) {
     return { error: 'Workspace not found.' };
   }
 
-  const isPro = workspace.plan === 'pro' || workspace.plan === 'team';
+  const isTeam = workspace.plan === 'team';
   const isPastDue = workspace.subscription_status === 'past_due';
-  if (!isPro && !isPastDue) {
-    return { error: 'Upgrade required to enable alert settings.' };
+  const canUseAlerts = isTeam && (workspace.subscription_status === 'active' || isPastDue);
+  if (!canUseAlerts) {
+    return { error: 'Upgrade to Team to enable alert settings.' };
   }
 
   // 1.6 Validate inputs

@@ -1,8 +1,7 @@
 'use server';
 
 import { createClient } from "@/utils/supabase/server";
-
-type PlanTier = 'free' | 'pro' | 'team';
+import type { PlanTier } from "@/lib/plan";
 
 const GRACE_PERIOD_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
 

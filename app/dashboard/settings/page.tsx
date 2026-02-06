@@ -4,6 +4,15 @@ import SettingsClient from './client';
 
 export const dynamic = 'force-dynamic';
 
+type AuditLog = {
+  id: string;
+  action: string;
+  actor_id: string | null;
+  target_resource: string | null;
+  details: Record<string, unknown> | null;
+  created_at: string;
+};
+
 export default async function SettingsPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -43,13 +52,17 @@ export default async function SettingsPage() {
     .eq('workspace_id', workspace.id)
     .maybeSingle();
 
-  // Get audit logs (Limit 50 for now)
-  const { data: auditLogs } = await supabase
-    .from('audit_logs')
-    .select('*')
-    .eq('workspace_id', workspace.id)
-    .order('created_at', { ascending: false })
-    .limit(50);
+  // Get audit logs (Team only)
+  let auditLogs: AuditLog[] | null = null;
+  if (workspace.plan === 'team') {
+    const { data } = await supabase
+      .from('audit_logs')
+      .select('*')
+      .eq('workspace_id', workspace.id)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    auditLogs = data || [];
+  }
 
   return (
     <SettingsClient 

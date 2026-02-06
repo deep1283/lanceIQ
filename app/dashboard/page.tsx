@@ -4,6 +4,8 @@ import Link from "next/link";
 import { FileText, Download, Calendar, CheckCircle, ShieldCheck, ShieldAlert, AlertTriangle, Plus } from "lucide-react";
 import DashboardNavbar from "@/components/DashboardNavbar";
 import { DashboardClient } from "@/components/DashboardClient";
+import { checkProStatus } from "@/app/actions/subscription";
+import { getPlanLimits } from "@/lib/plan";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -13,9 +15,14 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
+  const { plan } = await checkProStatus();
+  const limits = getPlanLimits(plan);
+
+  const nowIso = new Date().toISOString();
   const { data: certificates } = await supabase
     .from("certificates")
     .select("*")
+    .gt("expires_at", nowIso)
     .order("created_at", { ascending: false })
     .limit(50);
 
@@ -39,6 +46,15 @@ export default async function DashboardPage() {
           >
             ← Back to Generator
           </Link>
+          {limits.canExport && (
+            <a
+              href="/api/certificates/export"
+              className="flex items-center gap-2 text-slate-600 hover:text-indigo-600 transition-colors text-sm font-medium"
+            >
+              <Download className="w-4 h-4" />
+              Export CSV
+            </a>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-8">

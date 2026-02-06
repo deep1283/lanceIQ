@@ -14,6 +14,8 @@ interface VerifySignatureModalProps {
   certificateId?: string; // Optional: provided if we have a saved cert (future flow)
   reportId?: string;      // Optional: provided if we have a saved cert report ID
   onVerified: (result: VerificationApiResponse) => void;
+  canVerify?: boolean;
+  upgradeHref?: string;
 }
 
 export function VerifySignatureModal({
@@ -23,7 +25,9 @@ export function VerifySignatureModal({
   headers,
   certificateId,
   reportId,
-  onVerified
+  onVerified,
+  canVerify = true,
+  upgradeHref = "/pricing"
 }: VerifySignatureModalProps) {
   const [secret, setSecret] = useState('');
   const [showSecret, setShowSecret] = useState(false);
@@ -34,6 +38,10 @@ export function VerifySignatureModal({
   if (!isOpen) return null;
 
   const handleVerify = async () => {
+    if (!canVerify) {
+      setError("Upgrade required to verify signatures.");
+      return;
+    }
     if (!secret.trim()) {
       setError("Please enter your webhook secret.");
       return;
@@ -131,11 +139,13 @@ export function VerifySignatureModal({
                 value={secret}
                 onChange={(e) => setSecret(e.target.value)}
                 placeholder="whsec_..."
+                disabled={!canVerify}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none pr-10 font-mono text-sm"
               />
               <button
                 type="button"
                 onClick={() => setShowSecret(!showSecret)}
+                disabled={!canVerify}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
                 {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -145,6 +155,16 @@ export function VerifySignatureModal({
               Your secret is processed server-side for verification and is <strong className="text-gray-700">designed to not be stored</strong>.
             </p>
           </div>
+
+          {!canVerify && (
+            <div className="p-3 bg-amber-50 text-amber-800 text-sm rounded-lg flex items-start gap-2">
+              <HelpCircle className="w-5 h-5 shrink-0" />
+              <span>
+                Signature verification is available on paid plans.{" "}
+                <a href={upgradeHref} className="underline font-medium">Upgrade to unlock</a>.
+              </span>
+            </div>
+          )}
 
           {/* Result Display */}
           {error && (
@@ -195,7 +215,7 @@ export function VerifySignatureModal({
           </button>
           <button
             onClick={handleVerify}
-            disabled={loading || !secret.trim()}
+            disabled={loading || !secret.trim() || !canVerify}
             className={cn(
               "px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium shadow-sm hover:bg-indigo-700 focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all",
               loading && "animate-pulse"

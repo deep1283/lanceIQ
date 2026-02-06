@@ -41,8 +41,10 @@ export default function SettingsClient({
   initialAuditLogs: AuditLog[]
 }) {
   const router = useRouter();
-  const isPro = workspace.plan === 'pro' || workspace.plan === 'team';
+  const isPaid = workspace.plan !== 'free';
+  const isTeam = workspace.plan === 'team';
   const isPastDue = workspace.subscription_status === 'past_due';
+  const canUseAlerts = isTeam && (workspace.subscription_status === 'active' || isPastDue);
 
   const [activeTab, setActiveTab] = useState<'alerts' | 'audit'>('alerts');
 
@@ -57,7 +59,7 @@ export default function SettingsClient({
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
-    if (!isPro && !isPastDue) return; // Strict gating
+    if (!canUseAlerts) return; // Strict gating
     setSaving(true);
 
     const payload = {
@@ -90,8 +92,8 @@ export default function SettingsClient({
             <h2 className="text-xl font-semibold text-white mb-1">Subscription Plan</h2>
             <p className="text-zinc-400 text-sm">Manage your billing and features</p>
           </div>
-          <div className={`px-4 py-1.5 rounded-full text-xs font-medium uppercase tracking-wide ${
-            isPro ? 'bg-green-900/30 text-green-400 border border-green-800' : 'bg-blue-900/30 text-blue-400 border border-blue-800'
+        <div className={`px-4 py-1.5 rounded-full text-xs font-medium uppercase tracking-wide ${
+            isPaid ? 'bg-green-900/30 text-green-400 border border-green-800' : 'bg-blue-900/30 text-blue-400 border border-blue-800'
           }`}>
             {workspace.plan}
             {isPastDue && <span className="ml-2 text-yellow-500 font-bold">PAST DUE</span>}
@@ -113,7 +115,7 @@ export default function SettingsClient({
           </div>
         </div>
         
-        {!isPro && (
+        {!isTeam && (
           <div className="mt-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg p-6 text-white flex justify-between items-center shadow-lg">
              <div>
                <h3 className="font-bold text-lg">Upgrade to Team ($79/mo)</h3>
@@ -162,7 +164,7 @@ export default function SettingsClient({
       {/* Tab Content */}
       {activeTab === 'alerts' ? (
         <div className="relative">
-          <div className={`bg-zinc-900 border border-zinc-800 rounded-xl p-6 ${!isPro && 'opacity-50 pointer-events-none blur-[1px]'}`}>
+          <div className={`bg-zinc-900 border border-zinc-800 rounded-xl p-6 ${!canUseAlerts && 'opacity-50 pointer-events-none blur-[1px]'}`}>
             <h2 className="text-xl font-semibold text-white mb-6">Smart Alerts</h2>
             
             <div className="space-y-6">
@@ -228,7 +230,7 @@ export default function SettingsClient({
             </div>
           </div>
           
-          {!isPro && (
+          {!canUseAlerts && (
             <div className="absolute inset-0 flex items-center justify-center z-10">
               <div className="bg-zinc-950/90 border border-zinc-800 p-8 rounded-xl text-center backdrop-blur-sm max-w-sm mx-4">
                 <div className="w-12 h-12 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -245,14 +247,14 @@ export default function SettingsClient({
         </div>
       ) : (
         /* Audit Logs Tab */
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-sm">
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-sm relative">
           <div className="p-6 border-b border-zinc-800 flex justify-between items-center">
              <div>
                <h2 className="text-xl font-semibold text-white mb-1">Audit Log</h2>
                <p className="text-zinc-400 text-sm">Track all critical actions in your workspace.</p>
              </div>
              {/* Simple export button placeholder */}
-             <button className="text-sm text-zinc-400 hover:text-white transition-colors flex items-center gap-2">
+             <button className="text-sm text-zinc-400 hover:text-white transition-colors flex items-center gap-2" disabled={!isTeam}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                 Export CSV
              </button>
@@ -297,6 +299,21 @@ export default function SettingsClient({
               </tbody>
             </table>
           </div>
+
+          {!isTeam && (
+            <div className="absolute inset-0 flex items-center justify-center z-10">
+              <div className="bg-zinc-950/90 border border-zinc-800 p-8 rounded-xl text-center backdrop-blur-sm max-w-sm mx-4">
+                <div className="w-12 h-12 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">Audit Log is Locked</h3>
+                <p className="text-zinc-400 mb-6 text-sm">Upgrade to the Team plan to access audit logs.</p>
+                <a href={`/api/dodo/checkout?workspace_id=${workspace.id}&plan=team`} className="block w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-md transition-colors">
+                  Unlock for $79/mo
+                </a>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -7,6 +7,8 @@ import {
   extractEventId
 } from "@/lib/signature-verification";
 import { verifyVerificationToken } from "@/lib/verification-token";
+import { checkProStatus } from "@/app/actions/subscription";
+import { getPlanLimits, getRetentionExpiry } from "@/lib/plan";
 
 export interface CertificateData {
   report_id: string;
@@ -25,6 +27,29 @@ export async function saveCertificate(data: CertificateData) {
   
   if (!user) {
     return { success: false, error: "Not authenticated" };
+  }
+
+  const { plan } = await checkProStatus();
+  const limits = getPlanLimits(plan);
+  const now = new Date();
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0));
+
+  const { count: monthCount, error: countError } = await supabase
+    .from("certificates")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .gte("created_at", monthStart.toISOString());
+
+  if (countError) {
+    console.error("Certificate count failed:", countError);
+    return { success: false, error: "Unable to verify monthly limits." };
+  }
+
+  if ((monthCount ?? 0) >= limits.monthlyCertificates) {
+    return { 
+      success: false, 
+      error: `Monthly certificate limit reached (${limits.monthlyCertificates}).` 
+    };
   }
 
   // Compute additional fields for verification support
@@ -47,7 +72,7 @@ export async function saveCertificate(data: CertificateData) {
     verified_by_user_id: null,
   };
 
-  if (data.verificationToken) {
+  if (plan !== 'free' && data.verificationToken) {
     const token = verifyVerificationToken(data.verificationToken);
     if (token.userId !== user.id) {
       return { success: false, error: "Invalid verification token (user mismatch)" };
@@ -89,7 +114,9 @@ export async function saveCertificate(data: CertificateData) {
     
     ...verificationFields,
     
-    is_pro: data.is_pro,
+    is_pro: plan !== 'free',
+    plan_tier: plan,
+    expires_at: getRetentionExpiry(plan, now).toISOString(),
   });
 
   if (error) {
@@ -119,13 +146,17 @@ export async function getCertificateForVerification(reportId: string) {
       created_at, payload, headers, payload_hash, is_pro,
       signature_status, verified_at, verification_method, 
       verification_error, signature_secret_hint, provider,
-      raw_body_sha256, canonical_json_sha256
+      raw_body_sha256, canonical_json_sha256, expires_at
     `)
     .eq("report_id", reportId)
     .single();
 
   if (error) {
     return { success: false, error: error.message };
+  }
+
+  if (data?.expires_at && new Date(data.expires_at).getTime() <= Date.now()) {
+    return { success: false, error: "Certificate expired" };
   }
 
   return { success: true, data };
@@ -139,9 +170,11 @@ export async function getCertificates() {
     return { certificates: [], error: "Not authenticated" };
   }
 
+  const nowIso = new Date().toISOString();
   const { data, error } = await supabase
     .from("certificates")
     .select("*")
+    .gt("expires_at", nowIso)
     .order("created_at", { ascending: false })
     .limit(50);
 

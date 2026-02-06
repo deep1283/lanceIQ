@@ -31,33 +31,36 @@ function getSiteUrl(): string {
   );
 }
 
-export async function maybeSendCriticalEmailAlert(opts: {
-  redis: Redis | null;
+function buildAlertLines(opts: {
   setting: AlertSetting;
   workspaceName: string;
   provider: string;
   reason: string;
   eventId?: string | null;
-}): Promise<void> {
-  const { redis, setting, workspaceName, provider, reason, eventId } = opts;
+}) {
+  const { workspaceName, provider, reason, eventId, setting } = opts;
+  return [
+    `Critical alert: repeated signature verification failures detected.`,
+    ``,
+    `Workspace: ${workspaceName}`,
+    `Provider: ${provider}`,
+    `Reason: ${reason}`,
+    `Failures in last ${setting.window_minutes}m: (threshold reached)`,
+    eventId ? `Latest event id: ${eventId}` : null,
+  ].filter(Boolean) as string[];
+}
 
-  if (!setting.enabled || setting.channel !== "email") return;
-  if (!setting.destination) return;
-  if (!isCriticalReason(reason)) return;
-  if (!redis) return;
+async function sendEmailAlert(opts: {
+  setting: AlertSetting;
+  workspaceName: string;
+  provider: string;
+  reason: string;
+  eventId?: string | null;
+}) {
+  const { setting, workspaceName, provider, reason, eventId } = opts;
 
   const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return;
-
-  const countKey = `alerts:failures:${setting.workspace_id}:${provider}:${reason}`;
-  const windowSec = Math.max(1, setting.window_minutes) * 60;
-  const count = await incrementWindowCounter(redis, countKey, windowSec);
-  if (count < Math.max(1, setting.critical_fail_count)) return;
-
-  const cooldownKey = `alerts:cooldown:${setting.workspace_id}:${provider}:${reason}`;
-  const cooldownSec = Math.max(1, setting.cooldown_minutes) * 60;
-  const acquired = await acquireCooldown(redis, cooldownKey, cooldownSec);
-  if (!acquired) return;
+  if (!apiKey) return { ok: false, error: "Missing RESEND_API_KEY" };
 
   const resend = new Resend(apiKey);
   const siteUrl = getSiteUrl();
@@ -65,18 +68,12 @@ export async function maybeSendCriticalEmailAlert(opts: {
   const from = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
 
   const lines = [
-    `Critical alert: repeated signature verification failures detected.`,
-    ``,
-    `Workspace: ${workspaceName}`,
-    `Provider: ${provider}`,
-    `Reason: ${reason}`,
-    `Failures in last ${setting.window_minutes}m: ${count}`,
-    eventId ? `Latest event id: ${eventId}` : null,
+    ...buildAlertLines({ setting, workspaceName, provider, reason, eventId }),
     ``,
     `Review: ${siteUrl}/dashboard`,
     ``,
     `This alert is rate-limited (cooldown ${setting.cooldown_minutes}m) to avoid noise.`,
-  ].filter(Boolean);
+  ];
 
   try {
     const response = await resend.emails.send({
@@ -89,21 +86,119 @@ export async function maybeSendCriticalEmailAlert(opts: {
       (response as { data?: { id?: string } }).data?.id ||
       (response as { id?: string }).id ||
       undefined;
-
-    await logAlertDelivery({
-      workspaceId: setting.workspace_id,
-      alertSettingId: setting.id,
-      channel: "email",
-      status: "sent",
-      responsePayload: typeof response === "object" && response ? (response as Record<string, unknown>) : { response },
-      providerMessageId,
-    });
+    return { ok: true, response, providerMessageId };
   } catch (err) {
-    console.error("Alert email failed:", err);
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+async function sendWebhookAlert(opts: {
+  setting: AlertSetting;
+  workspaceName: string;
+  provider: string;
+  reason: string;
+  eventId?: string | null;
+}) {
+  const { setting, workspaceName, provider, reason, eventId } = opts;
+  const siteUrl = getSiteUrl();
+  const payload =
+    setting.channel === "slack"
+      ? {
+          text: [
+            `*LanceIQ Alert*`,
+            `Workspace: ${workspaceName}`,
+            `Provider: ${provider}`,
+            `Reason: ${reason}`,
+            eventId ? `Event ID: ${eventId}` : null,
+            `Review: ${siteUrl}/dashboard`,
+          ].filter(Boolean).join("\n"),
+        }
+      : {
+          type: "signature_failure",
+          workspace: workspaceName,
+          provider,
+          reason,
+          event_id: eventId ?? null,
+          url: `${siteUrl}/dashboard`,
+          occurred_at: new Date().toISOString(),
+        };
+
+  try {
+    const response = await fetch(setting.destination, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      return { ok: false, error: `Webhook failed: ${response.status} ${text}` };
+    }
+    return { ok: true, response: { status: response.status } };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function maybeSendCriticalAlert(opts: {
+  redis: Redis | null;
+  setting: AlertSetting;
+  workspaceName: string;
+  provider: string;
+  reason: string;
+  eventId?: string | null;
+}): Promise<void> {
+  const { redis, setting, workspaceName, provider, reason, eventId } = opts;
+
+  if (!setting.enabled) return;
+  if (!setting.destination) return;
+  if (!isCriticalReason(reason)) return;
+  if (!redis) return;
+
+  const countKey = `alerts:failures:${setting.workspace_id}:${provider}:${reason}`;
+  const windowSec = Math.max(1, setting.window_minutes) * 60;
+  const count = await incrementWindowCounter(redis, countKey, windowSec);
+  if (count < Math.max(1, setting.critical_fail_count)) return;
+
+  const cooldownKey = `alerts:cooldown:${setting.workspace_id}:${provider}:${reason}`;
+  const cooldownSec = Math.max(1, setting.cooldown_minutes) * 60;
+  const acquired = await acquireCooldown(redis, cooldownKey, cooldownSec);
+  if (!acquired) return;
+
+  try {
+    let result:
+      | { ok: true; response?: Record<string, unknown>; providerMessageId?: string }
+      | { ok: false; error: string };
+
+    if (setting.channel === "email") {
+      result = await sendEmailAlert({ setting, workspaceName, provider, reason, eventId });
+    } else {
+      result = await sendWebhookAlert({ setting, workspaceName, provider, reason, eventId });
+    }
+
+    if (result.ok) {
+      await logAlertDelivery({
+        workspaceId: setting.workspace_id,
+        alertSettingId: setting.id,
+        channel: setting.channel,
+        status: "sent",
+        responsePayload: result.response || {},
+        providerMessageId: result.providerMessageId,
+      });
+    } else {
+      await logAlertDelivery({
+        workspaceId: setting.workspace_id,
+        alertSettingId: setting.id,
+        channel: setting.channel,
+        status: "failed",
+        lastError: result.error,
+      });
+    }
+  } catch (err) {
+    console.error("Alert delivery failed:", err);
     await logAlertDelivery({
       workspaceId: setting.workspace_id,
       alertSettingId: setting.id,
-      channel: "email",
+      channel: setting.channel,
       status: "failed",
       lastError: err instanceof Error ? err.message : String(err),
     });

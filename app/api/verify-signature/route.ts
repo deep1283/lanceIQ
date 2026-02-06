@@ -3,6 +3,8 @@ import { createClient } from '@/utils/supabase/server';
 import { computeRawBodySha256, verifySignature, detectProvider, type Provider } from '@/lib/signature-verification';
 import { rateLimit } from '@/lib/rate-limit';
 import { signVerificationToken } from '@/lib/verification-token';
+import { checkProStatus } from '@/app/actions/subscription';
+import { getPlanLimits } from '@/lib/plan';
 
 // Simple in-memory rate limiter for Phase 1 (since we don't have Redis)
 const limiter = rateLimit({
@@ -40,28 +42,35 @@ export async function POST(request: NextRequest) {
     // 4. Auth (optional). Token issuance and persistence are only available when authenticated.
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Login required to verify signatures.' }, { status: 401 });
+    }
+
+    const { plan } = await checkProStatus();
+    const limits = getPlanLimits(plan);
+    if (!limits.canVerify) {
+      return NextResponse.json({ error: 'Upgrade required to verify signatures.' }, { status: 403 });
+    }
 
     let verificationToken: string | undefined;
-    if (user) {
-      try {
-        verificationToken = signVerificationToken({
-          v: 1,
-          userId: user.id,
-          provider,
-          rawBodySha256,
-          issuedAt: Math.floor(Date.now() / 1000),
-          result,
-        });
-      } catch (e) {
-        // If token signing fails (missing env), still return the verification result,
-        // but the client won't be able to persist via saveCertificate.
-        console.error("Failed to sign verification token:", e);
-      }
+    try {
+      verificationToken = signVerificationToken({
+        v: 1,
+        userId: user.id,
+        provider,
+        rawBodySha256,
+        issuedAt: Math.floor(Date.now() / 1000),
+        result,
+      });
+    } catch (e) {
+      // If token signing fails (missing env), still return the verification result,
+      // but the client won't be able to persist via saveCertificate.
+      console.error("Failed to sign verification token:", e);
     }
 
     // 5. Persistence (Optional: Only if authenticated and owns certificate)
     // Supports resolving by reportId (friendly ID) or certificateId (UUID)
-    if (user && (reportId || certificateId)) {
+    if (reportId || certificateId) {
       const updateData = {
         signature_status: result.status,
         signature_status_reason: result.reason || null,
