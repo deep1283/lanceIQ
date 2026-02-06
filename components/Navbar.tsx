@@ -4,7 +4,6 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
-import { useRouter } from "next/navigation";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 // Using string path for public assets since standard imports might be tricky without configured aliases
 // or if the files are just in public. Next.js serves public folder at root.
@@ -12,7 +11,6 @@ import type { User as SupabaseUser } from "@supabase/supabase-js";
 const Navbar: React.FC = () => {
   const [user, setUser] = React.useState<SupabaseUser | null>(null);
   const supabase = React.useMemo(() => createClient(), []);
-  const router = useRouter();
 
   React.useEffect(() => {
     const setInitialUser = async () => {
@@ -27,11 +25,6 @@ const Navbar: React.FC = () => {
 
     return () => subscription.unsubscribe();
   }, [supabase]);
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.refresh();
-  };
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-black h-17 flex items-center justify-between px-6 py-3 space-y-0">
@@ -60,6 +53,12 @@ const Navbar: React.FC = () => {
           </div>
         ) : (
           <div className="flex items-center gap-4">
+             <Link
+              href="/pricing"
+              className="text-white hover:text-zinc-200 text-sm transition-colors font-medium"
+            >
+              Pricing
+            </Link>
              <Link
               href="/login"
               className="text-white hover:text-zinc-200 text-sm transition-colors font-medium"

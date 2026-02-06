@@ -2,7 +2,7 @@ import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { FileText, Download, Calendar, CheckCircle, ShieldCheck, ShieldAlert, AlertTriangle, Plus } from "lucide-react";
-import Navbar from "@/components/Navbar";
+import DashboardNavbar from "@/components/DashboardNavbar";
 import { DashboardClient } from "@/components/DashboardClient";
 
 export default async function DashboardPage() {
@@ -29,7 +29,7 @@ export default async function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-slate-50">
-      <Navbar />
+      <DashboardNavbar />
       <DashboardClient>
         {/* Stats */}
         <div className="flex items-center justify-between mb-6">
