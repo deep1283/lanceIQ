@@ -9,6 +9,7 @@ import {
 import { verifyVerificationToken } from "@/lib/verification-token";
 import { checkProStatus } from "@/app/actions/subscription";
 import { getPlanLimits, getRetentionExpiry } from "@/lib/plan";
+import { pickPrimaryWorkspace } from "@/lib/workspace";
 
 export interface CertificateData {
   report_id: string;
@@ -30,15 +31,38 @@ export async function saveCertificate(data: CertificateData) {
     return { success: false, error: "Not authenticated" };
   }
 
-  const { plan } = await checkProStatus();
+  // Find User's Primary Workspace (Logic matches migration backfill)
+  // Priority: 1. Team Plan workspace (if any). 2. Oldest workspace.
+  // We need to fetch this to save it with the certificate.
+  const { data: workspaces, error: wsError } = await supabase
+    .from("workspace_members")
+    .select(`
+      workspace_id, 
+      workspaces ( id, plan, created_at )
+    `)
+    .eq("user_id", user.id);
+
+  const activeWorkspace = pickPrimaryWorkspace(workspaces);
+  if (wsError || !activeWorkspace) {
+    return { success: false, error: "No workspace found for user." };
+  }
+
+  const workspaceId = activeWorkspace.id;
+
+  // Pass workspaceId to checkProStatus to ensure we check the RIGHT workspace's plan
+  const { plan } = await checkProStatus(workspaceId);
   const limits = getPlanLimits(plan);
   const now = new Date();
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0));
 
+  // Count certificates for this WORKSPACE (universal scoping)
+  // Note: strict RLS might block seeing other users' certs if not admin, 
+  // but "count" queries often run as service role or we rely on the policy "View via workspace membership"
+  // which we just added to allow members to see workspace certs.
   const { count: monthCount, error: countError } = await supabase
     .from("certificates")
     .select("id", { count: "exact", head: true })
-    .eq("user_id", user.id)
+    .eq("workspace_id", workspaceId)
     .gte("created_at", monthStart.toISOString());
 
   if (countError) {
@@ -49,7 +73,7 @@ export async function saveCertificate(data: CertificateData) {
   if ((monthCount ?? 0) >= limits.monthlyCertificates) {
     return { 
       success: false, 
-      error: `Monthly certificate limit reached (${limits.monthlyCertificates}).` 
+      error: `Monthly certificate limit reached (${limits.monthlyCertificates}) for this workspace.` 
     };
   }
 
@@ -99,6 +123,7 @@ export async function saveCertificate(data: CertificateData) {
 
   const { error } = await supabase.from("certificates").insert({
     user_id: user.id,
+    workspace_id: workspaceId, // <-- Added Universal Scope
     report_id: data.report_id,
     payload: data.payload,
     headers: data.headers,
@@ -172,10 +197,28 @@ export async function getCertificates() {
     return { certificates: [], error: "Not authenticated" };
   }
 
+  // To support Universal Workspace Scoping, we must filter by the user's *primary* or *active* workspace.
+  // For now, let's reuse the "Primary Workspace" logic: Team > Oldest.
+  // In a future update, we'd pass workspaceId as an argument to this function.
+
+  const { data: workspaces } = await supabase
+    .from("workspace_members")
+    .select(`workspace_id, workspaces ( id, plan, created_at )`)
+    .eq("user_id", user.id);
+  
+  const activeWorkspace = pickPrimaryWorkspace(workspaces);
+  const workspaceId = activeWorkspace?.id ?? null;
+
+  if (!workspaceId) {
+     return { certificates: [], error: "No workspace context found." };
+  }
+
   const nowIso = new Date().toISOString();
+  // Query strictly by workspace_id. RLS policy "View via workspace membership" enables this.
   const { data, error } = await supabase
     .from("certificates")
     .select("*")
+    .eq("workspace_id", workspaceId)
     .gt("expires_at", nowIso)
     .order("created_at", { ascending: false })
     .limit(50);

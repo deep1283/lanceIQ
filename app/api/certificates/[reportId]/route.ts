@@ -3,9 +3,9 @@ import { createClient } from '@/utils/supabase/server';
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { reportId: string } }
+  { params }: { params: Promise<{ reportId: string }> }
 ) {
-  const { reportId } = params;
+  const { reportId } = await params;
   const supabase = await createClient();
 
   const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -13,6 +13,8 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // Universal Scope: Rely on RLS (View via workspace membership) to control access.
+  // This allows Team Admins/Members to see certs in their workspace, not just their own.
   const { data: certificate, error } = await supabase
     .from('certificates')
     .select(
@@ -36,14 +38,13 @@ export async function GET(
       ].join(',')
     )
     .eq('report_id', reportId)
-    .eq('user_id', user.id)
     .single();
 
   if (error || !certificate) {
     return NextResponse.json({ error: 'Certificate not found' }, { status: 404 });
   }
 
-  if (certificate.expires_at && new Date(certificate.expires_at).getTime() <= Date.now()) {
+  if ((certificate as any).expires_at && new Date((certificate as any).expires_at).getTime() <= Date.now()) {
     return NextResponse.json(
       { error: 'Certificate has expired according to your data retention plan.' },
       { status: 410 }

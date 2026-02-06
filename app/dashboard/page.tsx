@@ -6,6 +6,7 @@ import DashboardNavbar from "@/components/DashboardNavbar";
 import { DashboardClient } from "@/components/DashboardClient";
 import { checkProStatus } from "@/app/actions/subscription";
 import { getPlanLimits } from "@/lib/plan";
+import { pickPrimaryWorkspace } from "@/lib/workspace";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -15,16 +16,29 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  const { plan } = await checkProStatus();
+  const { data: memberships } = await supabase
+    .from("workspace_members")
+    .select(`workspace_id, workspaces ( id, plan, created_at )`)
+    .eq("user_id", user.id);
+
+  const activeWorkspace = pickPrimaryWorkspace(memberships);
+  const workspaceId = activeWorkspace?.id ?? null;
+
+  const { plan } = workspaceId ? await checkProStatus(workspaceId) : { plan: 'free' as const };
   const limits = getPlanLimits(plan);
 
   const nowIso = new Date().toISOString();
-  const { data: certificates } = await supabase
-    .from("certificates")
-    .select("*")
-    .gt("expires_at", nowIso)
-    .order("created_at", { ascending: false })
-    .limit(50);
+  let certificates: any[] | null = [];
+  if (workspaceId) {
+    const { data } = await supabase
+      .from("certificates")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .gt("expires_at", nowIso)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    certificates = data || [];
+  }
 
   const thisMonth = new Date();
   thisMonth.setDate(1);
