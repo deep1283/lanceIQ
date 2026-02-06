@@ -44,6 +44,18 @@ const Navbar: React.FC = () => {
       <div className="flex items-center gap-4">
         {user ? (
           <div className="flex items-center gap-4">
+            <Link
+              href="/pricing"
+              className="text-white hover:text-zinc-200 text-sm transition-colors font-medium"
+            >
+              Pricing
+            </Link>
+            <Link
+              href="/contact"
+              className="text-white hover:text-zinc-200 text-sm transition-colors font-medium"
+            >
+              Contact Us
+            </Link>
             <Link 
               href="/dashboard"
               className="text-white hover:text-zinc-200 text-sm transition-colors font-medium"
