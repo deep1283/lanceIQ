@@ -102,6 +102,15 @@ async function sendWebhookAlert(opts: {
 }) {
   const { setting, workspaceName, provider, reason, eventId } = opts;
   const siteUrl = getSiteUrl();
+  let destinationUrl: URL;
+  try {
+    destinationUrl = new URL(setting.destination);
+  } catch {
+    return { ok: false as const, error: "Invalid destination URL." };
+  }
+  if (destinationUrl.protocol !== "https:") {
+    return { ok: false as const, error: "Destination URL must use HTTPS." };
+  }
   const payload =
     setting.channel === "slack"
       ? {
@@ -125,17 +134,24 @@ async function sendWebhookAlert(opts: {
         };
 
   try {
-    const response = await fetch(setting.destination, {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const response = await fetch(destinationUrl.toString(), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
     if (!response.ok) {
       const text = await response.text();
       return { ok: false as const, error: `Webhook failed: ${response.status} ${text}` };
     }
     return { ok: true as const, response: { status: response.status } };
   } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      return { ok: false as const, error: "Webhook timed out after 5s." };
+    }
     return { ok: false as const, error: err instanceof Error ? err.message : String(err) };
   }
 }

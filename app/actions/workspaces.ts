@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { generateApiKey } from '@/lib/api-key';
 import { revalidatePath } from 'next/cache';
+import { logAuditAction, AUDIT_ACTIONS } from '@/utils/audit';
 
 import { encrypt } from '@/lib/encryption';
 
@@ -12,6 +13,18 @@ export async function createWorkspace(data: {
   storeRawBody: boolean;
   secret?: string;
 }) {
+  const name = data.name?.trim();
+  if (!name) {
+    return { error: 'Workspace name is required.' };
+  }
+  if (name.length > 120) {
+    return { error: 'Workspace name must be 120 characters or fewer.' };
+  }
+  const allowedProviders = new Set(['stripe', 'razorpay', 'generic']);
+  if (!allowedProviders.has(data.provider)) {
+    return { error: 'Unsupported provider.' };
+  }
+
   const supabase = await createClient();
   const user = await supabase.auth.getUser();
 
@@ -42,7 +55,7 @@ export async function createWorkspace(data: {
   const { data: workspace, error: wsError } = await supabase
     .from('workspaces')
     .insert({
-      name: data.name,
+      name: name,
       provider: data.provider,
       api_key_hash: hash,
       api_key_last4: last4,
@@ -90,6 +103,18 @@ export async function createWorkspace(data: {
     return { error: 'Failed to assign ownership.' };
   }
 
+  await logAuditAction({
+    workspaceId: workspace.id,
+    action: AUDIT_ACTIONS.WORKSPACE_CREATED,
+    actorId: creatorId,
+    targetResource: 'workspaces',
+    details: {
+      name: name,
+      provider: data.provider,
+      store_raw_body: data.storeRawBody,
+    },
+  });
+
   // 3. Default alert setting (email) - only useful after upgrade
   const defaultEmail = user.data.user.email;
   if (defaultEmail) {
@@ -136,6 +161,10 @@ export async function getWorkspaces() {
 
 export async function deleteWorkspace(id: string) {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: 'Unauthorized' };
+  }
   
   // RLS ensures only owner can delete
   const { error } = await supabase
@@ -147,6 +176,16 @@ export async function deleteWorkspace(id: string) {
     console.error('Delete Workspace Error:', error);
     return { error: 'Failed to delete source.' };
   }
+
+  await logAuditAction({
+    workspaceId: id,
+    action: AUDIT_ACTIONS.WORKSPACE_DELETED,
+    actorId: user.id,
+    targetResource: 'workspaces',
+    details: {
+      workspace_id: id,
+    },
+  });
 
   revalidatePath('/dashboard');
   return { success: true };

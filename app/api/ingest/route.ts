@@ -21,14 +21,14 @@ export async function POST(req: NextRequest) {
   try {
     const apiKey = getApiKeyFromHeaders(req);
     if (!apiKey) {
-      return NextResponse.json({ error: 'Missing API key' }, { status: 401 });
+      return errorResponse('Missing API key', 401);
     }
 
     if (!process.env.API_KEY_HASH_SECRET) {
-      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+      return errorResponse('Server configuration error', 500);
     }
     if (!supabaseUrl || !supabaseServiceKey) {
-      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+      return errorResponse('Server configuration error', 500);
     }
 
     // 1. Hash Request Key
@@ -37,14 +37,14 @@ export async function POST(req: NextRequest) {
       keyHash = hashApiKey(apiKey);
     } catch (err: unknown) {
       console.error('API Key Hashing Error:', err);
-      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+      return errorResponse('Server configuration error', 500);
     }
 
     // 2. Rate Limiting (Per Key)
     const rateLimit = await checkRateLimit(`ingest:${keyHash}`);
     if (!rateLimit.allowed) {
       return NextResponse.json(
-        { error: 'Rate limit exceeded' },
+        { status: 'error', id: null, error: 'Rate limit exceeded' },
         { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSec ?? 60) } }
       );
     }
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (wsError || !workspace) {
-      return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
+      return errorResponse('Invalid API key', 401);
     }
 
     // 3.5. Enforce Monthly Limits (Plan Quota)
@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
        
        if (usageCount >= limit) {
           return NextResponse.json(
-            { error: `Monthly limit exceeded for ${plan} plan (${limit} certificates). Upgrade to accept more.` },
+            { status: 'error', id: null, error: `Monthly limit exceeded for ${plan} plan (${limit} certificates). Upgrade to accept more.` },
             { status: 429 } // Too Many Requests
           );
        }
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
     try {
       rawBody = await req.text();
     } catch {
-      return NextResponse.json({ error: 'Unable to read body' }, { status: 400 });
+      return errorResponse('Unable to read body', 400);
     }
 
     const rawBodySha256 = computeRawBodySha256(rawBody);
@@ -169,7 +169,7 @@ export async function POST(req: NextRequest) {
 
     if (insertError) {
       console.error('Ingest Insert Error:', insertError);
-      return NextResponse.json({ error: 'Storage failed' }, { status: 500 });
+      return errorResponse('Storage failed', 500);
     }
 
     // 7. Log to Verification History
@@ -218,10 +218,15 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ status: 'stored', verified: verificationResult.status }, { status: 200 });
+    const statusText = isDuplicate ? 'duplicate' : 'queued';
+    const httpStatus = isDuplicate ? 200 : 202;
+    return NextResponse.json(
+      { status: statusText, id: event.id, verified: verificationResult.status },
+      { status: httpStatus }
+    );
   } catch (globalErr: unknown) {
     console.error('Unhandled API Error:', globalErr);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return errorResponse('Internal Server Error', 500);
   }
 }
 
@@ -269,4 +274,8 @@ function sanitizeHeaders(headers: Headers): Record<string, string> {
     }
   });
   return obj;
+}
+
+function errorResponse(message: string, status: number) {
+  return NextResponse.json({ status: 'error', id: null, error: message }, { status });
 }

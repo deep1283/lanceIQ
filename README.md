@@ -3,9 +3,19 @@
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Live Demo](https://img.shields.io/badge/demo-lanceiq.com-green)](https://lanceiq.com)
 
-**Generate professional Webhook Delivery Certificates in seconds.**
+**Generate professional Webhook Receipt Certificates in seconds.**
 
-LanceIQ creates official-looking PDF certificates documenting webhook deliveries. Perfect for audits, compliance, dispute resolution, and record-keeping.
+LanceIQ creates official-looking PDF certificates documenting webhook receipt and verification. Perfect for audits, compliance, dispute resolution, and record-keeping.
+
+## Read First
+Before making changes, read:
+1. `/Users/deepmishra/vscode/LanceIQ/OWNERSHIP.md`
+2. `/Users/deepmishra/vscode/LanceIQ/ATOMIZATION.md`
+3. `/Users/deepmishra/vscode/LanceIQ/ARCHITECTURE.md`
+4. `/Users/deepmishra/vscode/LanceIQ/CONTRACTS.md`
+5. `/Users/deepmishra/vscode/LanceIQ/DECISIONS.md`
+6. `/Users/deepmishra/vscode/LanceIQ/STATUS.md`
+7. `/Users/deepmishra/vscode/LanceIQ/OPERATING_RULES.md`
 
 ![LanceIQ Input Form](./public/assets/input%20form.png)
 

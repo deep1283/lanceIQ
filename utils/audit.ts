@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server';
 
 export const AUDIT_ACTIONS = {
+  WORKSPACE_CREATED: 'workspace.created',
   WORKSPACE_UPDATED: 'workspace.updated',
   WORKSPACE_DELETED: 'workspace.deleted',
   MEMBER_INVITED: 'member.invited',
@@ -50,6 +51,10 @@ export async function logAuditAction(params: {
 
     // Use admin client for insertion (bypassing RLS insert restrictions)
     const adminClient = await createAdminClient();
+    if (!adminClient) {
+      console.error('Audit log skipped: missing Supabase admin credentials.');
+      return;
+    }
 
     const { error } = await adminClient
       .from('audit_logs')
@@ -76,8 +81,9 @@ export async function logAuditAction(params: {
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
 async function createAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceKey) return null;
   return createSupabaseClient(url, serviceKey, {
     auth: {
       autoRefreshToken: false,

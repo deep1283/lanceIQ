@@ -43,15 +43,15 @@ export async function POST(
     }
     
     if (!apiKey || apiKey === '_') {
-      return NextResponse.json({ error: 'Missing API Key' }, { status: 400 });
+      return errorResponse('Missing API Key', 400);
     }
     
     if (!process.env.API_KEY_HASH_SECRET) {
-      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+      return errorResponse('Server configuration error', 500);
     }
     
     if (!supabaseUrl || !supabaseServiceKey) {
-      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+      return errorResponse('Server configuration error', 500);
     }
 
     // 1. Hash Request Key
@@ -60,14 +60,14 @@ export async function POST(
       keyHash = hashApiKey(apiKey);
     } catch (err: unknown) {
       console.error('API Key Hashing Error:', err);
-      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+      return errorResponse('Server configuration error', 500);
     }
 
     // 2. Rate Limiting (Per Key)
     const rateLimit = await checkRateLimit(`ingest:${keyHash}`);
     if (!rateLimit.allowed) {
       return NextResponse.json(
-        { error: 'Rate limit exceeded' },
+        { status: 'error', id: null, error: 'Rate limit exceeded' },
         { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSec ?? 60) } }
       );
     }
@@ -82,7 +82,39 @@ export async function POST(
       .single();
 
     if (wsError || !workspace) {
-      return NextResponse.json({ error: 'Invalid API Key' }, { status: 401 });
+      return errorResponse('Invalid API Key', 401);
+    }
+
+    // 3.5. Enforce Monthly Limits (Plan Quota)
+    // Avoid heavy COUNT(*) on every request by caching or using estimates if scale is huge.
+    // For now, simple count is fine for <10k scale.
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    
+    // Check usage
+    const { count: usageCount, error: countError } = await supabase
+      .from('ingested_events')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspace.id)
+      .gte('received_at', startOfMonth);
+
+    if (!countError && usageCount !== null) {
+       // Import limits dynamically or fallback
+       const limits = {
+         free: 100,
+         pro: 2000,
+         team: 10000 
+       };
+       // Current plan or default to free
+       const plan = (workspace.plan || 'free') as 'free' | 'pro' | 'team';
+       const limit = limits[plan] || 100;
+       
+       if (usageCount >= limit) {
+          return NextResponse.json(
+            { status: 'error', id: null, error: `Monthly limit exceeded for ${plan} plan (${limit} certificates). Upgrade to accept more.` },
+            { status: 429 } // Too Many Requests
+          );
+       }
     }
 
     // 4. Process Payload
@@ -90,7 +122,7 @@ export async function POST(
     try {
       rawBody = await req.text();
     } catch {
-      return NextResponse.json({ error: 'Unable to read body' }, { status: 400 });
+      return errorResponse('Unable to read body', 400);
     }
 
     const rawBodySha256 = computeRawBodySha256(rawBody);
@@ -165,7 +197,7 @@ export async function POST(
 
     if (insertError) {
       console.error('Ingest Insert Error:', insertError);
-      return NextResponse.json({ error: 'Storage failed' }, { status: 500 });
+      return errorResponse('Storage failed', 500);
     }
 
     // 7. Log to Verification History
@@ -216,11 +248,16 @@ export async function POST(
       }
     }
 
-    return NextResponse.json({ status: 'stored', verified: verificationResult.status }, { status: 200 });
+    const statusText = isDuplicate ? 'duplicate' : 'queued';
+    const httpStatus = isDuplicate ? 200 : 202;
+    return NextResponse.json(
+      { status: statusText, id: event.id, verified: verificationResult.status },
+      { status: httpStatus }
+    );
     
   } catch (globalErr: unknown) {
     console.error('Unhandled API Error:', globalErr);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return errorResponse('Internal Server Error', 500);
   }
 }
 
@@ -259,4 +296,8 @@ function sanitizeHeaders(headers: Headers): Record<string, string> {
     }
   });
   return obj;
+}
+
+function errorResponse(message: string, status: number) {
+  return NextResponse.json({ status: 'error', id: null, error: message }, { status });
 }

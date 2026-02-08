@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { logAuditAction, AUDIT_ACTIONS } from '@/utils/audit';
 import { revalidatePath } from 'next/cache';
+import { canManageWorkspace } from '@/lib/roles';
 
 interface AlertSettingsUpdate {
   workspace_id: string;
@@ -44,7 +45,7 @@ export async function updateAlertSettings(data: AlertSettingsUpdate) {
     .eq('user_id', user.id)
     .single();
 
-  if (memError || !membership || !['owner', 'admin'].includes(membership.role)) {
+  if (memError || !membership || !canManageWorkspace(membership.role)) {
     return { error: 'You do not have permission to manage alerts for this workspace.' };
   }
 
@@ -60,8 +61,13 @@ export async function updateAlertSettings(data: AlertSettingsUpdate) {
   }
 
   const isTeam = workspace.plan === 'team';
-  const isPastDue = workspace.subscription_status === 'past_due';
-  const canUseAlerts = isTeam && (workspace.subscription_status === 'active' || isPastDue);
+  const status = workspace.subscription_status;
+  const isActive = status === 'active' || status === 'past_due';
+  const isCanceledButActive =
+    status === 'canceled' &&
+    typeof workspace.subscription_current_period_end === 'string' &&
+    new Date(workspace.subscription_current_period_end).getTime() > Date.now();
+  const canUseAlerts = isTeam && (isActive || isCanceledButActive);
   if (!canUseAlerts) {
     return { error: 'Upgrade to Team to enable alert settings.' };
   }

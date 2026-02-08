@@ -40,6 +40,7 @@ export default async function VerifyPage({ params }: { params: Promise<{ id: str
 
   const cert = result.data;
   const formattedDate = cert.created_at ? format(new Date(cert.created_at), "PPpp") : "Unknown Date";
+  const payloadHash = cert.raw_body_sha256 || cert.payload_hash || cert.hash || "Legacy Record (No Hash Stored)";
 
   // Truncate payload for preview
   const payloadString = JSON.stringify(cert.payload, null, 2);
@@ -90,6 +91,15 @@ export default async function VerifyPage({ params }: { params: Promise<{ id: str
           <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4 tracking-tight">LanceIQ Verification</h1>
           <p className="text-slate-500 max-w-lg mx-auto">
             This page shows the stored certificate data and (when available) a server-computed signature verification result.
+          </p>
+        </div>
+
+        <div className="bg-white border border-slate-200/60 rounded-2xl p-6 md:p-8 mb-8 text-sm text-slate-600">
+          <p className="font-semibold text-slate-900 mb-2">Scope of Proof</p>
+          <p>
+            This certificate attests only to receipt by LanceIQ at the timestamp shown, the payload and headers received,
+            and the verification status computed. It does not attest to upstream provider intent, downstream processing,
+            or financial settlement.
           </p>
         </div>
 
@@ -180,10 +190,11 @@ export default async function VerifyPage({ params }: { params: Promise<{ id: str
               <div className="bg-green-50 rounded-xl p-6 border border-green-200 mb-6">
                 <div className="flex items-center gap-3 mb-3">
                    <ShieldCheck className="w-5 h-5 text-green-700" />
-                   <h4 className="font-bold text-green-900">Origin Verified by LanceIQ</h4>
+                   <h4 className="font-bold text-green-900">Signature Verified by LanceIQ</h4>
                 </div>
                 <p className="text-sm text-green-800 mb-3 leading-relaxed">
-                   This payload was cryptographically verified against the provider&apos;s signature using the secret key provided by the host. 
+                   This payload was cryptographically verified using the secret configured for this workspace. 
+                   This indicates the payload matched the signature at verification time.
                 </p>
                  <div className="bg-white/80 p-3 rounded-lg text-xs font-mono text-green-800 space-y-1">
                     <p>Method: {cert.verification_method}</p>
@@ -211,7 +222,7 @@ export default async function VerifyPage({ params }: { params: Promise<{ id: str
               <div className="mb-4">
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Payload Hash (SHA-256)</p>
                 <div className="bg-white p-3 rounded-lg border border-slate-200 font-mono text-xs text-slate-600 break-all">
-                  {cert.payload_hash || "Legacy Record (No Hash Stored)"}
+                  {payloadHash}
                 </div>
               </div>
                <p className="text-xs text-slate-400 leading-relaxed">

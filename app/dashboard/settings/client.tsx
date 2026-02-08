@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateAlertSettings } from '@/app/actions/alert-settings';
 import { inviteMember, removeMember } from '@/app/actions/members';
+import type { Role } from '@/lib/roles';
 
 interface Workspace {
   id: string;
@@ -35,7 +36,7 @@ interface AuditLog {
 interface Member {
   user_id: string;
   email: string;
-  role: 'owner' | 'admin' | 'member';
+  role: Role;
   joined_at: string;
 }
 

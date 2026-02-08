@@ -2,6 +2,12 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
+import { canInviteMembers, isOwner } from "@/lib/roles";
+import { logAuditAction, AUDIT_ACTIONS } from "@/utils/audit";
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
 
 export async function inviteMember(email: string, workspaceId: string) {
   const supabase = await createClient();
@@ -9,6 +15,13 @@ export async function inviteMember(email: string, workspaceId: string) {
   // 1. Verify Authentication & Ownership
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail || !isValidEmail(normalizedEmail)) {
+    return { error: "Please provide a valid email address." };
+  }
+  if (user.email && normalizedEmail === user.email.toLowerCase()) {
+    return { error: "You are already a member of this workspace." };
+  }
 
   const { data: membership, error: membershipError } = await supabase
     .from('workspace_members')
@@ -17,7 +30,7 @@ export async function inviteMember(email: string, workspaceId: string) {
     .eq('user_id', user.id)
     .single();
 
-  if (membershipError || !membership || !['owner', 'admin'].includes(membership.role)) {
+  if (membershipError || !membership || !canInviteMembers(membership.role)) {
     return { error: "You do not have permission to invite members." };
   }
 
@@ -34,7 +47,7 @@ export async function inviteMember(email: string, workspaceId: string) {
   
   // 3. Lookup User by Email using RPC
   const { data: targetUserId, error: lookupError } = await supabase
-    .rpc('get_user_id_by_email', { email, lookup_workspace_id: workspaceId });
+    .rpc('get_user_id_by_email', { email: normalizedEmail, lookup_workspace_id: workspaceId });
 
   if (lookupError || !targetUserId) {
     // If user not found, we currently BLOCK (MVP).
@@ -58,6 +71,17 @@ export async function inviteMember(email: string, workspaceId: string) {
     return { error: "Failed to add member." };
   }
 
+  await logAuditAction({
+    workspaceId: workspaceId,
+    action: AUDIT_ACTIONS.MEMBER_INVITED,
+    actorId: user.id,
+    targetResource: 'workspace_members',
+    details: {
+      invited_user_id: targetUserId,
+      invited_email: normalizedEmail,
+    },
+  });
+
   revalidatePath('/dashboard/settings');
   return { success: true };
 }
@@ -76,7 +100,7 @@ export async function removeMember(userId: string, workspaceId: string) {
     .eq('user_id', user.id)
     .single();
 
-  if (!requester || requester.role !== 'owner') {
+  if (!requester || !isOwner(requester.role)) {
      return { error: "Only owners can remove members." };
   }
 
@@ -94,6 +118,16 @@ export async function removeMember(userId: string, workspaceId: string) {
   if (error) {
     return { error: error.message };
   }
+
+  await logAuditAction({
+    workspaceId: workspaceId,
+    action: AUDIT_ACTIONS.MEMBER_REMOVED,
+    actorId: user.id,
+    targetResource: 'workspace_members',
+    details: {
+      removed_user_id: userId,
+    },
+  });
 
   revalidatePath('/dashboard/settings');
   return { success: true };
