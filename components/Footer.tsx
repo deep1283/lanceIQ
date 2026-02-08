@@ -4,6 +4,14 @@ import Link from "next/link";
 const Footer: React.FC = () => {
   return (
     <footer className="flex flex-col justify-center items-center py-8 bg-gray-900 text-white border-t border-gray-800">
+      <div className="max-w-3xl text-center mb-6 px-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">Scope of Proof</p>
+        <p className="text-xs text-gray-400 mt-2 leading-relaxed">
+          This certificate attests only to receipt by LanceIQ at the timestamp shown, the payload and headers received,
+          and the verification status computed. It does not attest to upstream provider intent, downstream processing,
+          or financial settlement.
+        </p>
+      </div>
       <div className="flex flex-wrap justify-center gap-6 mb-4 text-sm text-gray-400">
         <Link href="/security" className="hover:text-white transition-colors">Security</Link>
         <Link href="/dpa" className="hover:text-white transition-colors">DPA</Link>

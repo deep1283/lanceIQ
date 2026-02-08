@@ -16,16 +16,30 @@ Owner: Product Owner (You)
 5. ATOMIZATION.md created with feature-level boundaries.
 6. Scope-of-proof disclaimer added to certificate template and verification page.
 7. Role helpers introduced and used in server actions.
+8. Ingest contract compliance (status + id, 202 for queued, 200 for duplicate).
+9. Standardized ingest error responses.
+10. Plan quota enforcement on ingest endpoints.
+11. Audit logging for workspace/member actions.
+12. Alert delivery hardening and input validation.
+13. Alert settings gating honors grace period.
+14. workspace_usage_periods.event_count defaulted to 0 for safe increment trigger.
+15. Audit logs API: read-only, paginated, owner/admin, team-plan only via RLS.
+16. Scope-of-proof language added to marketing pages and tool download flow.
+17. Tool UI shows read-only audit logs for team owners/admins.
+8. Ingest responses now return status + id and use 202 for queued, 200 for duplicate.
+9. Plan quota enforcement added to /api/ingest/[apiKey].
+10. Audit logs now recorded for workspace create/delete and member invite/remove.
+11. Alert delivery hardened (HTTPS validation, timeout, safe logging).
+12. Server-side validation added for workspace creation and member invites.
+13. Alert settings gating now honors canceled-but-active grace period.
 
 ## In Progress
 1. None active (ready to start next phase).
 
 ## Next Up (V1 to V2)
-1. Add scope-of-proof language to marketing pages and download flows.
-2. Implement audit logs API endpoint and UI for owners/admins.
-3. Document immutability policy in user-facing terms.
-4. Add legal hold policy and minimal schema changes.
-5. Define retention tier behavior in UI and exports.
+1. Define legal hold policy and add backend enforcement flows.
+2. Surface retention behavior in UI and exports.
+3. Add DB-level idempotency constraint for provider event IDs.
 
 ## Enterprise Roadmap (V3)
 1. Time credibility: external anchoring or RFC-3161 timestamping.

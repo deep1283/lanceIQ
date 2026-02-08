@@ -17,6 +17,16 @@ import AppNavbar from "@/components/AppNavbar";
 
 const PROMO_END_LOCAL = new Date(2026, 1, 6, 23, 59, 59, 999);
 
+type AuditLogEntry = {
+  id: string;
+  actor_id: string | null;
+  action: string;
+  target_resource: string | null;
+  details: Record<string, unknown> | null;
+  ip_address: string | null;
+  created_at: string;
+};
+
 export default function Home() {
   const searchParams = useSearchParams();
   const certificateId = searchParams?.get('id');
@@ -43,6 +53,15 @@ export default function Home() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [verifyMessage, setVerifyMessage] = useState<string | null>(null);
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [workspaceName, setWorkspaceName] = useState<string | null>(null);
+  const [workspacePlan, setWorkspacePlan] = useState<string | null>(null);
+  const [workspaceRole, setWorkspaceRole] = useState<string | null>(null);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [auditNextCursor, setAuditNextCursor] = useState<string | null>(null);
+  const [auditNextCursorId, setAuditNextCursorId] = useState<string | null>(null);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditError, setAuditError] = useState<string | null>(null);
   
   // Auth state
   const [user, setUser] = useState<SupabaseUser | null>(null);
@@ -56,6 +75,9 @@ export default function Home() {
   // Signature Verification State (BYOS Phase 1)
   const [showSigVerifyModal, setShowSigVerifyModal] = useState(false);
   const [verificationResult, setVerificationResult] = useState<VerificationApiResponse | null>(null);
+
+  const canViewAuditLogs =
+    workspacePlan === 'team' && (workspaceRole === 'owner' || workspaceRole === 'admin');
 
   const syncProStatus = async () => {
     const promoActive = Date.now() <= PROMO_END_LOCAL.getTime();
@@ -118,6 +140,107 @@ export default function Home() {
       }
     };
   }, [supabase, certificateId]);
+
+  useEffect(() => {
+    if (!user) {
+      setWorkspaceId(null);
+      setWorkspaceName(null);
+      setWorkspacePlan(null);
+      setWorkspaceRole(null);
+      setAuditLogs([]);
+      setAuditNextCursor(null);
+      setAuditNextCursorId(null);
+      setAuditError(null);
+      setAuditLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadWorkspaceContext = async () => {
+      const { data: membership, error: membershipError } = await supabase
+        .from('workspace_members')
+        .select('workspace_id, role')
+        .eq('user_id', user.id)
+        .limit(1)
+        .single();
+
+      if (cancelled) return;
+
+      if (membershipError || !membership) {
+        setWorkspaceId(null);
+        setWorkspaceName(null);
+        setWorkspacePlan(null);
+        setWorkspaceRole(null);
+        return;
+      }
+
+      setWorkspaceId(membership.workspace_id);
+      setWorkspaceRole(membership.role);
+
+      const { data: workspace } = await supabase
+        .from('workspaces')
+        .select('id, name, plan')
+        .eq('id', membership.workspace_id)
+        .single();
+
+      if (cancelled) return;
+
+      setWorkspaceName(workspace?.name ?? null);
+      setWorkspacePlan(workspace?.plan ?? null);
+    };
+
+    loadWorkspaceContext();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, user]);
+
+  const fetchAuditLogs = async (options?: { append?: boolean; cursor?: string | null; cursorId?: string | null }) => {
+    if (!workspaceId) return;
+    setAuditLoading(true);
+    setAuditError(null);
+
+    try {
+      const params = new URLSearchParams({
+        workspace_id: workspaceId,
+        limit: '50',
+      });
+      if (options?.cursor) {
+        params.set('cursor', options.cursor);
+      }
+      if (options?.cursorId) {
+        params.set('cursor_id', options.cursorId);
+      }
+
+      const res = await fetch(`/api/audit-logs?${params.toString()}`);
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload.error || 'Failed to load audit logs.');
+      }
+
+      const entries = Array.isArray(payload.data) ? payload.data : [];
+      setAuditLogs((prev) => (options?.append ? [...prev, ...entries] : entries));
+      setAuditNextCursor(payload.next_cursor ?? null);
+      setAuditNextCursorId(payload.next_cursor_id ?? null);
+    } catch (err) {
+      setAuditError(err instanceof Error ? err.message : 'Failed to load audit logs.');
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!canViewAuditLogs || !workspaceId) {
+      setAuditLogs([]);
+      setAuditNextCursor(null);
+      setAuditNextCursorId(null);
+      return;
+    }
+
+    void fetchAuditLogs();
+  }, [canViewAuditLogs, workspaceId]);
 
   useEffect(() => {
     if (!certificateId) {
@@ -678,8 +801,92 @@ export default function Home() {
                 <p className="text-xs text-slate-400 text-center mt-3">
                     {isWatermarkFree ? 'Watermark-free certificates enabled.' : 'Free tier includes a watermark.'}
                 </p>
+
+                <div className="mt-4 border border-slate-200 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
+                  <p className="font-semibold text-slate-700 mb-1">Scope of Proof</p>
+                  <p>
+                    This certificate attests only to receipt by LanceIQ at the timestamp shown, the payload and headers received,
+                    and the verification status computed. It does not attest to upstream provider intent, downstream processing,
+                    or financial settlement.
+                  </p>
+                </div>
              </div>
           </div>
+
+          {user && canViewAuditLogs && (
+            <div className="pt-8">
+              <div className="border-t border-slate-200 pt-6">
+                <div className="flex items-start justify-between gap-4 mb-4">
+                  <div>
+                    <h2 className="text-sm font-semibold text-slate-900">Audit Logs</h2>
+                    <p className="text-xs text-slate-500">
+                      Read-only workspace activity for owners/admins on Team plans.
+                    </p>
+                  </div>
+                  {workspaceName && (
+                    <span className="text-xs text-slate-500 bg-white border border-slate-200 rounded-full px-3 py-1">
+                      {workspaceName}
+                    </span>
+                  )}
+                </div>
+
+                {auditError && (
+                  <div className="mb-4 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">
+                    {auditError}
+                  </div>
+                )}
+
+                {!auditError && auditLoading && auditLogs.length === 0 && (
+                  <div className="text-xs text-slate-500">Loading audit logs...</div>
+                )}
+
+                {!auditLoading && auditLogs.length === 0 && !auditError && (
+                  <div className="text-xs text-slate-500">No audit activity recorded yet.</div>
+                )}
+
+                {auditLogs.length > 0 && (
+                  <div className="space-y-3">
+                    {auditLogs.map((entry) => (
+                      <div key={entry.id} className="border border-slate-200 rounded-lg bg-white p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                          <div className="text-xs font-semibold text-slate-800">{entry.action}</div>
+                          <div className="text-[11px] text-slate-400">
+                            {new Date(entry.created_at).toLocaleString()}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-500">
+                          <div>
+                            <span className="font-semibold text-slate-600">Actor:</span>{" "}
+                            <span className="font-mono">{entry.actor_id ?? "System"}</span>
+                          </div>
+                          <div>
+                            <span className="font-semibold text-slate-600">Target:</span>{" "}
+                            <span className="font-mono">{entry.target_resource ?? "—"}</span>
+                          </div>
+                        </div>
+                        {entry.details && (
+                          <pre className="mt-2 bg-slate-50 border border-slate-200 rounded p-2 text-[10px] text-slate-500 overflow-x-auto">
+                            {JSON.stringify(entry.details, null, 2)}
+                          </pre>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {auditNextCursor && (
+                  <button
+                    type="button"
+                    onClick={() => fetchAuditLogs({ append: true, cursor: auditNextCursor, cursorId: auditNextCursorId })}
+                    disabled={auditLoading}
+                    className="mt-4 w-full text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg py-2 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {auditLoading ? 'Loading...' : 'Load more'}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

@@ -62,19 +62,22 @@ export async function POST(req: NextRequest) {
     }
 
     // 3.5. Enforce Monthly Limits (Plan Quota)
-    // Avoid heavy COUNT(*) on every request by caching or using estimates if scale is huge.
-    // For now, simple count is fine for <10k scale.
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
     
-    // Check usage
-    const { count: usageCount, error: countError } = await supabase
-      .from('ingested_events')
-      .select('id', { count: 'exact', head: true })
+    // Check usage via optimized table (set by backend_feedback_fixes.sql)
+    const { data: usageData, error: usageError } = await supabase
+      .from('workspace_usage_periods')
+      .select('event_count')
       .eq('workspace_id', workspace.id)
-      .gte('received_at', startOfMonth);
+      .eq('period_start', startOfMonth)
+      .single();
 
-    if (!countError && usageCount !== null) {
+    // If no row exists, count is effectively 0. Error likely means row missing or DB issue.
+    // We treat missing row as 0 usage.
+    const usageCount = usageData?.event_count || 0;
+
+    if (!usageError || usageError.code === 'PGRST116') { // PGRST116 = no rows returned
        // Import limits dynamically or fallback
        const limits = {
          free: 100,
@@ -168,6 +171,26 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (insertError) {
+      // Handle Unique Violation (23505) from idx_ingested_events_dedup
+      if (insertError.code === '23505') {
+         // It's a duplicate. We must fetch the existing ID to return it.
+         // Note: Index is (workspace_id, detected_provider, provider_event_id), so we should use all 3 for best hit.
+         const { data: existing } = await supabase
+           .from('ingested_events')
+           .select('id')
+           .eq('workspace_id', workspace.id)
+           .eq('detected_provider', detectedProvider) 
+           .eq('provider_event_id', providerEventId)
+           .single();
+           
+         if (existing) {
+            return NextResponse.json(
+              { status: 'duplicate', id: existing.id, verified: verificationResult.status },
+              { status: 200 }
+            );
+         }
+      }
+
       console.error('Ingest Insert Error:', insertError);
       return errorResponse('Storage failed', 500);
     }
