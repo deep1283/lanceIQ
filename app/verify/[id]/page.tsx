@@ -1,4 +1,5 @@
 import { XCircle, Shield, Calendar, Activity, Hash, ShieldCheck, ShieldAlert, AlertTriangle } from "lucide-react";
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { getCertificateForVerification } from "@/app/actions/certificates";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -8,6 +9,94 @@ export const metadata = {
   title: "Verify Certificate | LanceIQ",
   description: "Verify the authenticity of a LanceIQ delivery record.",
 };
+
+type TimestampReceipt = {
+  anchoredHash: string | null;
+  transactionId: string | null;
+  proofData: string | null;
+  tsaUrl: string | null;
+  chainName: string | null;
+  blockHeight: number | null;
+  createdAt: string | null;
+};
+
+async function fetchTimestampReceipt(reportId: string, rawBodySha256: string | null) {
+  if (!rawBodySha256) {
+    return { receipt: null as TimestampReceipt | null, error: null as string | null };
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceRoleKey) {
+    return { receipt: null as TimestampReceipt | null, error: "Timestamp receipt unavailable." };
+  }
+
+  const supabase = createSupabaseClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  const { data: certRow, error: certError } = await supabase
+    .from("certificates")
+    .select("id, workspace_id")
+    .eq("report_id", reportId)
+    .single();
+
+  if (certError || !certRow?.workspace_id) {
+    return { receipt: null as TimestampReceipt | null, error: "Timestamp receipt unavailable." };
+  }
+
+  const { data: ingestedEvents, error: ingestedError } = await supabase
+    .from("ingested_events")
+    .select("id, received_at")
+    .eq("workspace_id", certRow.workspace_id)
+    .eq("raw_body_sha256", rawBodySha256)
+    .order("received_at", { ascending: false })
+    .limit(1);
+
+  if (ingestedError) {
+    return { receipt: null as TimestampReceipt | null, error: "Timestamp receipt unavailable." };
+  }
+
+  const ingestedEvent = Array.isArray(ingestedEvents) ? ingestedEvents[0] : null;
+  if (!ingestedEvent?.id) {
+    return { receipt: null as TimestampReceipt | null, error: null as string | null };
+  }
+
+  const { data: receipts, error: receiptError } = await supabase
+    .from("timestamp_receipts")
+    .select("anchored_hash, transaction_id, proof_data, tsa_url, chain_name, block_height, created_at")
+    .eq("workspace_id", certRow.workspace_id)
+    .eq("resource_type", "ingested_event")
+    .eq("resource_id", ingestedEvent.id)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (receiptError) {
+    return { receipt: null as TimestampReceipt | null, error: "Timestamp receipt unavailable." };
+  }
+
+  const receipt = Array.isArray(receipts) ? receipts[0] : null;
+  if (!receipt) {
+    return { receipt: null as TimestampReceipt | null, error: null as string | null };
+  }
+
+  return {
+    receipt: {
+      anchoredHash: receipt.anchored_hash ?? null,
+      transactionId: receipt.transaction_id ?? null,
+      proofData: typeof receipt.proof_data === "string"
+        ? receipt.proof_data
+        : receipt.proof_data
+          ? JSON.stringify(receipt.proof_data)
+          : null,
+      tsaUrl: receipt.tsa_url ?? null,
+      chainName: receipt.chain_name ?? null,
+      blockHeight: typeof receipt.block_height === "number" ? receipt.block_height : null,
+      createdAt: receipt.created_at ?? null,
+    },
+    error: null as string | null,
+  };
+}
 
 export default async function VerifyPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -41,6 +130,14 @@ export default async function VerifyPage({ params }: { params: Promise<{ id: str
   const cert = result.data;
   const formattedDate = cert.created_at ? format(new Date(cert.created_at), "PPpp") : "Unknown Date";
   const payloadHash = cert.raw_body_sha256 || cert.payload_hash || cert.hash || "Legacy Record (No Hash Stored)";
+  const rawBodyHashForReceipt =
+    typeof cert.raw_body_sha256 === "string" && cert.raw_body_sha256.length > 0
+      ? cert.raw_body_sha256
+      : typeof cert.payload_hash === "string" && cert.payload_hash.length > 0
+        ? cert.payload_hash
+        : typeof cert.hash === "string" && cert.hash.length > 0
+          ? cert.hash
+          : null;
   const rawBodyExpiresAt = cert.raw_body_expires_at ?? cert.rawBodyExpiresAt ?? null;
   const rawBodyPresent =
     typeof cert.raw_body_present === 'boolean'
@@ -49,6 +146,15 @@ export default async function VerifyPage({ params }: { params: Promise<{ id: str
         ? cert.rawBodyPresent
         : null;
   const retentionPolicyLabel = cert.retention_policy_label ?? cert.retentionPolicyLabel ?? null;
+  const { receipt: timestampReceipt, error: timestampReceiptError } = await fetchTimestampReceipt(
+    id,
+    rawBodyHashForReceipt
+  );
+  const timestampProofSnippet = timestampReceipt?.proofData
+    ? timestampReceipt.proofData.length > 96
+      ? `${timestampReceipt.proofData.slice(0, 64)}…${timestampReceipt.proofData.slice(-24)}`
+      : timestampReceipt.proofData
+    : null;
 
   // Truncate payload for preview
   const payloadString = JSON.stringify(cert.payload, null, 2);
@@ -194,10 +300,10 @@ export default async function VerifyPage({ params }: { params: Promise<{ id: str
             </div>
           </div>
 
-          {/* Retention Status */}
-          <div className="p-8 border-b border-slate-100">
-            <h3 className="text-sm font-semibold text-slate-900 mb-4">Retention Status</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-600">
+        {/* Retention Status */}
+        <div className="p-8 border-b border-slate-100">
+          <h3 className="text-sm font-semibold text-slate-900 mb-4">Retention Status</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-600">
               <div className="space-y-1">
                 <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Raw Body Present</p>
                 <p className="font-mono text-slate-700">{rawBodyPresentLabel}</p>
@@ -209,11 +315,52 @@ export default async function VerifyPage({ params }: { params: Promise<{ id: str
               <div className="space-y-1">
                 <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Retention Policy</p>
                 <p className="font-mono text-slate-700 break-all">{retentionPolicyLabelText}</p>
-              </div>
             </div>
           </div>
+        </div>
 
-          {/* Verification Proof Section */}
+        {/* Timestamp Proof */}
+        <div className="p-8 border-b border-slate-100">
+          <h3 className="text-sm font-semibold text-slate-900 mb-4">Timestamp Proof (RFC-3161)</h3>
+          {timestampReceipt ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-600">
+              <div className="space-y-1">
+                <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Anchored Hash</p>
+                <p className="font-mono text-slate-700 break-all">{timestampReceipt.anchoredHash}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Transaction ID</p>
+                <p className="font-mono text-slate-700 break-all">{timestampReceipt.transactionId}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Timestamped At</p>
+                <p className="font-mono text-slate-700 break-all">
+                  {timestampReceipt.createdAt ? `${format(new Date(timestampReceipt.createdAt), "PPpp")} UTC` : "Unknown"}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">TSA URL</p>
+                <p className="font-mono text-slate-700 break-all">{timestampReceipt.tsaUrl ?? "n/a"}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Chain / Block</p>
+                <p className="font-mono text-slate-700 break-all">
+                  {timestampReceipt.chainName || "n/a"}{typeof timestampReceipt.blockHeight === "number" ? ` @ ${timestampReceipt.blockHeight}` : ""}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Proof (Base64)</p>
+                <p className="font-mono text-slate-700 break-all">{timestampProofSnippet || "n/a"}</p>
+              </div>
+            </div>
+          ) : timestampReceiptError ? (
+            <p className="text-xs text-red-600">{timestampReceiptError}</p>
+          ) : (
+            <p className="text-xs text-slate-500">No RFC-3161 timestamp receipt recorded for this record.</p>
+          )}
+        </div>
+
+        {/* Verification Proof Section */}
           <div className="p-8">
             <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
               <span className="w-1 h-6 bg-indigo-500 rounded-full" />

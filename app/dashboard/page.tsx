@@ -7,6 +7,7 @@ import { DashboardClient } from "@/components/DashboardClient";
 import { checkProStatus } from "@/app/actions/subscription";
 import { getPlanLimits } from "@/lib/plan";
 import { pickPrimaryWorkspace } from "@/lib/workspace";
+import { canExportCertificates } from "@/lib/roles";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -18,11 +19,14 @@ export default async function DashboardPage() {
 
   const { data: memberships } = await supabase
     .from("workspace_members")
-    .select(`workspace_id, workspaces ( id, plan, created_at )`)
+    .select(`workspace_id, role, workspaces ( id, plan, created_at )`)
     .eq("user_id", user.id);
 
   const activeWorkspace = pickPrimaryWorkspace(memberships);
   const workspaceId = activeWorkspace?.id ?? null;
+  const activeMembership = memberships?.find((membership) => membership.workspace_id === workspaceId);
+  const workspaceRole = activeMembership?.role ?? null;
+  const canExport = canExportCertificates(workspaceRole);
 
   const { plan } = workspaceId ? await checkProStatus(workspaceId) : { plan: 'free' as const };
   const limits = getPlanLimits(plan);
@@ -51,7 +55,7 @@ export default async function DashboardPage() {
   return (
     <main className="min-h-screen bg-slate-50">
       <DashboardNavbar />
-      <DashboardClient>
+      <DashboardClient workspaceRole={workspaceRole}>
         {/* Stats */}
         <div className="flex items-center justify-between mb-6">
           <Link 
@@ -60,7 +64,7 @@ export default async function DashboardPage() {
           >
             ← Back to Generator
           </Link>
-          {limits.canExport && (
+          {limits.canExport && canExport && (
             <a
               href="/api/certificates/export"
               className="flex items-center gap-2 text-slate-600 hover:text-indigo-600 transition-colors text-sm font-medium"
@@ -176,13 +180,15 @@ export default async function DashboardPage() {
                           <ExternalLink className="w-3 h-3" />
                           Open
                         </Link>
-                        <a
-                          href={`/tool?id=${cert.report_id}&download=1`}
-                          className="inline-flex items-center gap-1 text-slate-600 hover:text-indigo-600 text-sm font-medium transition-colors"
-                        >
-                          <Download className="w-3 h-3" />
-                          PDF
-                        </a>
+                        {canExport && (
+                          <a
+                            href={`/tool?id=${cert.report_id}&download=1`}
+                            className="inline-flex items-center gap-1 text-slate-600 hover:text-indigo-600 text-sm font-medium transition-colors"
+                          >
+                            <Download className="w-3 h-3" />
+                            PDF
+                          </a>
+                        )}
                       </div>
                     </td>
                   </tr>

@@ -11,6 +11,15 @@ interface CertificateTemplateProps {
   retentionPolicyLabel?: string;
   rawBodyPresent?: boolean;
   rawBodyExpiresAt?: string;
+  timestampReceipt?: {
+    anchoredHash?: string | null;
+    transactionId?: string | null;
+    proofData?: string | null;
+    tsaUrl?: string | null;
+    chainName?: string | null;
+    blockHeight?: number | null;
+    createdAt?: string | null;
+  } | null;
   
   // Visuals
   showWatermark?: boolean;
@@ -36,6 +45,7 @@ export function CertificateTemplate({
   retentionPolicyLabel,
   rawBodyPresent,
   rawBodyExpiresAt,
+  timestampReceipt,
   showWatermark,
   qrCodeDataUrl,
   verificationUrl,
@@ -54,6 +64,17 @@ export function CertificateTemplate({
       : 'Pending backend data';
   const rawBodyExpiresAtLabel = rawBodyExpiresAt || 'Pending backend data';
   const retentionPolicyLabelText = retentionPolicyLabel || 'Pending backend data';
+  const timestampProofSnippet = timestampReceipt?.proofData
+    ? timestampReceipt.proofData.length > 96
+      ? `${timestampReceipt.proofData.slice(0, 64)}…${timestampReceipt.proofData.slice(-24)}`
+      : timestampReceipt.proofData
+    : null;
+  const hasTimestampReceipt = Boolean(
+    timestampReceipt?.anchoredHash ||
+      timestampReceipt?.transactionId ||
+      timestampReceipt?.tsaUrl ||
+      timestampReceipt?.createdAt
+  );
   
   return (
     <div 
@@ -206,6 +227,43 @@ export function CertificateTemplate({
                     <p className="font-mono text-slate-700 break-all">{retentionPolicyLabelText}</p>
                 </div>
             </div>
+        </div>
+
+        {/* Timestamp Proof */}
+        <div className="mb-10 pb-10 border-b border-slate-100">
+            <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold mb-4">Timestamp Proof (RFC-3161)</p>
+            {hasTimestampReceipt ? (
+                <div className="grid grid-cols-3 gap-6 text-xs text-slate-600">
+                    <div className="space-y-1">
+                        <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Anchored Hash</p>
+                        <p className="font-mono text-slate-700 break-all">{timestampReceipt?.anchoredHash}</p>
+                    </div>
+                    <div className="space-y-1">
+                        <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Transaction ID</p>
+                        <p className="font-mono text-slate-700 break-all">{timestampReceipt?.transactionId}</p>
+                    </div>
+                    <div className="space-y-1">
+                        <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Timestamped At</p>
+                        <p className="font-mono text-slate-700 break-all">{timestampReceipt?.createdAt}</p>
+                    </div>
+                    <div className="space-y-1">
+                        <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">TSA URL</p>
+                        <p className="font-mono text-slate-700 break-all">{timestampReceipt?.tsaUrl}</p>
+                    </div>
+                    <div className="space-y-1">
+                        <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Chain / Block</p>
+                        <p className="font-mono text-slate-700 break-all">
+                            {timestampReceipt?.chainName || 'n/a'}{typeof timestampReceipt?.blockHeight === 'number' ? ` @ ${timestampReceipt.blockHeight}` : ''}
+                        </p>
+                    </div>
+                    <div className="space-y-1">
+                        <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Proof (Base64)</p>
+                        <p className="font-mono text-slate-700 break-all">{timestampProofSnippet || 'n/a'}</p>
+                    </div>
+                </div>
+            ) : (
+                <p className="text-xs text-slate-500">No RFC-3161 timestamp receipt recorded for this record.</p>
+            )}
         </div>
 
         {/* Payload Section */}

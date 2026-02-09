@@ -51,6 +51,30 @@ Why: Hard-prevent duplicates for providers with stable event IDs.
 Backward compatibility: Events without provider_event_id remain unchanged; existing behavior preserved.
 Alternatives rejected: Global uniqueness or hashing-only constraints for all events.
 
+## 2026-02-07: Timestamp Anchoring (V3)
+Decision: Use RFC-3161 timestamp authority for anchoring in V3.
+Why: Enterprise-grade, standards-based time credibility.
+Backward compatibility: No change to evidence semantics; anchoring is additive.
+Alternatives rejected: Blockchain anchoring for V3 (defer to V4).
+
+## 2026-02-07: Timestamp Receipts Immutability (V3)
+Decision: Timestamp receipts are append-only with no UPDATE/DELETE; re-verification creates a new receipt.
+Why: Stronger evidence integrity and auditability.
+Backward compatibility: Existing records remain untouched.
+Alternatives rejected: Updating verified_at in place.
+
+## 2026-02-07: Legal Hold Manager Scope (V3)
+Decision: legal_hold_manager can create holds; only owner/admin can deactivate.
+Why: Prevent unauthorized release of holds.
+Backward compatibility: Existing roles retain previous privileges.
+Alternatives rejected: Allowing legal_hold_manager to deactivate.
+
+## 2026-02-07: Canonical Hash Storage (V3)
+Decision: Store canonical_json_sha256 on ingested_events.
+Why: Deterministic evidence hashing for exports and anchoring.
+Backward compatibility: Field is nullable; no breaking change.
+Alternatives rejected: On-the-fly computation during export only.
+
 ## 2026-02-08: Strict Evidence Immutability with Retention Exception
 Decision: Enforce database-level immutability on ingested evidence with a narrow retention exception for raw bodies.
 Why: Evidence integrity is paramount; updates to evidence fields are prohibited to preserve auditability and legal posture.

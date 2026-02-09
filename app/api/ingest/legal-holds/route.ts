@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
-import { isOwner } from '@/lib/roles';
+import { canCreateLegalHold, canDeactivateLegalHold } from '@/lib/roles';
 import { logAuditAction, AUDIT_ACTIONS } from '@/utils/audit';
 
 function isValidUuid(value: string) {
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
       .eq('user_id', user.id)
       .single();
 
-    if (membershipError || !membership || !isOwner(membership.role)) {
+    if (membershipError || !membership || !canCreateLegalHold(membership.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -94,7 +94,7 @@ export async function PATCH(request: NextRequest) {
       .eq('user_id', user.id)
       .single();
 
-    if (membershipError || !membership || !isOwner(membership.role)) {
+    if (membershipError || !membership || !canDeactivateLegalHold(membership.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

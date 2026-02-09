@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { checkProStatus } from "@/app/actions/subscription";
 import { pickPrimaryWorkspace } from "@/lib/workspace";
+import { canExportCertificates } from "@/lib/roles";
 
 const PAGE_SIZE = 1000;
 
@@ -40,6 +41,17 @@ export async function GET(_request: NextRequest) {
 
   const workspaceId = activeWorkspace.id;
 
+  const { data: membership, error: membershipError } = await supabase
+    .from("workspace_members")
+    .select("role")
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", user.id)
+    .single();
+
+  if (membershipError || !membership || !canExportCertificates(membership.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const { data: workspaceConfig } = await supabase
     .from("workspaces")
     .select("store_raw_body, raw_body_retention_days")
@@ -71,9 +83,17 @@ export async function GET(_request: NextRequest) {
     "Provider",
     "Status Code",
     "Payload Hash",
+    "Canonical JSON Hash",
     "Raw Body Expires At",
     "Raw Body Present",
     "Retention Policy",
+    "Anchored Hash",
+    "Anchor Transaction Id",
+    "Anchor TSA URL",
+    "Anchor Chain Name",
+    "Anchor Block Height",
+    "Anchor Created At",
+    "Anchor Proof",
   ].join(",");
 
   const stream = new ReadableStream({
@@ -95,6 +115,7 @@ export async function GET(_request: NextRequest) {
               'provider',
               'status_code',
               'raw_body_sha256',
+              'canonical_json_sha256',
               'provider_event_id',
               'hash',
               'expires_at',
@@ -129,13 +150,13 @@ export async function GET(_request: NextRequest) {
           )
         );
 
-        const ingestedByProvider = new Map<string, { raw_body_expires_at: string | null }>();
-        const ingestedByHash = new Map<string, { raw_body_expires_at: string | null }>();
+        const ingestedByProvider = new Map<string, { id: string; raw_body_expires_at: string | null }>();
+        const ingestedByHash = new Map<string, { id: string; raw_body_expires_at: string | null }>();
 
         if (providerEventIds.length) {
           const { data: eventsByProvider, error: providerError } = await supabase
             .from('ingested_events')
-            .select('provider_event_id, raw_body_expires_at')
+            .select('id, provider_event_id, raw_body_expires_at')
             .eq('workspace_id', workspaceId)
             .in('provider_event_id', providerEventIds);
 
@@ -147,6 +168,7 @@ export async function GET(_request: NextRequest) {
           for (const event of (eventsByProvider || [])) {
             if (event.provider_event_id && !ingestedByProvider.has(event.provider_event_id)) {
               ingestedByProvider.set(event.provider_event_id, {
+                id: event.id,
                 raw_body_expires_at: event.raw_body_expires_at ?? null,
               });
             }
@@ -156,7 +178,7 @@ export async function GET(_request: NextRequest) {
         if (rawHashes.length) {
           const { data: eventsByHash, error: hashError } = await supabase
             .from('ingested_events')
-            .select('raw_body_sha256, raw_body_expires_at, received_at')
+            .select('id, raw_body_sha256, raw_body_expires_at, received_at')
             .eq('workspace_id', workspaceId)
             .in('raw_body_sha256', rawHashes)
             .order('received_at', { ascending: false });
@@ -169,7 +191,56 @@ export async function GET(_request: NextRequest) {
           for (const event of (eventsByHash || [])) {
             if (event.raw_body_sha256 && !ingestedByHash.has(event.raw_body_sha256)) {
               ingestedByHash.set(event.raw_body_sha256, {
+                id: event.id,
                 raw_body_expires_at: event.raw_body_expires_at ?? null,
+              });
+            }
+          }
+        }
+
+        const ingestedEventIds = Array.from(
+          new Set(
+            [...ingestedByProvider.values(), ...ingestedByHash.values()]
+              .map((value) => value.id)
+              .filter((value) => typeof value === 'string' && value.length > 0)
+          )
+        );
+
+        const receiptsByEventId = new Map<
+          string,
+          {
+            anchored_hash: string | null;
+            transaction_id: string | null;
+            proof_data: unknown;
+            tsa_url: string | null;
+            chain_name: string | null;
+            block_height: number | null;
+            created_at: string | null;
+          }
+        >();
+
+        if (ingestedEventIds.length) {
+          const { data: receipts, error: receiptError } = await supabase
+            .from('timestamp_receipts')
+            .select('resource_id, anchored_hash, transaction_id, proof_data, tsa_url, chain_name, block_height, created_at')
+            .eq('resource_type', 'ingested_event')
+            .in('resource_id', ingestedEventIds);
+
+          if (receiptError) {
+            controller.error(receiptError);
+            return;
+          }
+
+          for (const receipt of receipts || []) {
+            if (receipt.resource_id && !receiptsByEventId.has(receipt.resource_id)) {
+              receiptsByEventId.set(receipt.resource_id, {
+                anchored_hash: receipt.anchored_hash ?? null,
+                transaction_id: receipt.transaction_id ?? null,
+                proof_data: receipt.proof_data ?? null,
+                tsa_url: receipt.tsa_url ?? null,
+                chain_name: receipt.chain_name ?? null,
+                block_height: receipt.block_height ?? null,
+                created_at: receipt.created_at ?? null,
               });
             }
           }
@@ -177,6 +248,7 @@ export async function GET(_request: NextRequest) {
 
         for (const cert of (certificates as any[])) {
           const payloadHash = cert.raw_body_sha256 || cert.hash || '';
+          const canonicalHash = cert.canonical_json_sha256 || '';
           const signatureStatus = cert.signature_status || 'not_verified';
           const planTier = cert.plan_tier || 'free';
           const provider = cert.provider || 'unknown';
@@ -192,6 +264,13 @@ export async function GET(_request: NextRequest) {
             ? new Date(ingested.raw_body_expires_at).toISOString()
             : '';
           const rawBodyPresent = rawBodyExpiresAt ? 'true' : 'false';
+          const receipt = ingested?.id ? receiptsByEventId.get(ingested.id) : undefined;
+          const anchorProof =
+            receipt?.proof_data === null || receipt?.proof_data === undefined
+              ? ''
+              : typeof receipt.proof_data === 'string'
+                ? receipt.proof_data
+                : JSON.stringify(receipt.proof_data);
 
           const row = [
             csvEscape(cert.report_id),
@@ -201,9 +280,17 @@ export async function GET(_request: NextRequest) {
             csvEscape(provider),
             csvEscape(statusCode),
             csvEscape(payloadHash),
+            csvEscape(canonicalHash),
             csvEscape(rawBodyExpiresAt),
             csvEscape(rawBodyPresent),
             csvEscape(retentionLabel),
+            csvEscape(receipt?.anchored_hash ?? ''),
+            csvEscape(receipt?.transaction_id ?? ''),
+            csvEscape(receipt?.tsa_url ?? ''),
+            csvEscape(receipt?.chain_name ?? ''),
+            csvEscape(typeof receipt?.block_height === 'number' ? receipt.block_height : ''),
+            csvEscape(receipt?.created_at ? new Date(receipt.created_at).toISOString() : ''),
+            csvEscape(anchorProof),
           ].join(',');
 
           controller.enqueue(encoder.encode(`${row}\n`));

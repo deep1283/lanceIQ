@@ -13,6 +13,7 @@ import { useSearchParams } from "next/navigation";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { VerifySignatureModal } from "@/components/VerifySignatureModal";
 import type { VerificationApiResponse } from "@/lib/signature-verification";
+import { canExportCertificates, canManageWorkspace as canManageWorkspaceRole, canViewAuditLogs as canViewAuditLogsRole, canCreateLegalHold } from "@/lib/roles";
 import AppNavbar from "@/components/AppNavbar";
 
 const PROMO_END_LOCAL = new Date(2026, 1, 6, 23, 59, 59, 999);
@@ -32,6 +33,16 @@ type LegalHoldStatus = {
   active: boolean;
   reason: string | null;
   created_at: string;
+};
+
+type TimestampReceipt = {
+  anchoredHash: string | null;
+  transactionId: string | null;
+  proofData: string | null;
+  tsaUrl: string | null;
+  chainName: string | null;
+  blockHeight: number | null;
+  createdAt: string | null;
 };
 
 export default function Home() {
@@ -75,6 +86,9 @@ export default function Home() {
   const [rawBodyExpiresAt, setRawBodyExpiresAt] = useState<string | null>(null);
   const [rawBodyPresent, setRawBodyPresent] = useState<boolean | null>(null);
   const [retentionPolicyLabel, setRetentionPolicyLabel] = useState<string | null>(null);
+  const [timestampReceipt, setTimestampReceipt] = useState<TimestampReceipt | null>(null);
+  const [timestampReceiptLoading, setTimestampReceiptLoading] = useState(false);
+  const [timestampReceiptError, setTimestampReceiptError] = useState<string | null>(null);
   
   // Auth state
   const [user, setUser] = useState<SupabaseUser | null>(null);
@@ -89,8 +103,10 @@ export default function Home() {
   const [showSigVerifyModal, setShowSigVerifyModal] = useState(false);
   const [verificationResult, setVerificationResult] = useState<VerificationApiResponse | null>(null);
 
-  const canManageWorkspace = workspaceRole === 'owner' || workspaceRole === 'admin';
-  const canViewAuditLogs = workspacePlan === 'team' && canManageWorkspace;
+  const canManageWorkspace = canManageWorkspaceRole(workspaceRole);
+  const canViewAuditLogs = workspacePlan === 'team' && canViewAuditLogsRole(workspaceRole);
+  const canViewLegalHold = canManageWorkspace || canCreateLegalHold(workspaceRole);
+  const canExport = !user || canExportCertificates(workspaceRole);
 
   const syncProStatus = async () => {
     const promoActive = Date.now() <= PROMO_END_LOCAL.getTime();
@@ -168,6 +184,9 @@ export default function Home() {
       setLegalHold(null);
       setLegalHoldError(null);
       setLegalHoldLoading(false);
+      setTimestampReceipt(null);
+      setTimestampReceiptError(null);
+      setTimestampReceiptLoading(false);
       return;
     }
 
@@ -259,7 +278,7 @@ export default function Home() {
   }, [canViewAuditLogs, workspaceId]);
 
   useEffect(() => {
-    if (!canManageWorkspace || !workspaceId) {
+    if (!canViewLegalHold || !workspaceId) {
       setLegalHold(null);
       setLegalHoldError(null);
       setLegalHoldLoading(false);
@@ -297,7 +316,92 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, [canManageWorkspace, workspaceId, supabase]);
+  }, [canViewLegalHold, workspaceId, supabase]);
+
+  useEffect(() => {
+    if (!workspaceId || !isExistingCertificate || !hash) {
+      setTimestampReceipt(null);
+      setTimestampReceiptError(null);
+      setTimestampReceiptLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setTimestampReceiptLoading(true);
+    setTimestampReceiptError(null);
+
+    const fetchTimestampReceipt = async () => {
+      const { data: ingestedEvents, error: ingestedError } = await supabase
+        .from('ingested_events')
+        .select('id, received_at')
+        .eq('workspace_id', workspaceId)
+        .eq('raw_body_sha256', hash)
+        .order('received_at', { ascending: false })
+        .limit(1);
+
+      if (cancelled) return;
+
+      if (ingestedError) {
+        setTimestampReceipt(null);
+        setTimestampReceiptError(ingestedError.message || 'Failed to load timestamp receipt.');
+        setTimestampReceiptLoading(false);
+        return;
+      }
+
+      const ingestedEvent = Array.isArray(ingestedEvents) ? ingestedEvents[0] : null;
+      if (!ingestedEvent?.id) {
+        setTimestampReceipt(null);
+        setTimestampReceiptLoading(false);
+        return;
+      }
+
+      const { data: receipts, error: receiptError } = await supabase
+        .from('timestamp_receipts')
+        .select('anchored_hash, transaction_id, proof_data, tsa_url, chain_name, block_height, created_at')
+        .eq('workspace_id', workspaceId)
+        .eq('resource_type', 'ingested_event')
+        .eq('resource_id', ingestedEvent.id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (cancelled) return;
+
+      if (receiptError) {
+        setTimestampReceipt(null);
+        setTimestampReceiptError(receiptError.message || 'Failed to load timestamp receipt.');
+        setTimestampReceiptLoading(false);
+        return;
+      }
+
+      const receipt = Array.isArray(receipts) ? receipts[0] : null;
+      if (!receipt) {
+        setTimestampReceipt(null);
+        setTimestampReceiptLoading(false);
+        return;
+      }
+
+      setTimestampReceipt({
+        anchoredHash: receipt.anchored_hash ?? null,
+        transactionId: receipt.transaction_id ?? null,
+        proofData: typeof receipt.proof_data === 'string'
+          ? receipt.proof_data
+          : receipt.proof_data
+            ? JSON.stringify(receipt.proof_data)
+            : null,
+        tsaUrl: receipt.tsa_url ?? null,
+        chainName: receipt.chain_name ?? null,
+        blockHeight: typeof receipt.block_height === 'number' ? receipt.block_height : null,
+        createdAt: receipt.created_at ?? null,
+      });
+      setTimestampReceiptLoading(false);
+    };
+
+    void fetchTimestampReceipt();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId, isExistingCertificate, hash, supabase]);
 
   useEffect(() => {
     if (!certificateId) {
@@ -311,6 +415,9 @@ export default function Home() {
     let cancelled = false;
     setIsLoadingCertificate(true);
     setError(null);
+    setTimestampReceipt(null);
+    setTimestampReceiptError(null);
+    setTimestampReceiptLoading(false);
 
     fetch(`/api/certificates/${certificateId}`)
       .then(async (res) => {
@@ -474,6 +581,7 @@ export default function Home() {
           rawBodyExpiresAt: rawBodyExpiresAt ?? undefined,
           rawBodyPresent: rawBodyPresent ?? undefined,
           retentionPolicyLabel: retentionPolicyLabel ?? undefined,
+          timestampReceipt: timestampReceipt ?? undefined,
           
           showWatermark: !isWatermarkFree,
           verificationUrl: user ? `https://lanceiq.com/verify/${newReportId}` : undefined,
@@ -593,7 +701,7 @@ export default function Home() {
   };
 
   useEffect(() => {
-    if (!autoDownload || !isExistingCertificate || autoDownloaded || isLoadingCertificate) return;
+    if (!autoDownload || !isExistingCertificate || autoDownloaded || isLoadingCertificate || !canExport) return;
     if (!reportId || !timestamp) return;
     setDownloadNotice("Downloading PDF...");
     setAutoDownloaded(true);
@@ -770,7 +878,7 @@ export default function Home() {
              <div className="pt-6">
                 <button
                     onClick={() => handleDownload()}
-                    disabled={isGenerating}
+                    disabled={isGenerating || !canExport}
                     className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-lg font-medium transition-colors disabled:opacity-50"
                 >
                     {isGenerating ? (
@@ -778,7 +886,13 @@ export default function Home() {
                     ) : (
                         <Download className="w-4 h-4" />
                     )}
-                    {isGenerating ? 'Generating...' : isWatermarkFree ? 'Download PDF (No Watermark)' : 'Download PDF (With Watermark)'}
+                    {isGenerating
+                      ? 'Generating...'
+                      : !canExport && user
+                        ? 'Export Unavailable'
+                        : isWatermarkFree
+                          ? 'Download PDF (No Watermark)'
+                          : 'Download PDF (With Watermark)'}
                 </button>
 
                 {/* 🎉 LAUNCH PROMO BANNER */}
@@ -827,6 +941,24 @@ export default function Home() {
                   </div>
                 )}
                 END PAYMENT UI */}
+
+                {!canExport && user && (
+                    <div className="mt-3 text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded p-2">
+                        PDF export is disabled for your role.
+                    </div>
+                )}
+
+                {timestampReceiptLoading && isExistingCertificate && (
+                    <div className="mt-3 text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded p-2">
+                        Loading timestamp receipt...
+                    </div>
+                )}
+
+                {timestampReceiptError && (
+                    <div className="mt-3 text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2">
+                        Timestamp receipt unavailable: {timestampReceiptError}
+                    </div>
+                )}
 
                 {error && (
                     <div className="flex items-center gap-2 mt-3 text-red-600 text-sm bg-red-50 p-2 rounded">
@@ -888,7 +1020,7 @@ export default function Home() {
              </div>
           </div>
 
-          {user && canManageWorkspace && (
+          {user && canViewLegalHold && (
             <div className="pt-8">
               <div className="border-t border-slate-200 pt-6">
                 <div className="flex items-start justify-between gap-4 mb-4">
@@ -1032,6 +1164,7 @@ export default function Home() {
                 rawBodyExpiresAt={rawBodyExpiresAt ?? undefined}
                 rawBodyPresent={rawBodyPresent ?? undefined}
                 retentionPolicyLabel={retentionPolicyLabel ?? undefined}
+                timestampReceipt={timestampReceipt ?? undefined}
                 
                 showWatermark={!isWatermarkFree}
                 verificationUrl={user ? `https://lanceiq.com/verify/${reportId}` : undefined}

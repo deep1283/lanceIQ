@@ -7,15 +7,20 @@ import { Plus } from 'lucide-react';
 import { AddSourceModal } from '@/components/AddSourceModal';
 import { SourcesList } from '@/components/SourcesList';
 import Link from 'next/link';
+import { canManageWorkspace, isExporter, isLegalHoldManager, isViewer } from '@/lib/roles';
+import type { Role } from '@/lib/roles';
 
 interface DashboardClientProps {
   children: React.ReactNode; // The server-rendered certificates list
+  workspaceRole?: Role | null;
 }
 
-export function DashboardClient({ children }: DashboardClientProps) {
+export function DashboardClient({ children, workspaceRole }: DashboardClientProps) {
   const [activeTab, setActiveTab] = useState('certificates');
   const [isAddSourceOpen, setIsAddSourceOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const canAddSource = canManageWorkspace(workspaceRole);
+  const canGenerate = !workspaceRole || (!isViewer(workspaceRole) && !isExporter(workspaceRole) && !isLegalHoldManager(workspaceRole));
 
   return (
     <>
@@ -31,17 +36,21 @@ export function DashboardClient({ children }: DashboardClientProps) {
           
           <div className="flex gap-2">
             {activeTab === 'sources' ? (
-              <Button onClick={() => setIsAddSourceOpen(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Source
-              </Button>
-            ) : (
-              <Link href="/tool">
-                <Button>
+              canAddSource ? (
+                <Button onClick={() => setIsAddSourceOpen(true)}>
                   <Plus className="w-4 h-4 mr-2" />
-                  Generate New
+                  Add Source
                 </Button>
-              </Link>
+              ) : null
+            ) : (
+              canGenerate ? (
+                <Link href="/tool">
+                  <Button>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Generate New
+                  </Button>
+                </Link>
+              ) : null
             )}
           </div>
         </div>
@@ -57,7 +66,7 @@ export function DashboardClient({ children }: DashboardClientProps) {
           </TabsContent>
           
           <TabsContent value="sources">
-            <SourcesList refreshTrigger={refreshTrigger} />
+            <SourcesList refreshTrigger={refreshTrigger} canManageSources={canAddSource} />
           </TabsContent>
         </Tabs>
       </div>

@@ -19,7 +19,7 @@ interface Workspace {
   created_at: string;
 }
 
-export function SourcesList({ refreshTrigger }: { refreshTrigger: number }) {
+export function SourcesList({ refreshTrigger, canManageSources = false }: { refreshTrigger: number; canManageSources?: boolean }) {
   const [sources, setSources] = useState<Workspace[]>([]);
   const [history, setHistory] = useState<IngestionEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,6 +86,7 @@ export function SourcesList({ refreshTrigger }: { refreshTrigger: number }) {
                 onDelete={() => handleDelete(source.id, source.name)}
                 isDeleting={deletingId === source.id}
                 baseUrl={getIngestUrl()}
+                canManageSources={canManageSources}
               />
             ))
           )}
@@ -170,7 +171,7 @@ export function SourcesList({ refreshTrigger }: { refreshTrigger: number }) {
   );
 }
 
-function SourceCard({ source, onDelete, isDeleting, baseUrl }: { source: Workspace, onDelete: () => void, isDeleting: boolean, baseUrl: string }) {
+function SourceCard({ source, onDelete, isDeleting, baseUrl, canManageSources }: { source: Workspace, onDelete: () => void, isDeleting: boolean, baseUrl: string, canManageSources: boolean }) {
   const [copied, setCopied] = useState(false);
   
   const handleCopyUrl = () => {
@@ -198,15 +199,17 @@ function SourceCard({ source, onDelete, isDeleting, baseUrl }: { source: Workspa
             <p className="text-sm text-slate-500">Created {formatDistanceToNow(new Date(source.created_at))} ago</p>
           </div>
           
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-            onClick={onDelete}
-            disabled={isDeleting}
-          >
-            {isDeleting ? 'Deleting...' : <Trash2 className="w-4 h-4" />}
-          </Button>
+          {canManageSources && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              onClick={onDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Deleting...' : <Trash2 className="w-4 h-4" />}
+            </Button>
+          )}
         </div>
 
         <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-4">

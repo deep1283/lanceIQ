@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { updateAlertSettings } from '@/app/actions/alert-settings';
 import { inviteMember, removeMember } from '@/app/actions/members';
 import type { Role } from '@/lib/roles';
+import { canInviteMembers, canManageWorkspace, canRemoveMembers, canViewAuditLogs } from '@/lib/roles';
 
 interface Workspace {
   id: string;
@@ -58,8 +59,18 @@ export default function SettingsClient({
   const isTeam = workspace.plan === 'team';
   const isPastDue = workspace.subscription_status === 'past_due';
   const canUseAlerts = isTeam && (workspace.subscription_status === 'active' || isPastDue);
+  const currentUserRole = initialMembers.find((member) => member.user_id === currentUserId)?.role ?? null;
+  const canManage = canManageWorkspace(currentUserRole);
+  const canViewAudit = canViewAuditLogs(currentUserRole);
+  const canInvite = canInviteMembers(currentUserRole);
+  const canRemove = canRemoveMembers(currentUserRole);
+  const availableTabs = [
+    canManage ? 'alerts' : null,
+    canViewAudit ? 'audit' : null,
+    canManage ? 'members' : null,
+  ].filter((tab): tab is 'alerts' | 'audit' | 'members' => Boolean(tab));
 
-  const [activeTab, setActiveTab] = useState<'alerts' | 'audit' | 'members'>('alerts');
+  const [activeTab, setActiveTab] = useState<'alerts' | 'audit' | 'members'>(availableTabs[0] || 'alerts');
 
   const [settings, setSettings] = useState<AlertSetting>(initialSettings || {
     channel: 'email',
@@ -187,40 +198,46 @@ export default function SettingsClient({
 
       {/* Tab Navigation */}
       <div className="flex space-x-6 border-b border-zinc-800 mb-8">
-        <button
-          onClick={() => setActiveTab('alerts')}
-          className={`pb-3 text-sm font-medium transition-colors border-b-2 ${
-            activeTab === 'alerts' 
-              ? 'border-blue-500 text-blue-400' 
-              : 'border-transparent text-zinc-400 hover:text-zinc-200'
-          }`}
-        >
-          Smart Alerts
-        </button>
-        <button
-          onClick={() => setActiveTab('audit')}
-          className={`pb-3 text-sm font-medium transition-colors border-b-2 ${
-            activeTab === 'audit' 
-              ? 'border-blue-500 text-blue-400' 
-              : 'border-transparent text-zinc-400 hover:text-zinc-200'
-          }`}
-        >
-          Audit Logs
-        </button>
-        <button
-          onClick={() => setActiveTab('members')}
-          className={`pb-3 text-sm font-medium transition-colors border-b-2 ${
-            activeTab === 'members' 
-              ? 'border-blue-500 text-blue-400' 
-              : 'border-transparent text-zinc-400 hover:text-zinc-200'
-          }`}
-        >
-          Team Members
-        </button>
+        {canManage && (
+          <button
+            onClick={() => setActiveTab('alerts')}
+            className={`pb-3 text-sm font-medium transition-colors border-b-2 ${
+              activeTab === 'alerts' 
+                ? 'border-blue-500 text-blue-400' 
+                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            Smart Alerts
+          </button>
+        )}
+        {canViewAudit && (
+          <button
+            onClick={() => setActiveTab('audit')}
+            className={`pb-3 text-sm font-medium transition-colors border-b-2 ${
+              activeTab === 'audit' 
+                ? 'border-blue-500 text-blue-400' 
+                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            Audit Logs
+          </button>
+        )}
+        {canManage && (
+          <button
+            onClick={() => setActiveTab('members')}
+            className={`pb-3 text-sm font-medium transition-colors border-b-2 ${
+              activeTab === 'members' 
+                ? 'border-blue-500 text-blue-400' 
+                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            Team Members
+          </button>
+        )}
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'alerts' ? (
+      {activeTab === 'alerts' && canManage ? (
         <div className="relative">
           <div className={`bg-zinc-900 border border-zinc-800 rounded-xl p-6 ${!canUseAlerts && 'opacity-50 pointer-events-none blur-[1px]'}`}>
             <h2 className="text-xl font-semibold text-white mb-6">Smart Alerts</h2>
@@ -303,7 +320,7 @@ export default function SettingsClient({
             </div>
           )}
         </div>
-      ) : activeTab === 'audit' ? (
+      ) : activeTab === 'audit' && canViewAudit ? (
         /* Audit Logs Tab */
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-sm relative">
           <div className="p-6 border-b border-zinc-800 flex justify-between items-center">
@@ -373,7 +390,7 @@ export default function SettingsClient({
             </div>
           )}
         </div>
-      ) : (
+      ) : activeTab === 'members' && canManage ? (
         /* Team Members Tab */
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm relative">
            <h2 className="text-xl font-semibold text-white mb-6">Team Members</h2>
@@ -392,31 +409,33 @@ export default function SettingsClient({
 
            <div className={`${!isTeam && 'opacity-20 pointer-events-none'}`}>
              {/* Invite Form */}
-             <div className="mb-8 bg-zinc-950 p-4 rounded-lg border border-zinc-800">
-               <h3 className="text-sm font-medium text-zinc-300 mb-4">Invite New Member</h3>
-               <form onSubmit={handleInvite} className="flex gap-3">
-                 <input 
-                   type="email" 
-                   value={inviteEmail}
-                   onChange={(e) => setInviteEmail(e.target.value)}
-                   placeholder="colleague@example.com"
-                   required
-                   className="flex-1 bg-zinc-900 border border-zinc-700 rounded-md px-4 py-2 text-zinc-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                 />
-                 <button 
-                   type="submit" 
-                   disabled={inviting}
-                   className="bg-zinc-100 hover:bg-white text-zinc-900 px-4 py-2 rounded-md font-medium transition-colors disabled:opacity-50"
-                 >
-                   {inviting ? 'Adding...' : 'Add Member'}
-                 </button>
-               </form>
-               {inviteError && <p className="text-red-400 text-sm mt-2">{inviteError}</p>}
-               {inviteSuccess && <p className="text-green-400 text-sm mt-2">{inviteSuccess}</p>}
-               <p className="text-xs text-zinc-500 mt-2">
-                 Note: The user must already be signed up for LanceIQ.
-               </p>
-             </div>
+             {canInvite && (
+               <div className="mb-8 bg-zinc-950 p-4 rounded-lg border border-zinc-800">
+                 <h3 className="text-sm font-medium text-zinc-300 mb-4">Invite New Member</h3>
+                 <form onSubmit={handleInvite} className="flex gap-3">
+                   <input 
+                     type="email" 
+                     value={inviteEmail}
+                     onChange={(e) => setInviteEmail(e.target.value)}
+                     placeholder="colleague@example.com"
+                     required
+                     className="flex-1 bg-zinc-900 border border-zinc-700 rounded-md px-4 py-2 text-zinc-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                   />
+                   <button 
+                     type="submit" 
+                     disabled={inviting}
+                     className="bg-zinc-100 hover:bg-white text-zinc-900 px-4 py-2 rounded-md font-medium transition-colors disabled:opacity-50"
+                   >
+                     {inviting ? 'Adding...' : 'Add Member'}
+                   </button>
+                 </form>
+                 {inviteError && <p className="text-red-400 text-sm mt-2">{inviteError}</p>}
+                 {inviteSuccess && <p className="text-green-400 text-sm mt-2">{inviteSuccess}</p>}
+                 <p className="text-xs text-zinc-500 mt-2">
+                   Note: The user must already be signed up for LanceIQ.
+                 </p>
+               </div>
+             )}
 
              {/* Member List */}
              <div className="overflow-hidden border border-zinc-800 rounded-lg">
@@ -449,7 +468,7 @@ export default function SettingsClient({
                           </td>
                           <td className="px-4 py-3 text-zinc-500">{new Date(member.joined_at).toLocaleDateString()}</td>
                           <td className="px-4 py-3 text-right">
-                            {member.user_id !== currentUserId && (
+                            {canRemove && member.user_id !== currentUserId && (
                               <button 
                                 onClick={() => handleRemove(member.user_id)}
                                 className="text-red-400 hover:text-red-300 text-xs font-medium"
@@ -465,6 +484,10 @@ export default function SettingsClient({
                 </table>
              </div>
            </div>
+        </div>
+      ) : (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 text-zinc-400">
+          Your role does not grant access to workspace settings.
         </div>
       )}
     </div>

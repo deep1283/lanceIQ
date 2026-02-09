@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { hashApiKey } from '@/lib/api-key';
-import { verifySignature, type Provider, detectProvider, computeRawBodySha256, type VerificationResult, extractEventId } from '@/lib/signature-verification';
+import { verifySignature, type Provider, detectProvider, computeRawBodySha256, computeCanonicalJsonSha256, type VerificationResult, extractEventId } from '@/lib/signature-verification';
 import { decrypt } from '@/lib/encryption';
 import { checkRateLimit, getRedisClient, markAndCheckDuplicate } from '@/lib/ingest-helpers';
 import { isCriticalReason, maybeSendCriticalAlert, type AlertSetting } from '@/lib/alerting';
+import { anchorIngestedEvent } from '@/lib/timestamps/anchor';
 
 // Header-based ingestion endpoint.
 // Use this for environments where putting secrets in the URL path is undesirable.
@@ -125,6 +126,8 @@ export async function POST(req: NextRequest) {
       return errorResponse('Unable to read body', 400, 'invalid_body');
     }
 
+    const parsedPayload = tryParseJson(rawBody);
+    const canonicalJsonSha256 = parsedPayload ? computeCanonicalJsonSha256(parsedPayload) : undefined;
     const rawBodySha256 = computeRawBodySha256(rawBody);
     const reqHeaders = new Headers(req.headers);
     const sanitizedHeaders = sanitizeHeaders(reqHeaders);
@@ -177,9 +180,10 @@ export async function POST(req: NextRequest) {
       .from('ingested_events')
       .insert({
         workspace_id: workspace.id,
-        payload: tryParseJson(rawBody),
+        payload: parsedPayload,
         headers: sanitizedHeaders,
         raw_body_sha256: rawBodySha256,
+        canonical_json_sha256: canonicalJsonSha256 ?? null,
         raw_body: workspace.store_raw_body ? rawBody : null,
         raw_body_expires_at: expiresAt ? expiresAt.toISOString() : null,
         detected_provider: detectedProvider,
@@ -213,6 +217,12 @@ export async function POST(req: NextRequest) {
       console.error('Ingest Insert Error:', insertError);
       return errorResponse('Storage failed', 500, 'storage_failed');
     }
+
+    void anchorIngestedEvent({
+      workspaceId: workspace.id,
+      ingestedEventId: event.id,
+      rawBodySha256,
+    });
 
     // 7. Log to Verification History
     const { error: historyError } = await supabase.from('verification_history').insert({

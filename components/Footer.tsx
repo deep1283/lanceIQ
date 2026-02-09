@@ -13,6 +13,7 @@ const Footer: React.FC = () => {
         </p>
       </div>
       <div className="flex flex-wrap justify-center gap-6 mb-4 text-sm text-gray-400">
+        <Link href="/compliance" className="hover:text-white transition-colors">Compliance</Link>
         <Link href="/security" className="hover:text-white transition-colors">Security</Link>
         <Link href="/dpa" className="hover:text-white transition-colors">DPA</Link>
         <Link href="/subprocessors" className="hover:text-white transition-colors">Subprocessors</Link>

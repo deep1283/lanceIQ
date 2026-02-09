@@ -32,6 +32,16 @@ Owner: Product Owner (You)
 21. Usage metering defaults and trigger safe increment.
 22. Retention status wired into tool view, verification page, and PDF export.
 23. Legal hold status wired into tool view for owners/admins.
+24. V3 DB: timestamp_receipts table with RLS and append-only enforcement.
+25. V3 DB: workspace roles expanded to viewer/exporter/legal_hold_manager.
+26. V3 DB: canonical_json_sha256 added to ingested_events with indexes.
+27. V3 Backend: RFC-3161 anchoring on ingest with timestamp_receipts.
+28. V3 Backend: canonical_json_sha256 stored on ingested_events.
+29. V3 Backend: role enforcement for viewer/exporter/legal_hold_manager.
+30. V3 Backend: export includes anchor metadata and canonical hash.
+31. V3 Frontend: RFC-3161 timestamp proof displayed in certificate and verification views.
+32. V3 Frontend: role-based UI gating across dashboard, tool, and settings.
+33. V3 Frontend: compliance pages added (SOC2/DPA/SLA templates).
 
 ## In Progress
 1. None active (ready to start next phase).
@@ -52,5 +62,6 @@ Owner: Product Owner (You)
 
 ## Readiness
 1. V1: Complete.
-2. V2: Planned.
-3. V3: Planned.
+2. V2: Complete.
+3. V3: Complete.
+4. V4: Planned.
