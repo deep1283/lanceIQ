@@ -11,6 +11,8 @@ export const AUDIT_ACTIONS = {
   ALERT_TEST_SENT: 'alert.test_sent',
   SECRET_ROTATED: 'secret.rotated',
   SECRET_VIEWED: 'secret.viewed',
+  LEGAL_HOLD_CREATED: 'legal_hold.created',
+  LEGAL_HOLD_DEACTIVATED: 'legal_hold.deactivated',
   PLAN_CHANGED: 'plan.changed',
   AUTH_LOGIN: 'auth.login',
 } as const;

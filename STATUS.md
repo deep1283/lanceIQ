@@ -26,20 +26,19 @@ Owner: Product Owner (You)
 15. Audit logs API: read-only, paginated, owner/admin, team-plan only via RLS.
 16. Scope-of-proof language added to marketing pages and tool download flow.
 17. Tool UI shows read-only audit logs for team owners/admins.
-8. Ingest responses now return status + id and use 202 for queued, 200 for duplicate.
-9. Plan quota enforcement added to /api/ingest/[apiKey].
-10. Audit logs now recorded for workspace create/delete and member invite/remove.
-11. Alert delivery hardened (HTTPS validation, timeout, safe logging).
-12. Server-side validation added for workspace creation and member invites.
-13. Alert settings gating now honors canceled-but-active grace period.
+18. Legal hold schema, RLS, and DB-level deletion blocks added.
+19. Evidence immutability enforced at DB layer (updates blocked except raw_body expiry cleanup).
+20. DB-level idempotency for provider_event_id (workspace+provider unique).
+21. Usage metering defaults and trigger safe increment.
+22. Retention status wired into tool view, verification page, and PDF export.
+23. Legal hold status wired into tool view for owners/admins.
 
 ## In Progress
 1. None active (ready to start next phase).
 
 ## Next Up (V1 to V2)
-1. Define legal hold policy and add backend enforcement flows.
-2. Surface retention behavior in UI and exports.
-3. Add DB-level idempotency constraint for provider event IDs.
+1. Expand verification support for additional providers (PayPal/JWS).
+2. Add ingest request size limits and structured error codes.
 
 ## Enterprise Roadmap (V3)
 1. Time credibility: external anchoring or RFC-3161 timestamping.
@@ -49,9 +48,9 @@ Owner: Product Owner (You)
 ## Risks / Gaps
 1. No external timestamp anchoring yet.
 2. No legal hold implementation yet.
-3. Audit logs exist in DB but no API surface or UI yet.
+3. Retention visibility not yet surfaced in UI/exports.
 
 ## Readiness
-1. V1: Partially complete.
+1. V1: Complete.
 2. V2: Planned.
 3. V3: Planned.

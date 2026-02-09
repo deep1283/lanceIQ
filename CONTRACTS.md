@@ -20,6 +20,9 @@ Minimum response fields:
 1. status
 2. id
 3. error when applicable
+Idempotency:
+1. If provider_event_id is present and already stored for the same workspace+provider, return 200 with existing id.
+2. If provider_event_id is absent, best-effort dedupe may occur, but no DB guarantee.
 
 ### POST /api/ingest/[apiKey]
 Purpose: Path-based ingestion for providers that do not support custom headers.
@@ -35,6 +38,9 @@ Minimum response fields:
 1. status
 2. id
 3. error when applicable
+Idempotency:
+1. If provider_event_id is present and already stored for the same workspace+provider, return 200 with existing id.
+2. If provider_event_id is absent, best-effort dedupe may occur, but no DB guarantee.
 
 ### GET /api/certificates/[reportId]
 Purpose: Fetch certificate data by report id.
@@ -49,6 +55,10 @@ Minimum response fields:
 3. provider
 4. signature_status
 5. raw_body_sha256
+Retention visibility (workspace-scoped UI/export, not public):
+1. raw_body_expires_at
+2. raw_body_present
+3. retention_policy_label
 
 ### POST /api/certificates/export
 Purpose: Export certificate as PDF or CSV.
@@ -102,6 +112,9 @@ Minimum fields:
 10. signature_status
 11. signature_reason
 12. provider_event_id
+Retention semantics:
+1. raw_body may be set to null after raw_body_expires_at, unless a legal hold is active.
+2. raw_body_expires_at is required when raw_body is stored.
 Note: raw_body may be NULL after raw_body_expires_at, but only if no active legal hold exists for the workspace.
 
 ### Certificate
@@ -122,6 +135,13 @@ Minimum fields:
 14. signature_secret_hint
 15. status_code
 16. expires_at
+17. raw_body_expires_at
+18. raw_body_present
+19. retention_policy_label
+Retention semantics:
+1. expires_at reflects plan-based certificate retention.
+2. raw_body_present indicates whether raw_body is currently retained.
+3. Legal hold does not change scope-of-proof; it only blocks retention pruning.
 
 ### AuditLog
 Minimum fields:

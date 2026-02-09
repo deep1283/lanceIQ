@@ -10,6 +10,7 @@ export interface IngestionEvent {
   signature_reason: string | null;
   received_at: string;
   raw_body_sha256: string;
+  raw_body_expires_at: string | null;
 }
 
 type IngestionEventRow = {
@@ -18,6 +19,7 @@ type IngestionEventRow = {
   signature_reason: string | null;
   received_at: string;
   raw_body_sha256: string;
+  raw_body_expires_at: string | null;
   detected_provider: string | null;
   workspaces: {
     name: string;
@@ -42,6 +44,7 @@ export async function getRecentIngestionEvents(limit = 20) {
       signature_reason,
       received_at,
       raw_body_sha256,
+      raw_body_expires_at,
       detected_provider,
       workspaces!inner (
         name,
@@ -67,7 +70,8 @@ export async function getRecentIngestionEvents(limit = 20) {
       signature_status: event.signature_status,
       signature_reason: event.signature_reason,
       received_at: event.received_at,
-      raw_body_sha256: event.raw_body_sha256
+      raw_body_sha256: event.raw_body_sha256,
+      raw_body_expires_at: event.raw_body_expires_at,
     };
   });
 }

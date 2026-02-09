@@ -13,6 +13,7 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const DEDUP_EVENT_TTL_SEC = 24 * 60 * 60; // 24h
 const DEDUP_HASH_TTL_SEC = 6 * 60 * 60; // 6h
+const DEFAULT_MAX_INGEST_BYTES = 1024 * 1024; // 1 MiB
 
 export async function POST(
   req: NextRequest, 
@@ -43,15 +44,15 @@ export async function POST(
     }
     
     if (!apiKey || apiKey === '_') {
-      return errorResponse('Missing API Key', 400);
+      return errorResponse('Missing API Key', 400, 'missing_api_key');
     }
     
     if (!process.env.API_KEY_HASH_SECRET) {
-      return errorResponse('Server configuration error', 500);
+      return errorResponse('Server configuration error', 500, 'server_config');
     }
     
     if (!supabaseUrl || !supabaseServiceKey) {
-      return errorResponse('Server configuration error', 500);
+      return errorResponse('Server configuration error', 500, 'server_config');
     }
 
     // 1. Hash Request Key
@@ -60,16 +61,15 @@ export async function POST(
       keyHash = hashApiKey(apiKey);
     } catch (err: unknown) {
       console.error('API Key Hashing Error:', err);
-      return errorResponse('Server configuration error', 500);
+      return errorResponse('Server configuration error', 500, 'server_config');
     }
 
     // 2. Rate Limiting (Per Key)
     const rateLimit = await checkRateLimit(`ingest:${keyHash}`);
     if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { status: 'error', id: null, error: 'Rate limit exceeded' },
-        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSec ?? 60) } }
-      );
+      return errorResponse('Rate limit exceeded', 429, 'rate_limited', {
+        'Retry-After': String(rateLimit.retryAfterSec ?? 60),
+      });
     }
 
     // 3. Lookup Workspace
@@ -82,7 +82,7 @@ export async function POST(
       .single();
 
     if (wsError || !workspace) {
-      return errorResponse('Invalid API Key', 401);
+      return errorResponse('Invalid API Key', 401, 'invalid_api_key');
     }
 
     // 3.5. Enforce Monthly Limits (Plan Quota)
@@ -110,19 +110,40 @@ export async function POST(
        const limit = limits[plan] || 100;
        
        if (usageCount >= limit) {
-          return NextResponse.json(
-            { status: 'error', id: null, error: `Monthly limit exceeded for ${plan} plan (${limit} certificates). Upgrade to accept more.` },
-            { status: 429 } // Too Many Requests
+          return errorResponse(
+            `Monthly limit exceeded for ${plan} plan (${limit} certificates). Upgrade to accept more.`,
+            429,
+            'quota_exceeded'
           );
        }
     }
 
     // 4. Process Payload
     let rawBody = '';
+    const maxBytes = getMaxIngestBytes();
+    const contentLength = req.headers.get('content-length');
+    if (contentLength) {
+      const parsedLength = Number(contentLength);
+      if (Number.isFinite(parsedLength) && parsedLength > maxBytes) {
+        return errorResponse(
+          `Payload too large. Max ${maxBytes} bytes.`,
+          413,
+          'payload_too_large'
+        );
+      }
+    }
     try {
-      rawBody = await req.text();
+      const buffer = await req.arrayBuffer();
+      if (buffer.byteLength > maxBytes) {
+        return errorResponse(
+          `Payload too large. Max ${maxBytes} bytes.`,
+          413,
+          'payload_too_large'
+        );
+      }
+      rawBody = new TextDecoder('utf-8').decode(buffer);
     } catch {
-      return errorResponse('Unable to read body', 400);
+      return errorResponse('Unable to read body', 400, 'invalid_body');
     }
 
     const rawBodySha256 = computeRawBodySha256(rawBody);
@@ -196,8 +217,25 @@ export async function POST(
       .single();
 
     if (insertError) {
+      if (insertError.code === '23505' && providerEventId) {
+        const { data: existing, error: existingError } = await supabase
+          .from('ingested_events')
+          .select('id')
+          .eq('workspace_id', workspace.id)
+          .eq('provider_event_id', providerEventId)
+          .order('received_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!existingError && existing?.id) {
+          return NextResponse.json(
+            { status: 'duplicate', id: existing.id, verified: 'not_verified' },
+            { status: 200 }
+          );
+        }
+      }
       console.error('Ingest Insert Error:', insertError);
-      return errorResponse('Storage failed', 500);
+      return errorResponse('Storage failed', 500, 'storage_failed');
     }
 
     // 7. Log to Verification History
@@ -257,7 +295,7 @@ export async function POST(
     
   } catch (globalErr: unknown) {
     console.error('Unhandled API Error:', globalErr);
-    return errorResponse('Internal Server Error', 500);
+    return errorResponse('Internal Server Error', 500, 'internal_error');
   }
 }
 
@@ -298,6 +336,18 @@ function sanitizeHeaders(headers: Headers): Record<string, string> {
   return obj;
 }
 
-function errorResponse(message: string, status: number) {
-  return NextResponse.json({ status: 'error', id: null, error: message }, { status });
+function errorResponse(message: string, status: number, code: string, headers?: HeadersInit) {
+  return NextResponse.json(
+    { status: 'error', id: null, error: message, error_code: code },
+    { status, headers }
+  );
+}
+
+function getMaxIngestBytes() {
+  const raw = process.env.INGEST_MAX_BYTES;
+  const parsed = raw ? Number(raw) : NaN;
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return Math.floor(parsed);
+  }
+  return DEFAULT_MAX_INGEST_BYTES;
 }

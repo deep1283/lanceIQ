@@ -41,6 +41,14 @@ export default async function VerifyPage({ params }: { params: Promise<{ id: str
   const cert = result.data;
   const formattedDate = cert.created_at ? format(new Date(cert.created_at), "PPpp") : "Unknown Date";
   const payloadHash = cert.raw_body_sha256 || cert.payload_hash || cert.hash || "Legacy Record (No Hash Stored)";
+  const rawBodyExpiresAt = cert.raw_body_expires_at ?? cert.rawBodyExpiresAt ?? null;
+  const rawBodyPresent =
+    typeof cert.raw_body_present === 'boolean'
+      ? cert.raw_body_present
+      : typeof cert.rawBodyPresent === 'boolean'
+        ? cert.rawBodyPresent
+        : null;
+  const retentionPolicyLabel = cert.retention_policy_label ?? cert.retentionPolicyLabel ?? null;
 
   // Truncate payload for preview
   const payloadString = JSON.stringify(cert.payload, null, 2);
@@ -73,7 +81,15 @@ export default async function VerifyPage({ params }: { params: Promise<{ id: str
             className: "bg-yellow-100 text-yellow-800 ring-yellow-200/50",
             icon: <AlertTriangle className="w-4 h-4" />,
             label: "Not Verified",
-          };
+        };
+
+  const rawBodyPresentLabel =
+    rawBodyPresent === null ? "Pending backend data" : rawBodyPresent ? "Present" : "Pruned";
+  const rawBodyExpiresAtLabel =
+    rawBodyExpiresAt && !Number.isNaN(new Date(rawBodyExpiresAt).getTime())
+      ? `${format(new Date(rawBodyExpiresAt), "PPpp")} UTC`
+      : "Pending backend data";
+  const retentionPolicyLabelText = retentionPolicyLabel ?? "Pending backend data";
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] font-sans selection:bg-indigo-100 selection:text-indigo-900">
@@ -174,6 +190,25 @@ export default async function VerifyPage({ params }: { params: Promise<{ id: str
                     {signatureStatus === 'verified' ? "Verified" : signatureStatus === 'failed' ? "Failed" : "Not Verified"}
                   </p>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Retention Status */}
+          <div className="p-8 border-b border-slate-100">
+            <h3 className="text-sm font-semibold text-slate-900 mb-4">Retention Status</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-600">
+              <div className="space-y-1">
+                <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Raw Body Present</p>
+                <p className="font-mono text-slate-700">{rawBodyPresentLabel}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Raw Body Expires At</p>
+                <p className="font-mono text-slate-700 break-all">{rawBodyExpiresAtLabel}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Retention Policy</p>
+                <p className="font-mono text-slate-700 break-all">{retentionPolicyLabelText}</p>
               </div>
             </div>
           </div>

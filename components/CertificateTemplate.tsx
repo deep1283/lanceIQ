@@ -8,6 +8,9 @@ interface CertificateTemplateProps {
   headers: Record<string, string>;
   status: number;
   payloadHash: string;
+  retentionPolicyLabel?: string;
+  rawBodyPresent?: boolean;
+  rawBodyExpiresAt?: string;
   
   // Visuals
   showWatermark?: boolean;
@@ -30,6 +33,9 @@ export function CertificateTemplate({
   headers,
   status,
   payloadHash,
+  retentionPolicyLabel,
+  rawBodyPresent,
+  rawBodyExpiresAt,
   showWatermark,
   qrCodeDataUrl,
   verificationUrl,
@@ -40,6 +46,14 @@ export function CertificateTemplate({
   secretHint,
   toleranceUsedSec,
 }: CertificateTemplateProps) {
+  const rawBodyPresentLabel =
+    typeof rawBodyPresent === 'boolean'
+      ? rawBodyPresent
+        ? 'Present'
+        : 'Pruned'
+      : 'Pending backend data';
+  const rawBodyExpiresAtLabel = rawBodyExpiresAt || 'Pending backend data';
+  const retentionPolicyLabelText = retentionPolicyLabel || 'Pending backend data';
   
   return (
     <div 
@@ -171,6 +185,25 @@ export function CertificateTemplate({
                 <div className="flex items-center gap-2 text-slate-700">
                     <Hash className="w-4 h-4 text-slate-400" />
                     <span className="font-mono text-xs break-all">{payloadHash}</span>
+                </div>
+            </div>
+        </div>
+
+        {/* Retention Status */}
+        <div className="mb-10 pb-10 border-b border-slate-100">
+            <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold mb-4">Retention Status</p>
+            <div className="grid grid-cols-3 gap-6 text-xs text-slate-600">
+                <div className="space-y-1">
+                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Raw Body Present</p>
+                    <p className="font-mono text-slate-700">{rawBodyPresentLabel}</p>
+                </div>
+                <div className="space-y-1">
+                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Raw Body Expires At</p>
+                    <p className="font-mono text-slate-700 break-all">{rawBodyExpiresAtLabel}</p>
+                </div>
+                <div className="space-y-1">
+                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Retention Policy</p>
+                    <p className="font-mono text-slate-700 break-all">{retentionPolicyLabelText}</p>
                 </div>
             </div>
         </div>

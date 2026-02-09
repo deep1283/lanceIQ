@@ -33,6 +33,24 @@ Why: Contract compliance and reliable client parsing.
 Backward compatibility: Responses still include `status` and `verified`; clients must accept 200 or 202.
 Alternatives rejected: Leaving inconsistent responses and undocumented behavior.
 
+## 2026-02-07: Legal Hold Semantics (V2)
+Decision: Legal holds are workspace-scoped, auditable, and block retention pruning while active.
+Why: Enterprise-grade immutability and defensible evidence handling.
+Backward compatibility: No breaking changes to existing evidence records; holds are additive.
+Alternatives rejected: Application-only enforcement without DB-level guarantees.
+
+## 2026-02-07: Retention Visibility (V2)
+Decision: Retention status will be surfaced in UI and exports using additive fields and updated labels.
+Why: Transparent data handling without changing evidence semantics.
+Backward compatibility: Existing fields remain; new fields are additive and optional.
+Alternatives rejected: Hiding retention behavior or exposing it only in internal logs.
+
+## 2026-02-07: DB-Level Idempotency (V2)
+Decision: Enforce uniqueness for provider_event_id at the database layer, scoped to workspace and provider.
+Why: Hard-prevent duplicates for providers with stable event IDs.
+Backward compatibility: Events without provider_event_id remain unchanged; existing behavior preserved.
+Alternatives rejected: Global uniqueness or hashing-only constraints for all events.
+
 ## 2026-02-08: Strict Evidence Immutability with Retention Exception
 Decision: Enforce database-level immutability on ingested evidence with a narrow retention exception for raw bodies.
 Why: Evidence integrity is paramount; updates to evidence fields are prohibited to preserve auditability and legal posture.

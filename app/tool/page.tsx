@@ -27,6 +27,13 @@ type AuditLogEntry = {
   created_at: string;
 };
 
+type LegalHoldStatus = {
+  id: string;
+  active: boolean;
+  reason: string | null;
+  created_at: string;
+};
+
 export default function Home() {
   const searchParams = useSearchParams();
   const certificateId = searchParams?.get('id');
@@ -62,6 +69,12 @@ export default function Home() {
   const [auditNextCursorId, setAuditNextCursorId] = useState<string | null>(null);
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditError, setAuditError] = useState<string | null>(null);
+  const [legalHold, setLegalHold] = useState<LegalHoldStatus | null>(null);
+  const [legalHoldLoading, setLegalHoldLoading] = useState(false);
+  const [legalHoldError, setLegalHoldError] = useState<string | null>(null);
+  const [rawBodyExpiresAt, setRawBodyExpiresAt] = useState<string | null>(null);
+  const [rawBodyPresent, setRawBodyPresent] = useState<boolean | null>(null);
+  const [retentionPolicyLabel, setRetentionPolicyLabel] = useState<string | null>(null);
   
   // Auth state
   const [user, setUser] = useState<SupabaseUser | null>(null);
@@ -76,8 +89,8 @@ export default function Home() {
   const [showSigVerifyModal, setShowSigVerifyModal] = useState(false);
   const [verificationResult, setVerificationResult] = useState<VerificationApiResponse | null>(null);
 
-  const canViewAuditLogs =
-    workspacePlan === 'team' && (workspaceRole === 'owner' || workspaceRole === 'admin');
+  const canManageWorkspace = workspaceRole === 'owner' || workspaceRole === 'admin';
+  const canViewAuditLogs = workspacePlan === 'team' && canManageWorkspace;
 
   const syncProStatus = async () => {
     const promoActive = Date.now() <= PROMO_END_LOCAL.getTime();
@@ -152,6 +165,9 @@ export default function Home() {
       setAuditNextCursorId(null);
       setAuditError(null);
       setAuditLoading(false);
+      setLegalHold(null);
+      setLegalHoldError(null);
+      setLegalHoldLoading(false);
       return;
     }
 
@@ -243,8 +259,52 @@ export default function Home() {
   }, [canViewAuditLogs, workspaceId]);
 
   useEffect(() => {
+    if (!canManageWorkspace || !workspaceId) {
+      setLegalHold(null);
+      setLegalHoldError(null);
+      setLegalHoldLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLegalHoldLoading(true);
+    setLegalHoldError(null);
+
+    const fetchLegalHoldStatus = async () => {
+      const { data, error } = await supabase
+        .from('workspace_legal_holds')
+        .select('id, active, reason, created_at')
+        .eq('workspace_id', workspaceId)
+        .eq('active', true)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (cancelled) return;
+
+      if (error) {
+        setLegalHold(null);
+        setLegalHoldError(error.message || 'Failed to load legal hold status.');
+      } else {
+        const activeHold = Array.isArray(data) && data.length > 0 ? data[0] : null;
+        setLegalHold(activeHold ?? null);
+      }
+
+      setLegalHoldLoading(false);
+    };
+
+    void fetchLegalHoldStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canManageWorkspace, workspaceId, supabase]);
+
+  useEffect(() => {
     if (!certificateId) {
       setIsExistingCertificate(false);
+      setRawBodyExpiresAt(null);
+      setRawBodyPresent(null);
+      setRetentionPolicyLabel(null);
       return;
     }
 
@@ -277,6 +337,15 @@ export default function Home() {
         setHash(hashValue);
         setStatus(typeof cert.status_code === 'number' ? cert.status_code : 200);
         setIsExistingCertificate(true);
+        setRawBodyExpiresAt(cert.raw_body_expires_at ?? cert.rawBodyExpiresAt ?? null);
+        setRawBodyPresent(
+          typeof cert.raw_body_present === 'boolean'
+            ? cert.raw_body_present
+            : typeof cert.rawBodyPresent === 'boolean'
+              ? cert.rawBodyPresent
+              : null
+        );
+        setRetentionPolicyLabel(cert.retention_policy_label ?? cert.retentionPolicyLabel ?? null);
 
         setVerificationResult({
           status: cert.signature_status ?? 'not_verified',
@@ -294,6 +363,9 @@ export default function Home() {
         if (cancelled) return;
         setError(err.message || "Unable to load certificate.");
         setIsExistingCertificate(false);
+        setRawBodyExpiresAt(null);
+        setRawBodyPresent(null);
+        setRetentionPolicyLabel(null);
       })
       .finally(() => {
         if (cancelled) return;
@@ -399,6 +471,9 @@ export default function Home() {
           headers: parsedHeaders,
           status,
           payloadHash: hash,
+          rawBodyExpiresAt: rawBodyExpiresAt ?? undefined,
+          rawBodyPresent: rawBodyPresent ?? undefined,
+          retentionPolicyLabel: retentionPolicyLabel ?? undefined,
           
           showWatermark: !isWatermarkFree,
           verificationUrl: user ? `https://lanceiq.com/verify/${newReportId}` : undefined,
@@ -813,6 +888,58 @@ export default function Home() {
              </div>
           </div>
 
+          {user && canManageWorkspace && (
+            <div className="pt-8">
+              <div className="border-t border-slate-200 pt-6">
+                <div className="flex items-start justify-between gap-4 mb-4">
+                  <div>
+                    <h2 className="text-sm font-semibold text-slate-900">Legal Hold</h2>
+                    <p className="text-xs text-slate-500">Owners/admins only.</p>
+                  </div>
+                  {workspaceName && (
+                    <span className="text-xs text-slate-500 bg-white border border-slate-200 rounded-full px-3 py-1">
+                      {workspaceName}
+                    </span>
+                  )}
+                </div>
+                <div className="border border-slate-200 rounded-lg bg-white p-3 text-xs text-slate-600">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-700">Status</span>
+                    {legalHoldLoading ? (
+                      <span className="font-mono text-slate-500">Loading...</span>
+                    ) : legalHoldError ? (
+                      <span className="font-mono text-red-600">Unavailable</span>
+                    ) : legalHold?.active ? (
+                      <span className="font-mono text-green-700">Active</span>
+                    ) : (
+                      <span className="font-mono text-slate-500">Not active</span>
+                    )}
+                  </div>
+                  {legalHold?.active && (
+                    <div className="mt-2 space-y-1 text-[11px] text-slate-500">
+                      <div>
+                        <span className="font-semibold text-slate-600">Active Since:</span>{" "}
+                        <span className="font-mono">{new Date(legalHold.created_at).toLocaleString()}</span>
+                      </div>
+                      {legalHold.reason && (
+                        <div>
+                          <span className="font-semibold text-slate-600">Reason:</span>{" "}
+                          <span className="font-mono">{legalHold.reason}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {!legalHoldLoading && !legalHoldError && !legalHold?.active && (
+                    <p className="mt-2 text-[11px] text-slate-400">No active legal hold.</p>
+                  )}
+                  {legalHoldError && (
+                    <p className="mt-2 text-[11px] text-red-600">{legalHoldError}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {user && canViewAuditLogs && (
             <div className="pt-8">
               <div className="border-t border-slate-200 pt-6">
@@ -902,6 +1029,9 @@ export default function Home() {
                 headers={parsedHeadersPreview}
                 status={status}
                 payloadHash={hash}
+                rawBodyExpiresAt={rawBodyExpiresAt ?? undefined}
+                rawBodyPresent={rawBodyPresent ?? undefined}
+                retentionPolicyLabel={retentionPolicyLabel ?? undefined}
                 
                 showWatermark={!isWatermarkFree}
                 verificationUrl={user ? `https://lanceiq.com/verify/${reportId}` : undefined}
