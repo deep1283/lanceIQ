@@ -13,6 +13,9 @@ export const AUDIT_ACTIONS = {
   SECRET_VIEWED: 'secret.viewed',
   LEGAL_HOLD_CREATED: 'legal_hold.created',
   LEGAL_HOLD_DEACTIVATED: 'legal_hold.deactivated',
+  KEY_ROTATED: 'key.rotated',
+  ACCESS_REVIEW_CREATED: 'access_review.created',
+  ACCESS_REVIEW_DECISION: 'access_review.decision',
   PLAN_CHANGED: 'plan.changed',
   AUTH_LOGIN: 'auth.login',
 } as const;

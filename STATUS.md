@@ -42,6 +42,10 @@ Owner: Product Owner (You)
 31. V3 Frontend: RFC-3161 timestamp proof displayed in certificate and verification views.
 32. V3 Frontend: role-based UI gating across dashboard, tool, and settings.
 33. V3 Frontend: compliance pages added (SOC2/DPA/SLA templates).
+34. V4 Backend: SAML SSO, SCIM, SLA incidents, access review, and key rotation implemented.
+35. V4 DB: SSO/SCIM identity mappings, access reviews, SLA/incidents, key rotation, retention policies, and RLS.
+36. V4 Frontend: SSO/SCIM, SLA/Incidents, Access Reviews, and Key Rotation UI shipped.
+37. V4 Frontend: retention placeholders removed in certificate and verification views.
 
 ## In Progress
 1. None active (ready to start next phase).
@@ -64,4 +68,5 @@ Owner: Product Owner (You)
 1. V1: Complete.
 2. V2: Complete.
 3. V3: Complete.
-4. V4: Planned.
+4. V4: Complete.
+5. V5: Planned.

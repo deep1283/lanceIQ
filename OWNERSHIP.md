@@ -37,6 +37,8 @@ UX may change; evidence must not.
 2. app/ui/*
 3. styles/*
 4. docs/* (except CONTRACTS.md)
+5. app/dashboard/*
+6. app/dashboard/settings/*
 
 ## Ownership Map
 1. Platform Contracts: CONTRACTS.md, ARCHITECTURE.md, DECISIONS.md
@@ -48,7 +50,7 @@ Owner: Backend Owner
 3. Evidence Storage and Migrations: supabase/migrations
 Owner: Database Owner
 
-4. UI and Certificate Rendering: app/verify, app/tool, components
+4. UI and Certificate Rendering: app/verify, app/tool, app/dashboard, app/dashboard/settings, components
 Owner: Frontend Owner
 
 5. Billing and Plans: app/api/dodo, app/actions/subscription

@@ -61,9 +61,9 @@ export function CertificateTemplate({
       ? rawBodyPresent
         ? 'Present'
         : 'Pruned'
-      : 'Pending backend data';
-  const rawBodyExpiresAtLabel = rawBodyExpiresAt || 'Pending backend data';
-  const retentionPolicyLabelText = retentionPolicyLabel || 'Pending backend data';
+      : 'Not available';
+  const rawBodyExpiresAtLabel = rawBodyExpiresAt || 'Not available';
+  const retentionPolicyLabelText = retentionPolicyLabel || 'Not available';
   const timestampProofSnippet = timestampReceipt?.proofData
     ? timestampReceipt.proofData.length > 96
       ? `${timestampReceipt.proofData.slice(0, 64)}…${timestampReceipt.proofData.slice(-24)}`

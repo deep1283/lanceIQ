@@ -15,6 +15,7 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const DEDUP_EVENT_TTL_SEC = 24 * 60 * 60; // 24h
 const DEDUP_HASH_TTL_SEC = 6 * 60 * 60; // 6h
 const DEFAULT_MAX_INGEST_BYTES = 1024 * 1024; // 1 MiB
+const KEY_ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
 
 export async function POST(
   req: NextRequest, 
@@ -76,13 +77,34 @@ export async function POST(
     // 3. Lookup Workspace
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     // Note: ensure we select everything needed, including encrypted_secret
-    const { data: workspace, error: wsError } = await supabase
+    let { data: workspace, error: wsError } = await supabase
       .from('workspaces')
       .select('id, name, provider, store_raw_body, raw_body_retention_days, encrypted_secret, plan, subscription_status, subscription_current_period_end')
       .eq('api_key_hash', keyHash)
       .single();
 
     if (wsError || !workspace) {
+      const graceCutoff = new Date(Date.now() - KEY_ROTATION_GRACE_MS).toISOString();
+      const { data: rotation } = await supabase
+        .from('api_key_rotations')
+        .select('workspace_id, rotated_at')
+        .eq('old_key_hash_hint', keyHash)
+        .gte('rotated_at', graceCutoff)
+        .order('rotated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (rotation?.workspace_id) {
+        const { data: fallbackWorkspace } = await supabase
+          .from('workspaces')
+          .select('id, name, provider, store_raw_body, raw_body_retention_days, encrypted_secret, plan, subscription_status, subscription_current_period_end')
+          .eq('id', rotation.workspace_id)
+          .single();
+        workspace = fallbackWorkspace || null;
+      }
+    }
+
+    if (!workspace) {
       return errorResponse('Invalid API Key', 401, 'invalid_api_key');
     }
 

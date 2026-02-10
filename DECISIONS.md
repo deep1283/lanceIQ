@@ -75,6 +75,36 @@ Why: Deterministic evidence hashing for exports and anchoring.
 Backward compatibility: Field is nullable; no breaking change.
 Alternatives rejected: On-the-fly computation during export only.
 
+## 2026-02-07: SAML Attribute Mapping (V4)
+Decision: Canonical attributes are email, name, and groups. Accept email from email, mail, or userPrincipalName; name from displayName/givenName/familyName; groups from groups.
+Why: Enterprise IdP compatibility with minimal friction.
+Backward compatibility: Additive mapping; no change to existing auth.
+Alternatives rejected: Single-attribute-only mapping.
+
+## 2026-02-07: Initial IdP Support (V4)
+Decision: Okta and Azure AD first; Google Workspace next.
+Why: Highest enterprise demand and predictable SAML profiles.
+Backward compatibility: No breaking changes.
+Alternatives rejected: Google-first.
+
+## 2026-02-07: SCIM Auth Tokens (V4)
+Decision: Authorization: Bearer <token>, allow multiple active tokens with last_used_at tracking.
+Why: Safe rotation and enterprise operational needs.
+Backward compatibility: Additive; existing tokens remain valid until revoked.
+Alternatives rejected: Single-token only with forced rotation windows.
+
+## 2026-02-07: SLA Incident Taxonomy (V4)
+Decision: Severity levels sev1, sev2, sev3. Incidents can be global or workspace-scoped.
+Why: Standard operational taxonomy with tenant-specific visibility.
+Backward compatibility: Additive; no change to prior behavior.
+Alternatives rejected: Single-scope incidents only.
+
+## 2026-02-07: API Key Rotation Grace Period (V4)
+Decision: 24-hour grace period for old keys after rotation.
+Why: Reduces customer downtime during key propagation.
+Backward compatibility: Additive; existing keys behavior unchanged.
+Alternatives rejected: Immediate revocation.
+
 ## 2026-02-08: Strict Evidence Immutability with Retention Exception
 Decision: Enforce database-level immutability on ingested evidence with a narrow retention exception for raw bodies.
 Why: Evidence integrity is paramount; updates to evidence fields are prohibited to preserve auditability and legal posture.

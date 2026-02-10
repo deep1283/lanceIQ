@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateAlertSettings } from '@/app/actions/alert-settings';
 import { inviteMember, removeMember } from '@/app/actions/members';
+import { createScimToken, revokeScimToken, saveSsoProvider } from './actions';
 import type { Role } from '@/lib/roles';
-import { canInviteMembers, canManageWorkspace, canRemoveMembers, canViewAuditLogs } from '@/lib/roles';
+import { canInviteMembers, canManageWorkspace, canRemoveMembers, canViewAuditLogs, isLegalHoldManager, isOwner, isViewer } from '@/lib/roles';
 
 interface Workspace {
   id: string;
@@ -41,36 +42,137 @@ interface Member {
   joined_at: string;
 }
 
+interface SsoProvider {
+  id: string;
+  domain: string;
+  metadata_xml: string | null;
+  enabled: boolean | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ScimToken {
+  id: string;
+  provider_id: string;
+  token_hash: string;
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  created_by: string | null;
+}
+
+interface AccessReviewCycle {
+  id: string;
+  reviewer_id: string | null;
+  status: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  created_at: string;
+}
+
+interface AccessReviewDecision {
+  id: string;
+  cycle_id: string;
+  target_user_id: string | null;
+  decision: string | null;
+  notes: string | null;
+  reviewed_at: string | null;
+}
+
+interface KeyRotation {
+  id: string;
+  workspace_id: string;
+  actor_id: string | null;
+  key_type: string | null;
+  rotated_at: string | null;
+  reason: string | null;
+  old_key_hash_hint: string | null;
+}
+
+interface Incident {
+  id: string;
+  workspace_id: string | null;
+  title: string;
+  severity: string | null;
+  status: string | null;
+  started_at: string;
+  resolved_at: string | null;
+  affected_components: string[] | null;
+  public_note: string | null;
+  created_at: string;
+}
+
+interface SlaPolicy {
+  id: string;
+  name: string;
+  target_availability: number | null;
+  violation_penalty_rate: number | null;
+  created_at: string;
+}
+
+interface SlaSummary {
+  workspace_id: string;
+  window_start: string;
+  window_end: string;
+  uptime_percent: number;
+  downtime_seconds: number;
+  policies: SlaPolicy[];
+}
+
 export default function SettingsClient({ 
   workspace, 
   initialSettings,
   initialAuditLogs,
   initialMembers,
-  currentUserId
+  currentUserId,
+  currentUserRole,
+  initialSsoProviders,
+  initialScimTokens,
+  initialAccessReviewCycles,
+  initialAccessReviewDecisions,
+  initialKeyRotations,
+  initialIncidents,
+  initialSlaSummary
 }: { 
   workspace: Workspace, 
   initialSettings: AlertSetting | null,
   initialAuditLogs: AuditLog[],
   initialMembers: Member[],
-  currentUserId: string
+  currentUserId: string,
+  currentUserRole: Role | null,
+  initialSsoProviders: SsoProvider[],
+  initialScimTokens: ScimToken[],
+  initialAccessReviewCycles: AccessReviewCycle[],
+  initialAccessReviewDecisions: AccessReviewDecision[],
+  initialKeyRotations: KeyRotation[],
+  initialIncidents: Incident[],
+  initialSlaSummary: SlaSummary | null
 }) {
   const router = useRouter();
   const isPaid = workspace.plan !== 'free';
   const isTeam = workspace.plan === 'team';
   const isPastDue = workspace.subscription_status === 'past_due';
   const canUseAlerts = isTeam && (workspace.subscription_status === 'active' || isPastDue);
-  const currentUserRole = initialMembers.find((member) => member.user_id === currentUserId)?.role ?? null;
   const canManage = canManageWorkspace(currentUserRole);
   const canViewAudit = canViewAuditLogs(currentUserRole);
   const canInvite = canInviteMembers(currentUserRole);
   const canRemove = canRemoveMembers(currentUserRole);
+  const canViewSso = canManage || isViewer(currentUserRole) || isLegalHoldManager(currentUserRole);
+  const canViewAccessReviews = canManage || isViewer(currentUserRole) || isLegalHoldManager(currentUserRole);
+  const canViewRotations = canManage || isViewer(currentUserRole) || isLegalHoldManager(currentUserRole);
+  const canViewOps = Boolean(currentUserRole);
+
   const availableTabs = [
     canManage ? 'alerts' : null,
     canViewAudit ? 'audit' : null,
     canManage ? 'members' : null,
-  ].filter((tab): tab is 'alerts' | 'audit' | 'members' => Boolean(tab));
+    canViewSso ? 'identity' : null,
+    canViewAccessReviews ? 'access' : null,
+    canViewOps ? 'ops' : null,
+    canViewRotations ? 'keys' : null,
+  ].filter((tab): tab is 'alerts' | 'audit' | 'members' | 'identity' | 'access' | 'ops' | 'keys' => Boolean(tab));
 
-  const [activeTab, setActiveTab] = useState<'alerts' | 'audit' | 'members'>(availableTabs[0] || 'alerts');
+  const [activeTab, setActiveTab] = useState<'alerts' | 'audit' | 'members' | 'identity' | 'access' | 'ops' | 'keys'>(availableTabs[0] || 'alerts');
 
   const [settings, setSettings] = useState<AlertSetting>(initialSettings || {
     channel: 'email',
@@ -86,6 +188,42 @@ export default function SettingsClient({
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
 
   const [saving, setSaving] = useState(false);
+  const [ssoForm, setSsoForm] = useState({
+    providerId: null as string | null,
+    domain: '',
+    metadataXml: '',
+    enabled: true,
+  });
+  const [ssoSaving, setSsoSaving] = useState(false);
+  const [ssoError, setSsoError] = useState<string | null>(null);
+  const [ssoSuccess, setSsoSuccess] = useState<string | null>(null);
+
+  const [selectedProviderId, setSelectedProviderId] = useState<string>(initialSsoProviders[0]?.id ?? '');
+  const [scimCreating, setScimCreating] = useState(false);
+  const [scimRevokingId, setScimRevokingId] = useState<string | null>(null);
+  const [scimError, setScimError] = useState<string | null>(null);
+  const [newScimToken, setNewScimToken] = useState<string | null>(null);
+
+  const [accessPeriodStart, setAccessPeriodStart] = useState('');
+  const [accessPeriodEnd, setAccessPeriodEnd] = useState('');
+  const [accessCreating, setAccessCreating] = useState(false);
+  const [accessError, setAccessError] = useState<string | null>(null);
+  const [accessSuccess, setAccessSuccess] = useState<string | null>(null);
+
+  const [includeGlobal, setIncludeGlobal] = useState(true);
+  const [incidents, setIncidents] = useState<Incident[]>(initialIncidents);
+  const [incidentsLoading, setIncidentsLoading] = useState(false);
+  const [incidentsError, setIncidentsError] = useState<string | null>(null);
+  const incidentsLoadedRef = useRef(false);
+
+  const [slaSummary, setSlaSummary] = useState<SlaSummary | null>(initialSlaSummary);
+  const [slaRefreshing, setSlaRefreshing] = useState(false);
+  const [slaError, setSlaError] = useState<string | null>(null);
+
+  const [rotateReason, setRotateReason] = useState('');
+  const [rotating, setRotating] = useState(false);
+  const [rotateError, setRotateError] = useState<string | null>(null);
+  const [rotateResult, setRotateResult] = useState<{ apiKey: string; rotatedAt: string } | null>(null);
 
   async function handleSave() {
     if (!canUseAlerts) return; // Strict gating
@@ -139,6 +277,233 @@ export default function SettingsClient({
       router.refresh();
     }
   }
+
+  useEffect(() => {
+    if (!selectedProviderId && initialSsoProviders[0]?.id) {
+      setSelectedProviderId(initialSsoProviders[0].id);
+    }
+  }, [initialSsoProviders, selectedProviderId]);
+
+  useEffect(() => {
+    if (!incidentsLoadedRef.current) {
+      incidentsLoadedRef.current = true;
+      return;
+    }
+
+    async function loadIncidents() {
+      setIncidentsLoading(true);
+      setIncidentsError(null);
+      try {
+        const params = new URLSearchParams({
+          workspace_id: workspace.id,
+          include_global: includeGlobal ? 'true' : 'false',
+        });
+        const res = await fetch(`/api/ops/incidents?${params.toString()}`);
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to load incidents.');
+        }
+        setIncidents(data.incidents || []);
+      } catch (error) {
+        setIncidentsError(error instanceof Error ? error.message : 'Failed to load incidents.');
+      } finally {
+        setIncidentsLoading(false);
+      }
+    }
+
+    loadIncidents();
+  }, [includeGlobal, workspace.id]);
+
+  async function handleSaveSsoProvider(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canManage) return;
+
+    setSsoSaving(true);
+    setSsoError(null);
+    setSsoSuccess(null);
+
+    const result = await saveSsoProvider({
+      workspaceId: workspace.id,
+      providerId: ssoForm.providerId,
+      domain: ssoForm.domain,
+      metadataXml: ssoForm.metadataXml,
+      enabled: ssoForm.enabled,
+    });
+
+    if (result.error) {
+      setSsoError(result.error);
+    } else {
+      setSsoSuccess(ssoForm.providerId ? 'SSO provider updated.' : 'SSO provider created.');
+      setSsoForm({ providerId: null, domain: '', metadataXml: '', enabled: true });
+      router.refresh();
+    }
+
+    setSsoSaving(false);
+  }
+
+  function startEditProvider(provider: SsoProvider) {
+    setSsoError(null);
+    setSsoSuccess(null);
+    setSsoForm({
+      providerId: provider.id,
+      domain: provider.domain,
+      metadataXml: provider.metadata_xml || '',
+      enabled: provider.enabled ?? true,
+    });
+  }
+
+  async function handleToggleProvider(provider: SsoProvider) {
+    if (!canManage) return;
+    const result = await saveSsoProvider({
+      workspaceId: workspace.id,
+      providerId: provider.id,
+      domain: provider.domain,
+      metadataXml: provider.metadata_xml,
+      enabled: !(provider.enabled ?? true),
+    });
+
+    if (result.error) {
+      setSsoError(result.error);
+    } else {
+      setSsoSuccess('Provider status updated.');
+      router.refresh();
+    }
+  }
+
+  async function handleCreateScimToken() {
+    if (!canManage || !selectedProviderId) return;
+    setScimCreating(true);
+    setScimError(null);
+    setNewScimToken(null);
+
+    const result = await createScimToken({
+      workspaceId: workspace.id,
+      providerId: selectedProviderId,
+    });
+
+    if (result.error) {
+      setScimError(result.error);
+    } else if (result.token) {
+      setNewScimToken(result.token);
+      router.refresh();
+    }
+
+    setScimCreating(false);
+  }
+
+  async function handleRevokeScimToken(tokenId: string) {
+    if (!canManage) return;
+    setScimRevokingId(tokenId);
+    setScimError(null);
+
+    const result = await revokeScimToken({ workspaceId: workspace.id, tokenId });
+    if (result.error) {
+      setScimError(result.error);
+    } else {
+      router.refresh();
+    }
+
+    setScimRevokingId(null);
+  }
+
+  async function handleCreateAccessReview(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canManage) return;
+
+    setAccessCreating(true);
+    setAccessError(null);
+    setAccessSuccess(null);
+
+    try {
+      const res = await fetch('/api/access-review/cycles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workspace_id: workspace.id,
+          period_start: accessPeriodStart || null,
+          period_end: accessPeriodEnd || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to create access review cycle.');
+      }
+      setAccessSuccess('Access review cycle created.');
+      setAccessPeriodStart('');
+      setAccessPeriodEnd('');
+      router.refresh();
+    } catch (error) {
+      setAccessError(error instanceof Error ? error.message : 'Failed to create access review cycle.');
+    } finally {
+      setAccessCreating(false);
+    }
+  }
+
+  async function handleRefreshSla() {
+    setSlaRefreshing(true);
+    setSlaError(null);
+    try {
+      const params = new URLSearchParams({
+        workspace_id: workspace.id,
+        window_days: '30',
+      });
+      const res = await fetch(`/api/ops/sla?${params.toString()}`);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to load SLA summary.');
+      }
+      setSlaSummary({
+        workspace_id: data.workspace_id,
+        window_start: data.window_start,
+        window_end: data.window_end,
+        uptime_percent: data.uptime_percent,
+        downtime_seconds: data.downtime_seconds,
+        policies: data.policies || [],
+      });
+    } catch (error) {
+      setSlaError(error instanceof Error ? error.message : 'Failed to load SLA summary.');
+    } finally {
+      setSlaRefreshing(false);
+    }
+  }
+
+  async function handleRotateKey() {
+    if (!isOwner(currentUserRole)) return;
+    setRotating(true);
+    setRotateError(null);
+    setRotateResult(null);
+
+    try {
+      const res = await fetch('/api/workspaces/keys/rotate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workspace_id: workspace.id,
+          reason: rotateReason || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to rotate API key.');
+      }
+      setRotateResult({ apiKey: data.api_key, rotatedAt: data.rotated_at });
+      setRotateReason('');
+      router.refresh();
+    } catch (error) {
+      setRotateError(error instanceof Error ? error.message : 'Failed to rotate API key.');
+    } finally {
+      setRotating(false);
+    }
+  }
+
+  const providerDomain = (providerId: string | null) =>
+    initialSsoProviders.find((provider) => provider.id === providerId)?.domain || 'Unknown';
+
+  const formatDate = (value: string | null | undefined) =>
+    value ? new Date(value).toLocaleString() : '-';
+
+  const shortId = (value: string | null | undefined) =>
+    value ? `${value.slice(0, 8)}...` : '-';
 
   return (
     <div className="max-w-4xl mx-auto py-10 px-6">
@@ -232,6 +597,54 @@ export default function SettingsClient({
             }`}
           >
             Team Members
+          </button>
+        )}
+        {canViewSso && (
+          <button
+            onClick={() => setActiveTab('identity')}
+            className={`pb-3 text-sm font-medium transition-colors border-b-2 ${
+              activeTab === 'identity'
+                ? 'border-blue-500 text-blue-400'
+                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            SSO & SCIM
+          </button>
+        )}
+        {canViewAccessReviews && (
+          <button
+            onClick={() => setActiveTab('access')}
+            className={`pb-3 text-sm font-medium transition-colors border-b-2 ${
+              activeTab === 'access'
+                ? 'border-blue-500 text-blue-400'
+                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            Access Reviews
+          </button>
+        )}
+        {canViewOps && (
+          <button
+            onClick={() => setActiveTab('ops')}
+            className={`pb-3 text-sm font-medium transition-colors border-b-2 ${
+              activeTab === 'ops'
+                ? 'border-blue-500 text-blue-400'
+                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            SLA & Incidents
+          </button>
+        )}
+        {canViewRotations && (
+          <button
+            onClick={() => setActiveTab('keys')}
+            className={`pb-3 text-sm font-medium transition-colors border-b-2 ${
+              activeTab === 'keys'
+                ? 'border-blue-500 text-blue-400'
+                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            Key Rotation
           </button>
         )}
       </div>
@@ -484,6 +897,596 @@ export default function SettingsClient({
                 </table>
              </div>
            </div>
+        </div>
+      ) : activeTab === 'identity' && canViewSso ? (
+        <div className="space-y-8">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm">
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-white mb-1">SSO Setup</h2>
+                <p className="text-zinc-400 text-sm">Configure SAML metadata and domain mapping for your IdP.</p>
+              </div>
+              <div className="text-xs text-zinc-500">SAML 2.0</div>
+            </div>
+
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4">
+                <p className="text-xs uppercase tracking-wider text-zinc-500 mb-2">Metadata URL</p>
+                <p className="text-sm font-mono text-zinc-200">/api/sso/saml/metadata</p>
+              </div>
+              <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4">
+                <p className="text-xs uppercase tracking-wider text-zinc-500 mb-2">ACS URL</p>
+                <p className="text-sm font-mono text-zinc-200">/api/sso/saml/acs</p>
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-zinc-200">Identity Providers</h3>
+                <span className="text-xs text-zinc-500">{initialSsoProviders.length} configured</span>
+              </div>
+              {initialSsoProviders.length === 0 ? (
+                <div className="text-sm text-zinc-500 border border-dashed border-zinc-800 rounded-lg p-4">
+                  No SSO providers configured yet.
+                </div>
+              ) : (
+                <div className="overflow-hidden border border-zinc-800 rounded-lg">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-zinc-950 text-zinc-400">
+                      <tr>
+                        <th className="px-4 py-3 font-medium">Domain</th>
+                        <th className="px-4 py-3 font-medium">Status</th>
+                        <th className="px-4 py-3 font-medium">Updated</th>
+                        <th className="px-4 py-3 font-medium text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800">
+                      {initialSsoProviders.map((provider) => (
+                        <tr key={provider.id} className="hover:bg-zinc-800/30">
+                          <td className="px-4 py-3 text-zinc-200">{provider.domain}</td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                              provider.enabled ? 'bg-emerald-900/30 text-emerald-300' : 'bg-zinc-800 text-zinc-300'
+                            }`}>
+                              {provider.enabled ? 'Enabled' : 'Disabled'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-zinc-500">{formatDate(provider.updated_at)}</td>
+                          <td className="px-4 py-3 text-right space-x-3">
+                            {canManage && (
+                              <>
+                                <button
+                                  onClick={() => startEditProvider(provider)}
+                                  className="text-xs text-blue-400 hover:text-blue-300"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleToggleProvider(provider)}
+                                  className="text-xs text-zinc-400 hover:text-zinc-200"
+                                >
+                                  {provider.enabled ? 'Disable' : 'Enable'}
+                                </button>
+                              </>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {canManage ? (
+              <form onSubmit={handleSaveSsoProvider} className="mt-6 bg-zinc-950 border border-zinc-800 rounded-lg p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-zinc-200">
+                    {ssoForm.providerId ? 'Update Provider' : 'Add Provider'}
+                  </h3>
+                  {ssoForm.providerId && (
+                    <button
+                      type="button"
+                      onClick={() => setSsoForm({ providerId: null, domain: '', metadataXml: '', enabled: true })}
+                      className="text-xs text-zinc-400 hover:text-zinc-200"
+                    >
+                      Cancel Edit
+                    </button>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-400 mb-2">Domain Mapping</label>
+                  <input
+                    value={ssoForm.domain}
+                    onChange={(e) => setSsoForm({ ...ssoForm, domain: e.target.value })}
+                    placeholder="acme.com"
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded-md px-4 py-2.5 text-zinc-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-400 mb-2">IdP Metadata XML</label>
+                  <textarea
+                    value={ssoForm.metadataXml}
+                    onChange={(e) => setSsoForm({ ...ssoForm, metadataXml: e.target.value })}
+                    placeholder="Paste IdP metadata XML here"
+                    rows={6}
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded-md px-4 py-2.5 text-zinc-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-mono text-xs"
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-3 text-sm text-zinc-400">
+                    <button
+                      type="button"
+                      onClick={() => setSsoForm({ ...ssoForm, enabled: !ssoForm.enabled })}
+                      className={`w-11 h-6 rounded-full transition-colors relative ${ssoForm.enabled ? 'bg-emerald-500' : 'bg-zinc-700'}`}
+                    >
+                      <span className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${ssoForm.enabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </button>
+                    Provider Enabled
+                  </label>
+                  <button
+                    type="submit"
+                    disabled={ssoSaving}
+                    className="bg-zinc-100 hover:bg-white text-zinc-900 px-4 py-2 rounded-md font-medium transition-colors disabled:opacity-50"
+                  >
+                    {ssoSaving ? 'Saving...' : 'Save Provider'}
+                  </button>
+                </div>
+                {ssoError && <p className="text-red-400 text-sm">{ssoError}</p>}
+                {ssoSuccess && <p className="text-green-400 text-sm">{ssoSuccess}</p>}
+              </form>
+            ) : (
+              <div className="mt-6 text-sm text-zinc-500">
+                You have read-only access to SSO configuration.
+              </div>
+            )}
+          </div>
+
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm">
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-white mb-1">SCIM Tokens</h2>
+                <p className="text-zinc-400 text-sm">Provision users and groups with SCIM.</p>
+              </div>
+              <div className="text-xs text-zinc-500">Base URL: /api/scim/v2</div>
+            </div>
+
+            {!canManage && (
+              <div className="mt-4 text-sm text-zinc-500">
+                Only owners and admins can create or revoke SCIM tokens.
+              </div>
+            )}
+
+            {canManage && (
+              <div className="mt-6 bg-zinc-950 border border-zinc-800 rounded-lg p-4">
+                {initialSsoProviders.length === 0 ? (
+                  <p className="text-sm text-zinc-500">Add an SSO provider before creating SCIM tokens.</p>
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-center gap-3">
+                      <label className="text-sm text-zinc-400">Provider</label>
+                      <select
+                        value={selectedProviderId}
+                        onChange={(e) => setSelectedProviderId(e.target.value)}
+                        className="bg-zinc-900 border border-zinc-700 rounded-md px-3 py-2 text-zinc-200"
+                      >
+                        {initialSsoProviders.map((provider) => (
+                          <option key={provider.id} value={provider.id}>{provider.domain}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={handleCreateScimToken}
+                        disabled={scimCreating || !selectedProviderId}
+                        className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50"
+                      >
+                        {scimCreating ? 'Creating...' : 'Create Token'}
+                      </button>
+                    </div>
+                    {newScimToken && (
+                      <div className="bg-zinc-900 border border-zinc-700 rounded-md p-4">
+                        <p className="text-xs uppercase text-zinc-500 mb-2">New SCIM Token (shown once)</p>
+                        <p className="text-sm font-mono text-zinc-200 break-all">{newScimToken}</p>
+                      </div>
+                    )}
+                    {scimError && <p className="text-sm text-red-400">{scimError}</p>}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="mt-6 overflow-hidden border border-zinc-800 rounded-lg">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-zinc-950 text-zinc-400">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">Token Hash</th>
+                    <th className="px-4 py-3 font-medium">Provider</th>
+                    <th className="px-4 py-3 font-medium">Created</th>
+                    <th className="px-4 py-3 font-medium">Last Used</th>
+                    <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="px-4 py-3 font-medium text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-800">
+                  {initialScimTokens.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-6 text-center text-zinc-500">
+                        No SCIM tokens created yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    initialScimTokens.map((token) => (
+                      <tr key={token.id} className="hover:bg-zinc-800/30">
+                        <td className="px-4 py-3 text-zinc-200 font-mono">
+                          {token.token_hash.slice(0, 12)}...
+                        </td>
+                        <td className="px-4 py-3 text-zinc-400">{providerDomain(token.provider_id)}</td>
+                        <td className="px-4 py-3 text-zinc-500">{formatDate(token.created_at)}</td>
+                        <td className="px-4 py-3 text-zinc-500">{formatDate(token.last_used_at)}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                            token.revoked_at ? 'bg-zinc-800 text-zinc-300' : 'bg-emerald-900/30 text-emerald-300'
+                          }`}>
+                            {token.revoked_at ? 'Revoked' : 'Active'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {canManage && !token.revoked_at && (
+                            <button
+                              onClick={() => handleRevokeScimToken(token.id)}
+                              disabled={scimRevokingId === token.id}
+                              className="text-xs text-red-400 hover:text-red-300 disabled:opacity-50"
+                            >
+                              {scimRevokingId === token.id ? 'Revoking...' : 'Revoke'}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : activeTab === 'access' && canViewAccessReviews ? (
+        <div className="space-y-8">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm">
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-white mb-1">Access Review Cycles</h2>
+                <p className="text-zinc-400 text-sm">Create review cycles and track attestations.</p>
+              </div>
+              {!canManage && (
+                <span className="text-xs text-zinc-500">Read-only</span>
+              )}
+            </div>
+
+            {canManage && (
+              <form onSubmit={handleCreateAccessReview} className="mt-6 bg-zinc-950 border border-zinc-800 rounded-lg p-4 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-400 mb-2">Period Start</label>
+                    <input
+                      type="date"
+                      value={accessPeriodStart}
+                      onChange={(e) => setAccessPeriodStart(e.target.value)}
+                      className="w-full bg-zinc-900 border border-zinc-700 rounded-md px-4 py-2 text-zinc-200"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-400 mb-2">Period End</label>
+                    <input
+                      type="date"
+                      value={accessPeriodEnd}
+                      onChange={(e) => setAccessPeriodEnd(e.target.value)}
+                      className="w-full bg-zinc-900 border border-zinc-700 rounded-md px-4 py-2 text-zinc-200"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-zinc-500">Dates are optional. Leave blank for an open-ended cycle.</p>
+                  <button
+                    type="submit"
+                    disabled={accessCreating}
+                    className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50"
+                  >
+                    {accessCreating ? 'Creating...' : 'Create Cycle'}
+                  </button>
+                </div>
+                {accessError && <p className="text-sm text-red-400">{accessError}</p>}
+                {accessSuccess && <p className="text-sm text-green-400">{accessSuccess}</p>}
+              </form>
+            )}
+
+            <div className="mt-6 overflow-hidden border border-zinc-800 rounded-lg">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-zinc-950 text-zinc-400">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">Cycle</th>
+                    <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="px-4 py-3 font-medium">Period</th>
+                    <th className="px-4 py-3 font-medium">Created</th>
+                    <th className="px-4 py-3 font-medium">Reviewer</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-800">
+                  {initialAccessReviewCycles.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-6 text-center text-zinc-500">
+                        No access review cycles yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    initialAccessReviewCycles.map((cycle) => (
+                      <tr key={cycle.id} className="hover:bg-zinc-800/30">
+                        <td className="px-4 py-3 text-zinc-200 font-mono">{shortId(cycle.id)}</td>
+                        <td className="px-4 py-3 text-zinc-400">{cycle.status || 'pending'}</td>
+                        <td className="px-4 py-3 text-zinc-500">
+                          {cycle.period_start || cycle.period_end
+                            ? `${cycle.period_start ? new Date(cycle.period_start).toLocaleDateString() : '-'} -> ${cycle.period_end ? new Date(cycle.period_end).toLocaleDateString() : '-'}`
+                            : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-zinc-500">{formatDate(cycle.created_at)}</td>
+                        <td className="px-4 py-3 text-zinc-500">{shortId(cycle.reviewer_id)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-white mb-1">Attestations</h3>
+                <p className="text-zinc-400 text-sm">Read-only record of access review decisions.</p>
+              </div>
+            </div>
+            <div className="overflow-hidden border border-zinc-800 rounded-lg">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-zinc-950 text-zinc-400">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">Cycle</th>
+                    <th className="px-4 py-3 font-medium">User</th>
+                    <th className="px-4 py-3 font-medium">Decision</th>
+                    <th className="px-4 py-3 font-medium">Notes</th>
+                    <th className="px-4 py-3 font-medium">Reviewed</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-800">
+                  {initialAccessReviewDecisions.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-6 text-center text-zinc-500">
+                        No attestations recorded yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    initialAccessReviewDecisions.map((decision) => (
+                      <tr key={decision.id} className="hover:bg-zinc-800/30">
+                        <td className="px-4 py-3 text-zinc-200 font-mono">{shortId(decision.cycle_id)}</td>
+                        <td className="px-4 py-3 text-zinc-500">{shortId(decision.target_user_id)}</td>
+                        <td className="px-4 py-3 text-zinc-400">{decision.decision || '-'}</td>
+                        <td className="px-4 py-3 text-zinc-500">{decision.notes || '-'}</td>
+                        <td className="px-4 py-3 text-zinc-500">{formatDate(decision.reviewed_at)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : activeTab === 'ops' && canViewOps ? (
+        <div className="space-y-8">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm">
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-white mb-1">SLA Summary</h2>
+                <p className="text-zinc-400 text-sm">Uptime calculated over the last 30 days.</p>
+              </div>
+              <button
+                onClick={handleRefreshSla}
+                disabled={slaRefreshing}
+                className="text-sm text-zinc-400 hover:text-white transition-colors"
+              >
+                {slaRefreshing ? 'Refreshing...' : 'Refresh'}
+              </button>
+            </div>
+
+            {slaError && <p className="text-sm text-red-400 mt-4">{slaError}</p>}
+            {slaSummary ? (
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4">
+                  <p className="text-xs uppercase text-zinc-500 mb-2">Uptime</p>
+                  <p className="text-2xl font-semibold text-white">{slaSummary.uptime_percent.toFixed(2)}%</p>
+                </div>
+                <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4">
+                  <p className="text-xs uppercase text-zinc-500 mb-2">Downtime</p>
+                  <p className="text-2xl font-semibold text-white">{Math.round(slaSummary.downtime_seconds / 60)} min</p>
+                </div>
+                <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4">
+                  <p className="text-xs uppercase text-zinc-500 mb-2">Window</p>
+                  <p className="text-sm text-zinc-200">{new Date(slaSummary.window_start).toLocaleDateString()} -> {new Date(slaSummary.window_end).toLocaleDateString()}</p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-zinc-500 mt-4">SLA summary is not available yet.</p>
+            )}
+
+            {slaSummary?.policies?.length ? (
+              <div className="mt-6 overflow-hidden border border-zinc-800 rounded-lg">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-zinc-950 text-zinc-400">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">Policy</th>
+                      <th className="px-4 py-3 font-medium">Target</th>
+                      <th className="px-4 py-3 font-medium">Created</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800">
+                    {slaSummary.policies.map((policy) => (
+                      <tr key={policy.id} className="hover:bg-zinc-800/30">
+                        <td className="px-4 py-3 text-zinc-200">{policy.name}</td>
+                        <td className="px-4 py-3 text-zinc-400">{policy.target_availability ? `${policy.target_availability}%` : '-'}</td>
+                        <td className="px-4 py-3 text-zinc-500">{formatDate(policy.created_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm">
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-white mb-1">Incidents</h2>
+                <p className="text-zinc-400 text-sm">View workspace and global incident reports.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIncludeGlobal(true)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    includeGlobal ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-400'
+                  }`}
+                >
+                  Workspace + Global
+                </button>
+                <button
+                  onClick={() => setIncludeGlobal(false)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    !includeGlobal ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-400'
+                  }`}
+                >
+                  Workspace Only
+                </button>
+              </div>
+            </div>
+
+            {incidentsError && <p className="text-sm text-red-400 mt-4">{incidentsError}</p>}
+            {incidentsLoading ? (
+              <p className="text-sm text-zinc-500 mt-4">Loading incidents...</p>
+            ) : (
+              <div className="mt-6 overflow-hidden border border-zinc-800 rounded-lg">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-zinc-950 text-zinc-400">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">Title</th>
+                      <th className="px-4 py-3 font-medium">Scope</th>
+                      <th className="px-4 py-3 font-medium">Severity</th>
+                      <th className="px-4 py-3 font-medium">Status</th>
+                      <th className="px-4 py-3 font-medium">Started</th>
+                      <th className="px-4 py-3 font-medium">Resolved</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800">
+                    {incidents.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-6 text-center text-zinc-500">
+                          No incidents reported.
+                        </td>
+                      </tr>
+                    ) : (
+                      incidents.map((incident) => (
+                        <tr key={incident.id} className="hover:bg-zinc-800/30">
+                          <td className="px-4 py-3 text-zinc-200">{incident.title}</td>
+                          <td className="px-4 py-3 text-zinc-400">{incident.workspace_id ? 'Workspace' : 'Global'}</td>
+                          <td className="px-4 py-3 text-zinc-400">{incident.severity || '-'}</td>
+                          <td className="px-4 py-3 text-zinc-400">{incident.status || '-'}</td>
+                          <td className="px-4 py-3 text-zinc-500">{formatDate(incident.started_at)}</td>
+                          <td className="px-4 py-3 text-zinc-500">{formatDate(incident.resolved_at)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : activeTab === 'keys' && canViewRotations ? (
+        <div className="space-y-8">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm">
+            <h2 className="text-xl font-semibold text-white mb-1">Key Rotation</h2>
+            <p className="text-zinc-400 text-sm">Track API key rotation events for this workspace.</p>
+
+            <div className="mt-6 overflow-hidden border border-zinc-800 rounded-lg">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-zinc-950 text-zinc-400">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">Key Type</th>
+                    <th className="px-4 py-3 font-medium">Rotated At</th>
+                    <th className="px-4 py-3 font-medium">Actor</th>
+                    <th className="px-4 py-3 font-medium">Reason</th>
+                    <th className="px-4 py-3 font-medium">Old Hash Hint</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-800">
+                  {initialKeyRotations.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-6 text-center text-zinc-500">
+                        No key rotations recorded yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    initialKeyRotations.map((rotation) => (
+                      <tr key={rotation.id} className="hover:bg-zinc-800/30">
+                        <td className="px-4 py-3 text-zinc-200">{rotation.key_type || 'api_key'}</td>
+                        <td className="px-4 py-3 text-zinc-500">{formatDate(rotation.rotated_at)}</td>
+                        <td className="px-4 py-3 text-zinc-500">{shortId(rotation.actor_id)}</td>
+                        <td className="px-4 py-3 text-zinc-500">{rotation.reason || '-'}</td>
+                        <td className="px-4 py-3 text-zinc-500">{rotation.old_key_hash_hint ? `${rotation.old_key_hash_hint.slice(0, 8)}...` : '-'}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-white mb-1">Rotate API Key</h3>
+                <p className="text-zinc-400 text-sm">Generate a new API key and invalidate the old one.</p>
+              </div>
+              {!isOwner(currentUserRole) && (
+                <span className="text-xs text-zinc-500">Owner only</span>
+              )}
+            </div>
+
+            {isOwner(currentUserRole) ? (
+              <div className="mt-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-400 mb-2">Reason (optional)</label>
+                  <input
+                    value={rotateReason}
+                    onChange={(e) => setRotateReason(e.target.value)}
+                    placeholder="Scheduled rotation"
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded-md px-4 py-2 text-zinc-200"
+                  />
+                </div>
+                <button
+                  onClick={handleRotateKey}
+                  disabled={rotating}
+                  className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50"
+                >
+                  {rotating ? 'Rotating...' : 'Rotate API Key'}
+                </button>
+                {rotateError && <p className="text-sm text-red-400">{rotateError}</p>}
+                {rotateResult && (
+                  <div className="bg-zinc-950 border border-zinc-800 rounded-md p-4">
+                    <p className="text-xs uppercase text-zinc-500 mb-2">New API Key (shown once)</p>
+                    <p className="text-sm font-mono text-zinc-200 break-all">{rotateResult.apiKey}</p>
+                    <p className="text-xs text-zinc-500 mt-2">Rotated at {new Date(rotateResult.rotatedAt).toLocaleString()}</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="mt-4 text-sm text-zinc-500">You do not have permission to rotate keys.</p>
+            )}
+          </div>
         </div>
       ) : (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 text-zinc-400">

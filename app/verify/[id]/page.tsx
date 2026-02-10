@@ -190,12 +190,12 @@ export default async function VerifyPage({ params }: { params: Promise<{ id: str
         };
 
   const rawBodyPresentLabel =
-    rawBodyPresent === null ? "Pending backend data" : rawBodyPresent ? "Present" : "Pruned";
+    rawBodyPresent === null ? "Not available" : rawBodyPresent ? "Present" : "Pruned";
   const rawBodyExpiresAtLabel =
     rawBodyExpiresAt && !Number.isNaN(new Date(rawBodyExpiresAt).getTime())
       ? `${format(new Date(rawBodyExpiresAt), "PPpp")} UTC`
-      : "Pending backend data";
-  const retentionPolicyLabelText = retentionPolicyLabel ?? "Pending backend data";
+      : "Not available";
+  const retentionPolicyLabelText = retentionPolicyLabel ?? "Not available";
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] font-sans selection:bg-indigo-100 selection:text-indigo-900">
