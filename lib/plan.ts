@@ -52,3 +52,40 @@ export function getRetentionExpiry(plan: PlanTier, fromDate = new Date()): Date 
 export function isPaidPlan(plan: PlanTier) {
   return plan !== 'free';
 }
+
+export type PlanEntitlements = {
+  plan: PlanTier;
+  isPaid: boolean;
+  isTeam: boolean;
+  canExportPdf: boolean;
+  canExportCsv: boolean;
+  canRemoveWatermark: boolean;
+  canUseSso: boolean;
+  canUseScim: boolean;
+  canUseAccessReviews: boolean;
+  canUseSlaIncidents: boolean;
+  canUseLegalHold: boolean;
+  canRotateKeys: boolean;
+  canViewAuditLogs: boolean;
+};
+
+export function getPlanEntitlements(plan: PlanTier): PlanEntitlements {
+  const isPaid = plan !== 'free';
+  const isTeam = plan === 'team';
+
+  return {
+    plan,
+    isPaid,
+    isTeam,
+    canExportPdf: true,
+    canExportCsv: isPaid,
+    canRemoveWatermark: isPaid,
+    canUseSso: isTeam,
+    canUseScim: isTeam,
+    canUseAccessReviews: isTeam,
+    canUseSlaIncidents: isTeam,
+    canUseLegalHold: isTeam,
+    canRotateKeys: isTeam,
+    canViewAuditLogs: isTeam,
+  };
+}

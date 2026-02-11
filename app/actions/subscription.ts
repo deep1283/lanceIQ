@@ -2,49 +2,12 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
-import type { PlanTier } from "@/lib/plan";
+import { type PlanTier, type PlanEntitlements, getPlanEntitlements } from "@/lib/plan";
 
 const GRACE_PERIOD_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
 
 function isPaidPlan(plan: string | null | undefined): plan is 'pro' | 'team' {
   return plan === 'pro' || plan === 'team';
-}
-
-export type PlanEntitlements = {
-  plan: PlanTier;
-  isPaid: boolean;
-  isTeam: boolean;
-  canExportPdf: boolean;
-  canExportCsv: boolean;
-  canRemoveWatermark: boolean;
-  canUseSso: boolean;
-  canUseScim: boolean;
-  canUseAccessReviews: boolean;
-  canUseSlaIncidents: boolean;
-  canUseLegalHold: boolean;
-  canRotateKeys: boolean;
-  canViewAuditLogs: boolean;
-};
-
-export function getPlanEntitlements(plan: PlanTier): PlanEntitlements {
-  const isPaid = plan !== 'free';
-  const isTeam = plan === 'team';
-
-  return {
-    plan,
-    isPaid,
-    isTeam,
-    canExportPdf: true,
-    canExportCsv: isPaid,
-    canRemoveWatermark: isPaid,
-    canUseSso: isTeam,
-    canUseScim: isTeam,
-    canUseAccessReviews: isTeam,
-    canUseSlaIncidents: isTeam,
-    canUseLegalHold: isTeam,
-    canRotateKeys: isTeam,
-    canViewAuditLogs: isTeam,
-  };
 }
 
 function isWorkspacePro(workspace: { plan?: string | null; subscription_status?: string | null; subscription_current_period_end?: string | null }) {
@@ -159,7 +122,6 @@ export async function checkProStatus(workspaceId?: string) {
 
   return {
     isPro,
-    plan: effectivePlan,
     ...entitlements,
   };
 }
