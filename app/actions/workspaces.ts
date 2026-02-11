@@ -51,60 +51,27 @@ export async function createWorkspace(data: {
     }
   }
 
-  // 1. Create Workspace
-  const { data: workspace, error: wsError } = await supabase
-    .from('workspaces')
-    .insert({
-      name: name,
-      provider: data.provider,
-      api_key_hash: hash,
-      api_key_last4: last4,
-      store_raw_body: data.storeRawBody,
-      raw_body_retention_days: 7, // default
-      created_by: creatorId,
-      encrypted_secret: encryptedSecret,
-      secret_last4: secretLast4
-    })
-    .select('id')
-    .single();
+  // Create workspace + owner atomically via RPC
+  const { data: workspaceId, error: rpcError } = await supabase
+    .rpc('create_workspace_with_owner', {
+      p_name: name,
+      p_provider: data.provider,
+      p_api_key_hash: hash,
+      p_api_key_last4: last4,
+      p_store_raw_body: data.storeRawBody,
+      p_raw_body_retention_days: 7,
+      p_created_by: creatorId,
+      p_encrypted_secret: encryptedSecret,
+      p_secret_last4: secretLast4,
+    });
 
-  if (wsError) {
-    console.error('Create Workspace Error:', wsError);
+  if (rpcError || !workspaceId) {
+    console.error('Create Workspace RPC Error:', rpcError);
     return { error: 'Failed to create source. Name might be too long or invalid.' };
   }
 
-  // 2. Add Member (Owner)
-  const { error: memberError } = await supabase
-    .from('workspace_members')
-    .insert({
-      workspace_id: workspace.id,
-      user_id: creatorId,
-      role: 'owner'
-    });
-
-  if (memberError) {
-    console.error('Add Member Error:', memberError);
-    // Cleanup if member add fails? Ideally transaction, but Supabase HTTP doesn't do cross-request transactions easily without RPC.
-    // For MVP, if this fails, the workspace exists but is orphaned (RLS prevents anyone from seeing it). 
-    // Delete via service role to avoid leaving an orphaned workspace row.
-    try {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-      if (serviceRoleKey) {
-        const { createClient: createAdminClient } = await import('@supabase/supabase-js');
-        const admin = createAdminClient(supabaseUrl, serviceRoleKey);
-        await admin.from('workspaces').delete().eq('id', workspace.id);
-      } else {
-        await supabase.from('workspaces').delete().eq('id', workspace.id);
-      }
-    } catch (cleanupErr) {
-      console.error('Workspace cleanup failed:', cleanupErr);
-    }
-    return { error: 'Failed to assign ownership.' };
-  }
-
   await logAuditAction({
-    workspaceId: workspace.id,
+    workspaceId,
     action: AUDIT_ACTIONS.WORKSPACE_CREATED,
     actorId: creatorId,
     targetResource: 'workspaces',
@@ -115,13 +82,13 @@ export async function createWorkspace(data: {
     },
   });
 
-  // 3. Default alert setting (email) - only useful after upgrade
+  // Default alert setting (email) - only useful after upgrade
   const defaultEmail = user.data.user.email;
   if (defaultEmail) {
     const { error: alertError } = await supabase
       .from('workspace_alert_settings')
       .insert({
-        workspace_id: workspace.id,
+        workspace_id: workspaceId,
         channel: 'email',
         destination: defaultEmail,
         enabled: false,

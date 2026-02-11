@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -10,7 +11,10 @@ function isAuthorized(req: NextRequest): boolean {
 
   const auth = req.headers.get("authorization") || "";
   const m = auth.match(/^Bearer\s+(.+)$/i);
-  return (m?.[1]?.trim() ?? "") === secret;
+  const token = m?.[1]?.trim() ?? "";
+
+  if (token.length !== secret.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(token), Buffer.from(secret));
 }
 
 export async function POST(req: NextRequest) {

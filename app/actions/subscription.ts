@@ -10,6 +10,43 @@ function isPaidPlan(plan: string | null | undefined): plan is 'pro' | 'team' {
   return plan === 'pro' || plan === 'team';
 }
 
+export type PlanEntitlements = {
+  plan: PlanTier;
+  isPaid: boolean;
+  isTeam: boolean;
+  canExportPdf: boolean;
+  canExportCsv: boolean;
+  canRemoveWatermark: boolean;
+  canUseSso: boolean;
+  canUseScim: boolean;
+  canUseAccessReviews: boolean;
+  canUseSlaIncidents: boolean;
+  canUseLegalHold: boolean;
+  canRotateKeys: boolean;
+  canViewAuditLogs: boolean;
+};
+
+export function getPlanEntitlements(plan: PlanTier): PlanEntitlements {
+  const isPaid = plan !== 'free';
+  const isTeam = plan === 'team';
+
+  return {
+    plan,
+    isPaid,
+    isTeam,
+    canExportPdf: true,
+    canExportCsv: isPaid,
+    canRemoveWatermark: isPaid,
+    canUseSso: isTeam,
+    canUseScim: isTeam,
+    canUseAccessReviews: isTeam,
+    canUseSlaIncidents: isTeam,
+    canUseLegalHold: isTeam,
+    canRotateKeys: isTeam,
+    canViewAuditLogs: isTeam,
+  };
+}
+
 function isWorkspacePro(workspace: { plan?: string | null; subscription_status?: string | null; subscription_current_period_end?: string | null }) {
   if (!isPaidPlan(workspace.plan)) return false;
 
@@ -26,13 +63,14 @@ function isWorkspacePro(workspace: { plan?: string | null; subscription_status?:
 }
 
 export async function checkProStatus(workspaceId?: string) {
+  const freeEntitlements = getPlanEntitlements('free');
   const supabase = await createClient();
   
   // 1. Get User (Auth Context)
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError || !user) {
     // console.log('[checkProStatus] No user found via getUser');
-    return { isPro: false, plan: 'free' as PlanTier };
+    return { isPro: false, ...freeEntitlements };
   }
 
   let workspaceIds: string[] = [];
@@ -47,14 +85,14 @@ export async function checkProStatus(workspaceId?: string) {
 
     if (membershipError) {
       // console.log('[checkProStatus] Membership error details:', membershipError);
-      return { isPro: false, plan: 'free' as PlanTier };
+      return { isPro: false, ...freeEntitlements };
     }
 
     if (membership?.workspace_id) {
       workspaceIds = [membership.workspace_id];
     } else {
       // console.log('[checkProStatus] No membership for specific workspace');
-      return { isPro: false, plan: 'free' as PlanTier };
+      return { isPro: false, ...freeEntitlements };
     }
   } else {
     const { data: memberships, error: membershipsError } = await supabase
@@ -64,7 +102,7 @@ export async function checkProStatus(workspaceId?: string) {
 
     if (membershipsError || !memberships || memberships.length === 0) {
       // console.log('[checkProStatus] No memberships found for user');
-      return { isPro: false, plan: 'free' as PlanTier };
+      return { isPro: false, ...freeEntitlements };
     }
 
     workspaceIds = memberships.map((m) => m.workspace_id);
@@ -99,7 +137,7 @@ export async function checkProStatus(workspaceId?: string) {
 
   if (workspacesError || !workspaces || workspaces.length === 0) {
     console.error('[checkProStatus] Failed to fetch workspaces (admin):', workspacesError);
-    return { isPro: false, plan: 'free' as PlanTier };
+    return { isPro: false, ...freeEntitlements };
   }
 
   let bestPlan: PlanTier = 'free';
@@ -116,5 +154,12 @@ export async function checkProStatus(workspaceId?: string) {
     }
   }
 
-  return { isPro, plan: isPro ? bestPlan : 'free' };
+  const effectivePlan: PlanTier = isPro ? bestPlan : 'free';
+  const entitlements = getPlanEntitlements(effectivePlan);
+
+  return {
+    isPro,
+    plan: effectivePlan,
+    ...entitlements,
+  };
 }

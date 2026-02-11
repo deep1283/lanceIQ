@@ -9,13 +9,13 @@ LanceIQ creates official-looking PDF certificates documenting webhook receipt an
 
 ## Read First
 Before making changes, read:
-1. `/Users/deepmishra/vscode/LanceIQ/OWNERSHIP.md`
-2. `/Users/deepmishra/vscode/LanceIQ/ATOMIZATION.md`
-3. `/Users/deepmishra/vscode/LanceIQ/ARCHITECTURE.md`
-4. `/Users/deepmishra/vscode/LanceIQ/CONTRACTS.md`
-5. `/Users/deepmishra/vscode/LanceIQ/DECISIONS.md`
-6. `/Users/deepmishra/vscode/LanceIQ/STATUS.md`
-7. `/Users/deepmishra/vscode/LanceIQ/OPERATING_RULES.md`
+1. [OWNERSHIP.md](./OWNERSHIP.md)
+2. [ATOMIZATION.md](./ATOMIZATION.md)
+3. [ARCHITECTURE.md](./ARCHITECTURE.md)
+4. [CONTRACTS.md](./CONTRACTS.md)
+5. [DECISIONS.md](./DECISIONS.md)
+6. [STATUS.md](./STATUS.md)
+7. [OPERATING_RULES.md](./OPERATING_RULES.md)
 
 ![LanceIQ Input Form](./public/assets/input%20form.png)
 
@@ -63,7 +63,7 @@ Visit [lanceiq.com](https://lanceiq.com) — no setup required.
    ```
 
 4. **Set up Supabase** (for auth & storage)
-   Run the migrations in `/Users/deepmishra/vscode/LanceIQ/supabase/migrations` in order.
+   Run all `.sql` files in `supabase/migrations/` in chronological order using the Supabase Dashboard SQL Editor (Settings → SQL Editor). Paste each file's contents and execute sequentially.
 
 5. **Run locally**
    ```bash

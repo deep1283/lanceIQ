@@ -107,7 +107,7 @@ export async function runFailoverChecks(admin: any) {
     );
 
     const relevantStatuses = relevantConfigs
-      .map((config) => statusesByConfig.get(config.id))
+      .map((config: ReplicationConfig) => statusesByConfig.get(config.id))
       .filter(Boolean) as ReplicationStatus[];
 
     const { status, summary } = summarizeReplication(relevantStatuses, threshold);

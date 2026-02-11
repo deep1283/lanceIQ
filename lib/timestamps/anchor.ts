@@ -45,7 +45,7 @@ async function requestTimestampReceipt(hashedHex: string): Promise<AnchorResult>
     const response = await fetch(tsaUrl, {
       method: 'POST',
       headers,
-      body: request,
+      body: request as unknown as BodyInit,
       signal: controller.signal,
     });
 
@@ -95,7 +95,8 @@ export async function anchorIngestedEvent(params: {
       return;
     }
 
-    const { data: existing, error: existingError } = await admin
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: existing, error: existingError } = await (admin as any)
       .from('timestamp_receipts')
       .select('id')
       .eq('resource_type', 'ingested_event')
@@ -108,7 +109,7 @@ export async function anchorIngestedEvent(params: {
 
     const { transactionId, proofData } = await requestTimestampReceipt(params.rawBodySha256);
 
-    const { error } = await admin
+    const { error } = await (admin as any)
       .from('timestamp_receipts')
       .insert({
         workspace_id: params.workspaceId,

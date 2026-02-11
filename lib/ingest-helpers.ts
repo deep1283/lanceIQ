@@ -7,6 +7,14 @@ const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 const redis =
   REDIS_URL && REDIS_TOKEN ? Redis.fromEnv() : null;
 
+if (!redis && process.env.NODE_ENV === 'production') {
+  console.warn(
+    '[LanceIQ] WARNING: Redis not configured. Rate limiting and dedup ' +
+    'will use in-memory fallback, which is NOT effective on serverless. ' +
+    'Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.'
+  );
+}
+
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 const RATE_LIMIT_MAX_REQUESTS = 60; // 60 reqs/min per key
 

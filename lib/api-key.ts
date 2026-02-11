@@ -2,19 +2,14 @@ import crypto from 'crypto';
 
 // Server-side secret for HMAC hashing of API keys
 // MUST be set in .env.local
-const API_KEY_HASH_SECRET = process.env.API_KEY_HASH_SECRET;
-
-/**
- * Computes a secure HMAC-SHA256 hash of the API key.
- * This ensures that even if the database is leaked, keys cannot be easily brute-forced.
- */
 export function hashApiKey(apiKey: string): string {
-  if (!API_KEY_HASH_SECRET) {
+  const secret = process.env.API_KEY_HASH_SECRET;
+  if (!secret) {
     throw new Error('Missing API_KEY_HASH_SECRET environment variable');
   }
 
   return crypto
-    .createHmac('sha256', API_KEY_HASH_SECRET)
+    .createHmac('sha256', secret)
     .update(apiKey)
     .digest('hex');
 }

@@ -1,7 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { FileText, Download, Calendar, CheckCircle, ShieldCheck, ShieldAlert, AlertTriangle, Plus, ExternalLink } from "lucide-react";
+import { FileText, Download, Calendar, CheckCircle, ShieldCheck, ShieldAlert, AlertTriangle, Plus, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
 import DashboardNavbar from "@/components/DashboardNavbar";
 import { DashboardClient } from "@/components/DashboardClient";
 import { checkProStatus } from "@/app/actions/subscription";
@@ -9,7 +9,17 @@ import { getPlanLimits } from "@/lib/plan";
 import { pickPrimaryWorkspace } from "@/lib/workspace";
 import { canExportCertificates } from "@/lib/roles";
 
-export default async function DashboardPage() {
+const PAGE_SIZE = 50;
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const params = await searchParams;
+  const page = Math.max(1, parseInt(params.page || '1', 10) || 1);
+  const offset = (page - 1) * PAGE_SIZE;
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -33,24 +43,44 @@ export default async function DashboardPage() {
 
   const nowIso = new Date().toISOString();
   let certificates: any[] | null = [];
+  let totalCount = 0;
+  let thisMonthCount = 0;
+
   if (workspaceId) {
+    const thisMonth = new Date();
+    thisMonth.setDate(1);
+    thisMonth.setHours(0, 0, 0, 0);
+    const thisMonthIso = thisMonth.toISOString();
+
+    // Accurate total count
+    const { count } = await supabase
+      .from("certificates")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", workspaceId)
+      .gt("expires_at", nowIso);
+    totalCount = count ?? 0;
+
+    // Accurate this-month count
+    const { count: monthCount } = await supabase
+      .from("certificates")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", workspaceId)
+      .gt("expires_at", nowIso)
+      .gte("created_at", thisMonthIso);
+    thisMonthCount = monthCount ?? 0;
+
+    // Paginated fetch
     const { data } = await supabase
       .from("certificates")
       .select("*")
       .eq("workspace_id", workspaceId)
       .gt("expires_at", nowIso)
       .order("created_at", { ascending: false })
-      .limit(50);
+      .range(offset, offset + PAGE_SIZE - 1);
     certificates = data || [];
   }
 
-  const thisMonth = new Date();
-  thisMonth.setDate(1);
-  thisMonth.setHours(0, 0, 0, 0);
-
-  const thisMonthCount = certificates?.filter(
-    (c) => new Date(c.created_at) >= thisMonth
-  ).length ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -78,7 +108,7 @@ export default async function DashboardPage() {
         <div className="grid grid-cols-2 gap-4 mb-8">
           <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
             <p className="text-sm text-slate-500">Total Certificates</p>
-            <p className="text-2xl font-bold text-slate-900">{certificates?.length ?? 0}</p>
+            <p className="text-2xl font-bold text-slate-900">{totalCount}</p>
           </div>
           <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
             <p className="text-sm text-slate-500">This Month</p>
@@ -195,6 +225,48 @@ export default async function DashboardPage() {
                 ))}
               </tbody>
             </table>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200 bg-slate-50">
+                <p className="text-sm text-slate-500">
+                  Showing {offset + 1}–{Math.min(offset + PAGE_SIZE, totalCount)} of {totalCount}
+                </p>
+                <div className="flex items-center gap-2">
+                  {page > 1 ? (
+                    <Link
+                      href={`/dashboard?page=${page - 1}`}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-slate-600 hover:text-indigo-600 bg-white border border-slate-200 rounded-lg transition-colors"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      Prev
+                    </Link>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-slate-300 bg-white border border-slate-100 rounded-lg cursor-not-allowed">
+                      <ChevronLeft className="w-4 h-4" />
+                      Prev
+                    </span>
+                  )}
+                  <span className="text-sm text-slate-500">
+                    Page {page} of {totalPages}
+                  </span>
+                  {page < totalPages ? (
+                    <Link
+                      href={`/dashboard?page=${page + 1}`}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-slate-600 hover:text-indigo-600 bg-white border border-slate-200 rounded-lg transition-colors"
+                    >
+                      Next
+                      <ChevronRight className="w-4 h-4" />
+                    </Link>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-slate-300 bg-white border border-slate-100 rounded-lg cursor-not-allowed">
+                      Next
+                      <ChevronRight className="w-4 h-4" />
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </DashboardClient>

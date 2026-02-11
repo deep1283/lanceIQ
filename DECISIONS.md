@@ -106,6 +106,18 @@ Why: COUNT(*) on ingested_events does not scale; counters and batch metadata pro
 Backward compatibility: Existing single-event ingest remains supported; batch fields are optional and additive; counters are derived from inserts.
 Alternatives rejected: Per-request COUNT(*) and no batch tracking due to performance risk at enterprise scale.
 
+## 2026-02-11: Ingest Core Refactor (Tier-1)
+Decision: Deduplicate ingest routes into a shared processIngestEvent() core and centralize ingest limits/UUID validation.
+Why: Reduces drift risk between header- and path-based ingestion, improves maintainability, and hardens validation.
+Backward compatibility: HTTP responses and payload semantics remain unchanged; refactor is internal.
+Alternatives rejected: Maintaining duplicate logic in two route handlers.
+
+## 2026-02-11: Workspace Creation RPC Auth Enforcement (Tier-1)
+Decision: Enforce auth.uid() for workspace creation and owner membership inside the SECURITY DEFINER RPC.
+Why: Prevents spoofing the creator/owner identity and preserves audit integrity.
+Backward compatibility: Normal authenticated creation flows continue; only mismatched caller-supplied user ids are rejected.
+Alternatives rejected: Trusting client-supplied user ids in a SECURITY DEFINER function.
+
 ## 2026-02-08: Strict Evidence Immutability with Retention Exception
 Decision: Enforce database-level immutability on ingested evidence with a narrow retention exception for raw bodies.
 Why: Evidence integrity is paramount; updates to evidence fields are prohibited to preserve auditability and legal posture.

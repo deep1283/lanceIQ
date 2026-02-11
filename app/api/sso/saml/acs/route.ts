@@ -69,13 +69,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'SSO provider not configured' }, { status: 404 });
     }
 
-    const { data: existingUser, error: userLookupError } = await admin.auth.admin.getUserByEmail(email);
+    const { data: userList, error: userLookupError } = await admin.auth.admin.listUsers();
     if (userLookupError) {
       console.error('User lookup failed:', userLookupError);
       return NextResponse.json({ error: 'Failed to resolve user' }, { status: 500 });
     }
+    const existingUser = userList?.users?.find((u: { email?: string }) => u.email === email);
 
-    let userId = existingUser?.user?.id;
+    let userId = existingUser?.id;
     if (!userId) {
       const { data: created, error: createError } = await admin.auth.admin.createUser({
         email,
@@ -130,12 +131,12 @@ export async function POST(request: NextRequest) {
       options: { redirectTo },
     });
 
-    if (linkError || !linkData?.action_link) {
+    if (linkError || !linkData?.properties?.action_link) {
       console.error('Magic link generation failed:', linkError);
       return NextResponse.json({ error: 'Failed to create session link' }, { status: 500 });
     }
 
-    return NextResponse.redirect(linkData.action_link, { status: 302 });
+    return NextResponse.redirect(linkData.properties.action_link, { status: 302 });
   } catch (err) {
     console.error('SAML ACS error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

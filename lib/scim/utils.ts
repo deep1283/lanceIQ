@@ -4,7 +4,8 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 export type ScimContext = {
   workspaceId: string;
   providerId: string;
-  admin: ReturnType<typeof createSupabaseClient>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  admin: any;
 };
 
 export function getAdminClient() {

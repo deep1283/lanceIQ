@@ -65,11 +65,11 @@ export function verifySignature(
     case 'lemon_squeezy':
       return verifyLemonSqueezySignature(rawBody, normalizedHeaders, secret, secretHint);
     case 'paypal':
-      // Phase 1: Not supported (requires server-to-server API calls)
+      // @roadmap: PayPal requires JWS server-to-server verification
       return { 
         status: 'not_verified', 
         reason: 'unsupported_provider', 
-        error: 'PayPal verification requires server-side API credentials (supported in Phase 2).',
+        error: 'PayPal verification is not yet supported (requires JWS server-to-server calls).',
         secretHint
       };
     default:

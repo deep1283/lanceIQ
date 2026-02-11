@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     return scimError(500, 'Failed to list users');
   }
 
-  const resources = (mappings || []).map((mapping) => ({
+  const resources = (mappings || []).map((mapping: { external_id: string; external_email: string }) => ({
     schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
     id: mapping.external_id,
     userName: mapping.external_email,
@@ -62,13 +62,14 @@ export async function POST(request: NextRequest) {
   const groups = extractScimGroups(body);
   const role = deriveRoleFromGroups(groups);
 
-  const { data: existingUser, error: lookupError } = await ctx.admin.auth.admin.getUserByEmail(email);
+  const { data: userList, error: lookupError } = await ctx.admin.auth.admin.listUsers();
   if (lookupError) {
     console.error('SCIM lookup failed:', lookupError);
     return scimError(500, 'Failed to lookup user');
   }
+  const existingUser = userList?.users?.find((u: { email?: string }) => u.email === email);
 
-  let userId = existingUser?.user?.id;
+  let userId = existingUser?.id;
   if (!userId) {
     const { data: created, error: createError } = await ctx.admin.auth.admin.createUser({
       email,

@@ -65,6 +65,9 @@ export default function Home() {
   const [isPro, setIsPro] = useState(false);
   const [currentPlan, setCurrentPlan] = useState<string>("free");
   const [isWatermarkFree, setIsWatermarkFree] = useState(false);
+  const [canRemoveWatermark, setCanRemoveWatermark] = useState(false);
+  const [canExportPdf, setCanExportPdf] = useState(false);
+  const [canExportCsv, setCanExportCsv] = useState(false);
   const [canVerify, setCanVerify] = useState(false);
   const [isPromoActive, setIsPromoActive] = useState(false);
   const [verifyEmail, setVerifyEmail] = useState("");
@@ -106,18 +109,28 @@ export default function Home() {
   const canManageWorkspace = canManageWorkspaceRole(workspaceRole);
   const canViewAuditLogs = workspacePlan === 'team' && canViewAuditLogsRole(workspaceRole);
   const canViewLegalHold = canManageWorkspace || canCreateLegalHold(workspaceRole);
-  const canExport = !user || canExportCertificates(workspaceRole);
+  const canExportByRole = !user || canExportCertificates(workspaceRole);
+  const canExportPdfAllowed = canExportByRole && canExportPdf;
 
   const syncProStatus = async () => {
     const promoActive = Date.now() <= PROMO_END_LOCAL.getTime();
     setIsPromoActive(promoActive);
 
     try {
-      const { isPro: dbPro, plan: planTier } = await checkProStatus();
-      const watermarkFree = promoActive || dbPro;
+      const {
+        isPro: dbPro,
+        plan: planTier,
+        canRemoveWatermark: watermarkEntitlement,
+        canExportPdf: pdfEntitlement,
+        canExportCsv: csvEntitlement,
+      } = await checkProStatus();
+      const watermarkFree = promoActive || watermarkEntitlement;
       setIsPro(dbPro);
       setCurrentPlan(planTier);
       setIsWatermarkFree(watermarkFree);
+      setCanRemoveWatermark(watermarkEntitlement);
+      setCanExportPdf(pdfEntitlement);
+      setCanExportCsv(csvEntitlement);
       setCanVerify(planTier !== 'free');
       return watermarkFree;
     } catch (err) {
@@ -125,6 +138,9 @@ export default function Home() {
       setIsPro(false);
       setCurrentPlan('free');
       setIsWatermarkFree(promoActive);
+      setCanRemoveWatermark(false);
+      setCanExportPdf(false);
+      setCanExportCsv(false);
       setCanVerify(false);
       return promoActive;
     }
@@ -701,7 +717,7 @@ export default function Home() {
   };
 
   useEffect(() => {
-    if (!autoDownload || !isExistingCertificate || autoDownloaded || isLoadingCertificate || !canExport) return;
+    if (!autoDownload || !isExistingCertificate || autoDownloaded || isLoadingCertificate || !canExportPdfAllowed) return;
     if (!reportId || !timestamp) return;
     setDownloadNotice("Downloading PDF...");
     setAutoDownloaded(true);
@@ -713,7 +729,7 @@ export default function Home() {
         window.location.href = "/dashboard";
       }, 1400);
     });
-  }, [autoDownload, isExistingCertificate, autoDownloaded, isLoadingCertificate, reportId, timestamp]);
+  }, [autoDownload, isExistingCertificate, autoDownloaded, isLoadingCertificate, reportId, timestamp, canExportPdfAllowed]);
 
   const parsedHeadersPreview: Record<string, string> = {};
   headersInput.split('\n').forEach(line => {
@@ -878,7 +894,7 @@ export default function Home() {
              <div className="pt-6">
                 <button
                     onClick={() => handleDownload()}
-                    disabled={isGenerating || !canExport}
+                    disabled={isGenerating || !canExportPdfAllowed}
                     className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-lg font-medium transition-colors disabled:opacity-50"
                 >
                     {isGenerating ? (
@@ -888,7 +904,7 @@ export default function Home() {
                     )}
                     {isGenerating
                       ? 'Generating...'
-                      : !canExport && user
+                      : !canExportPdfAllowed && user
                         ? 'Export Unavailable'
                         : isWatermarkFree
                           ? 'Download PDF (No Watermark)'
@@ -896,7 +912,7 @@ export default function Home() {
                 </button>
 
                 {/* 🎉 LAUNCH PROMO BANNER */}
-                {isPromoActive && !isPro && (
+                {isPromoActive && !canRemoveWatermark && (
                   <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
                     <p className="text-sm text-green-700 font-medium text-center">
                       🎉 Launch Week Special: Watermark-free for everyone through Feb 6, 2026 (local time).
@@ -942,9 +958,13 @@ export default function Home() {
                 )}
                 END PAYMENT UI */}
 
-                {!canExport && user && (
+                {!canExportPdfAllowed && user && (
                     <div className="mt-3 text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded p-2">
-                        PDF export is disabled for your role.
+                        {!canExportByRole
+                          ? 'PDF export isn’t available for your role. Ask an owner/admin to grant export access.'
+                          : !canExportPdf
+                            ? 'Upgrade your plan to enable PDF export.'
+                            : 'PDF export is unavailable.'}
                     </div>
                 )}
 

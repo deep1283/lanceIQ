@@ -127,17 +127,14 @@ export default async function VerifyPage({ params }: { params: Promise<{ id: str
     );
   }
 
-  const cert = result.data;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const cert = result.data as any;
   const formattedDate = cert.created_at ? format(new Date(cert.created_at), "PPpp") : "Unknown Date";
-  const payloadHash = cert.raw_body_sha256 || cert.payload_hash || cert.hash || "Legacy Record (No Hash Stored)";
+  const payloadHash = cert.raw_body_sha256 || cert.payload_hash || "Legacy Record (No Hash Stored)";
   const rawBodyHashForReceipt =
     typeof cert.raw_body_sha256 === "string" && cert.raw_body_sha256.length > 0
       ? cert.raw_body_sha256
-      : typeof cert.payload_hash === "string" && cert.payload_hash.length > 0
-        ? cert.payload_hash
-        : typeof cert.hash === "string" && cert.hash.length > 0
-          ? cert.hash
-          : null;
+      : null;
   const rawBodyExpiresAt = cert.raw_body_expires_at ?? cert.rawBodyExpiresAt ?? null;
   const rawBodyPresent =
     typeof cert.raw_body_present === 'boolean'

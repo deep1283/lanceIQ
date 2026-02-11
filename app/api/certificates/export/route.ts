@@ -52,6 +52,15 @@ export async function GET(_request: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  // 3. Plan Check (CSV export gated by plan entitlements)
+  const { canExportCsv } = await checkProStatus(workspaceId);
+  if (!canExportCsv) {
+    return NextResponse.json(
+      { error: "Export is available on Pro and Team plans only." },
+      { status: 403 }
+    );
+  }
+
   const { data: workspaceConfig } = await supabase
     .from("workspaces")
     .select("store_raw_body, raw_body_retention_days")
@@ -62,15 +71,6 @@ export async function GET(_request: NextRequest) {
     workspaceConfig?.store_raw_body ?? null,
     workspaceConfig?.raw_body_retention_days ?? null
   );
-
-  // 3. Plan Check (Pro/Team only)
-  const { isPro } = await checkProStatus(workspaceId);
-  if (!isPro) {
-    return NextResponse.json(
-      { error: "Export is available on Pro and Team plans only." },
-      { status: 403 }
-    );
-  }
 
   const nowIso = new Date().toISOString();
   const fileDate = nowIso.split('T')[0];

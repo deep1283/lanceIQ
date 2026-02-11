@@ -1383,7 +1383,7 @@ export default function SettingsClient({
                         <td className="px-4 py-3 text-zinc-400">{cycle.status || 'pending'}</td>
                         <td className="px-4 py-3 text-zinc-500">
                           {cycle.period_start || cycle.period_end
-                            ? `${cycle.period_start ? new Date(cycle.period_start).toLocaleDateString() : '-'} -> ${cycle.period_end ? new Date(cycle.period_end).toLocaleDateString() : '-'}`
+                            ? `${cycle.period_start ? new Date(cycle.period_start).toLocaleDateString() : '-'} → ${cycle.period_end ? new Date(cycle.period_end).toLocaleDateString() : '-'}`
                             : '-'}
                         </td>
                         <td className="px-4 py-3 text-zinc-500">{formatDate(cycle.created_at)}</td>
@@ -1467,7 +1467,7 @@ export default function SettingsClient({
                 </div>
                 <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4">
                   <p className="text-xs uppercase text-zinc-500 mb-2">Window</p>
-                  <p className="text-sm text-zinc-200">{new Date(slaSummary.window_start).toLocaleDateString()} -> {new Date(slaSummary.window_end).toLocaleDateString()}</p>
+                  <p className="text-sm text-zinc-200">{new Date(slaSummary.window_start).toLocaleDateString()} → {new Date(slaSummary.window_end).toLocaleDateString()}</p>
                 </div>
               </div>
             ) : (

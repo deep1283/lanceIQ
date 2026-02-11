@@ -24,16 +24,18 @@ function computeNextRun(rrule: string, base: Date, now: Date) {
   return next;
 }
 
-async function getWorkspaceName(admin: ReturnType<typeof createSupabaseClient>, workspaceId: string) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getWorkspaceName(admin: any, workspaceId: string) {
   const { data } = await admin
     .from('workspaces')
     .select('name')
     .eq('id', workspaceId)
     .maybeSingle();
-  return data?.name || 'Workspace';
+  return (data as { name?: string } | null)?.name || 'Workspace';
 }
 
-async function getOwnerAdminEmails(admin: ReturnType<typeof createSupabaseClient>, workspaceId: string) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getOwnerAdminEmails(admin: any, workspaceId: string) {
   const { data: members, error } = await admin
     .from('workspace_members')
     .select('user_id, role')
@@ -46,7 +48,7 @@ async function getOwnerAdminEmails(admin: ReturnType<typeof createSupabaseClient
   }
 
   const emails = new Set<string>();
-  for (const member of members || []) {
+  for (const member of (members as Array<{ user_id: string; role: string }>) || []) {
     if (!member.user_id) continue;
     try {
       const { data, error: userError } = await admin.auth.admin.getUserById(member.user_id);

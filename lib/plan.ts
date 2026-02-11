@@ -3,6 +3,7 @@ export type PlanTier = 'free' | 'pro' | 'team';
 export const PLAN_LIMITS = {
   free: {
     monthlyCertificates: 100,
+    monthlyIngestEvents: 100,
     retentionDays: 7,
     canVerify: false,
     canExport: false,
@@ -12,6 +13,7 @@ export const PLAN_LIMITS = {
   },
   pro: {
     monthlyCertificates: 2000,
+    monthlyIngestEvents: 2000,
     retentionDays: 365,
     canVerify: true,
     canExport: true,
@@ -21,6 +23,7 @@ export const PLAN_LIMITS = {
   },
   team: {
     monthlyCertificates: 10000,
+    monthlyIngestEvents: 10000,
     retentionDays: 1095,
     canVerify: true,
     canExport: true,
