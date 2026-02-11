@@ -89,7 +89,7 @@ export function AddSourceModal({ isOpen, onClose, onSuccess }: AddSourceModalPro
                     {newKey}
                   </code>
                   <Button size="icon" variant="ghost" onClick={handleCopy}>
-                    {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                    {copied ? <Check className="w-4 h-4 text-violet-600" /> : <Copy className="w-4 h-4" />}
                   </Button>
                 </div>
              </div>

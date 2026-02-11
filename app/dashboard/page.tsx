@@ -2,7 +2,6 @@ import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { FileText, Download, Calendar, CheckCircle, ShieldCheck, ShieldAlert, AlertTriangle, Plus, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
-import DashboardNavbar from "@/components/DashboardNavbar";
 import { DashboardClient } from "@/components/DashboardClient";
 import { checkProStatus } from "@/app/actions/subscription";
 import { getPlanLimits } from "@/lib/plan";
@@ -14,10 +13,11 @@ const PAGE_SIZE = 50;
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; tab?: string }>;
 }) {
   const params = await searchParams;
   const page = Math.max(1, parseInt(params.page || '1', 10) || 1);
+  const initialTab = params.tab === 'sources' ? 'sources' : 'certificates';
   const offset = (page - 1) * PAGE_SIZE;
 
   const supabase = await createClient();
@@ -84,8 +84,7 @@ export default async function DashboardPage({
 
   return (
     <main className="min-h-screen bg-slate-50">
-      <DashboardNavbar />
-      <DashboardClient workspaceRole={workspaceRole}>
+      <DashboardClient workspaceRole={workspaceRole} initialTab={initialTab}>
         {/* Stats */}
         <div className="flex items-center justify-between mb-6">
           <Link 
@@ -124,7 +123,7 @@ export default async function DashboardPage({
             <p className="text-slate-500 mb-6">Generate your first webhook certificate to see it here.</p>
             <Link
               href="/tool"
-              className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+              className="inline-flex items-center gap-2 bg-black hover:bg-zinc-800 text-white px-6 py-3 rounded-lg font-medium transition-colors"
             >
               <Plus className="w-4 h-4" />
               Generate Certificate
@@ -171,7 +170,7 @@ export default async function DashboardPage({
                     </td>
                     <td className="py-3 px-4">
                         {cert.signature_status === 'verified' && (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-50 text-green-700 text-xs font-medium rounded-full border border-green-200" title={`Verified with ${cert.verification_method}`}>
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-violet-50 text-violet-700 text-xs font-medium rounded-full border border-violet-200" title={`Verified with ${cert.verification_method}`}>
                                 <ShieldCheck className="w-3 h-3" />
                                 Verified
                             </span>
@@ -191,7 +190,7 @@ export default async function DashboardPage({
                     </td>
                     <td className="py-3 px-4">
                       {cert.is_pro ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-50 text-indigo-700 text-xs font-medium rounded-full border border-indigo-100">
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-violet-50 text-violet-700 text-xs font-medium rounded-full border border-violet-100">
                           <CheckCircle className="w-3 h-3" />
                           Pro
                         </span>

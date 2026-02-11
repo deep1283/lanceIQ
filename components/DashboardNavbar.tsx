@@ -24,6 +24,12 @@ const DashboardNavbar: React.FC = () => {
       </div>
 
       <div className="flex items-center gap-4">
+        <Link
+          href="/dashboard/settings"
+          className="text-slate-600 hover:text-slate-900 transition-colors text-sm font-medium"
+        >
+          Settings
+        </Link>
         <button
           onClick={handleLogout}
           className="flex items-center gap-2 text-slate-600 hover:text-red-600 transition-colors text-sm font-medium"

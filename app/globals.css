@@ -134,3 +134,117 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* Dashboard-only theme overrides */
+.dashboard-theme {
+  background-color: #fafaf9;
+  color: #1f2937;
+}
+
+.dashboard-theme .bg-zinc-950,
+.dashboard-theme .bg-zinc-900 {
+  background-color: #ffffff !important;
+}
+
+.dashboard-theme .bg-zinc-800 {
+  background-color: #f3f4f6 !important;
+}
+
+.dashboard-theme .border-zinc-800 {
+  border-color: #e5e7eb !important;
+}
+
+.dashboard-theme .border-zinc-900 {
+  border-color: #e5e7eb !important;
+}
+
+.dashboard-theme .text-white {
+  color: #111827 !important;
+}
+
+.dashboard-theme .bg-black.text-white,
+.dashboard-theme a.bg-black {
+  color: #ffffff !important;
+}
+
+.dashboard-theme .text-zinc-200,
+.dashboard-theme .text-zinc-300 {
+  color: #374151 !important;
+}
+
+.dashboard-theme .text-zinc-400,
+.dashboard-theme .text-zinc-500 {
+  color: #6b7280 !important;
+}
+
+.dashboard-theme.dashboard-dark {
+  background-color: #121212;
+  color: #e5e7eb;
+}
+
+.dashboard-theme.dashboard-dark .bg-zinc-950 {
+  background-color: #121212 !important;
+}
+
+.dashboard-theme.dashboard-dark .bg-zinc-900 {
+  background-color: #1b1b1b !important;
+}
+
+.dashboard-theme.dashboard-dark .bg-zinc-800 {
+  background-color: #242424 !important;
+}
+
+.dashboard-theme.dashboard-dark .bg-slate-900,
+.dashboard-theme.dashboard-dark .bg-slate-800 {
+  background-color: #1a1a1a !important;
+}
+
+.dashboard-theme.dashboard-dark .bg-white {
+  background-color: #1f1f1f !important;
+}
+
+.dashboard-theme.dashboard-dark .bg-slate-50 {
+  background-color: #202020 !important;
+}
+
+.dashboard-theme.dashboard-dark .bg-slate-100 {
+  background-color: #262626 !important;
+}
+
+.dashboard-theme.dashboard-dark .border-slate-200,
+.dashboard-theme.dashboard-dark .border-slate-100,
+.dashboard-theme.dashboard-dark .border-zinc-800 {
+  border-color: #2a2a2a !important;
+}
+
+.dashboard-theme.dashboard-dark .border-zinc-900 {
+  border-color: #2a2a2a !important;
+}
+
+.dashboard-theme.dashboard-dark .text-white {
+  color: #f9fafb !important;
+}
+
+.dashboard-theme.dashboard-dark .text-zinc-200,
+.dashboard-theme.dashboard-dark .text-zinc-300 {
+  color: #e5e7eb !important;
+}
+
+.dashboard-theme.dashboard-dark .text-zinc-400,
+.dashboard-theme.dashboard-dark .text-zinc-500 {
+  color: #9ca3af !important;
+}
+
+.dashboard-theme.dashboard-dark .text-slate-900 {
+  color: #f3f4f6 !important;
+}
+
+.dashboard-theme.dashboard-dark .text-slate-700,
+.dashboard-theme.dashboard-dark .text-slate-600 {
+  color: #d1d5db !important;
+}
+
+.dashboard-theme.dashboard-dark .text-slate-500,
+.dashboard-theme.dashboard-dark .text-slate-400 {
+  color: #9ca3af !important;
+}

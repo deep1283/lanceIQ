@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
@@ -13,14 +13,19 @@ import type { Role } from '@/lib/roles';
 interface DashboardClientProps {
   children: React.ReactNode; // The server-rendered certificates list
   workspaceRole?: Role | null;
+  initialTab?: 'certificates' | 'sources';
 }
 
-export function DashboardClient({ children, workspaceRole }: DashboardClientProps) {
-  const [activeTab, setActiveTab] = useState('certificates');
+export function DashboardClient({ children, workspaceRole, initialTab = 'certificates' }: DashboardClientProps) {
+  const [activeTab, setActiveTab] = useState<'certificates' | 'sources'>(initialTab);
   const [isAddSourceOpen, setIsAddSourceOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const canAddSource = canManageWorkspace(workspaceRole);
   const canGenerate = !workspaceRole || (!isViewer(workspaceRole) && !isExporter(workspaceRole) && !isLegalHoldManager(workspaceRole));
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   return (
     <>
@@ -28,8 +33,8 @@ export function DashboardClient({ children, workspaceRole }: DashboardClientProp
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-            <p className="text-slate-500 text-sm mt-1">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Dashboard</h1>
+            <p className="text-slate-500 dark:text-zinc-400 text-sm mt-1">
               Manage your webhook verifications and ingestion sources.
             </p>
           </div>
@@ -66,7 +71,11 @@ export function DashboardClient({ children, workspaceRole }: DashboardClientProp
           </TabsContent>
           
           <TabsContent value="sources">
-            <SourcesList refreshTrigger={refreshTrigger} canManageSources={canAddSource} />
+            <SourcesList
+              refreshTrigger={refreshTrigger}
+              canManageSources={canAddSource}
+              workspaceRole={workspaceRole}
+            />
           </TabsContent>
         </Tabs>
       </div>

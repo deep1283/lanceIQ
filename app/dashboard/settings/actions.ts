@@ -62,7 +62,7 @@ export async function saveSsoProvider(params: {
       return { error: 'Failed to update SSO provider.' };
     }
 
-    revalidatePath('/dashboard/settings');
+    revalidatePath('/dashboard/admin');
     return { provider: data };
   }
 
@@ -77,7 +77,7 @@ export async function saveSsoProvider(params: {
     return { error: 'Failed to create SSO provider.' };
   }
 
-  revalidatePath('/dashboard/settings');
+  revalidatePath('/dashboard/admin');
   return { provider: data };
 }
 
@@ -130,7 +130,7 @@ export async function createScimToken(params: {
     return { error: 'Failed to create SCIM token.' };
   }
 
-  revalidatePath('/dashboard/settings');
+  revalidatePath('/dashboard/admin');
   return { token, tokenRecord: data };
 }
 
@@ -175,6 +175,6 @@ export async function revokeScimToken(params: {
     return { error: 'Failed to revoke SCIM token.' };
   }
 
-  revalidatePath('/dashboard/settings');
+  revalidatePath('/dashboard/admin');
   return { success: true };
 }

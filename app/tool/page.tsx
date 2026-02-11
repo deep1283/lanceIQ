@@ -792,13 +792,6 @@ export default function Home() {
           <div>
             <div className="flex items-center justify-between mb-2">
               <h1 className="text-2xl font-bold text-slate-900 tracking-tight">LanceIQ Generator</h1>
-              {isPro && (
-                <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
-                  <CheckCircle className="w-3 h-3" />
-                  PRO
-                </span>
-              )}
-
             </div>
             <p className="text-slate-500 text-sm">Create an official-looking delivery record provided by you.</p>
           </div>
@@ -1009,15 +1002,15 @@ export default function Home() {
                 
                 {/* Logged in indicator */}
                 {user && (
-                  <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
+                  <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-green-600" />
-                        <span className="text-sm text-green-700">Logged in — certificates will be saved</span>
+                        <CheckCircle className="w-4 h-4 text-slate-500" />
+                        <span className="text-sm text-slate-600">Saved to your workspace</span>
                       </div>
                       <Link
                         href="/dashboard"
-                        className="text-sm text-green-700 hover:text-green-800 font-medium underline"
+                        className="text-sm text-slate-600 hover:text-slate-800 font-medium underline"
                       >
                         View History
                       </Link>
@@ -1025,9 +1018,11 @@ export default function Home() {
                   </div>
                 )}
                 
-                <p className="text-xs text-slate-400 text-center mt-3">
-                    {isWatermarkFree ? 'Watermark-free certificates enabled.' : 'Free tier includes a watermark.'}
-                </p>
+                {!isWatermarkFree && (
+                  <p className="text-xs text-slate-400 text-center mt-3">
+                    Free tier includes a watermark.
+                  </p>
+                )}
 
                 <div className="mt-4 border border-slate-200 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
                   <p className="font-semibold text-slate-700 mb-1">Scope of Proof</p>
@@ -1040,132 +1035,7 @@ export default function Home() {
              </div>
           </div>
 
-          {user && canViewLegalHold && (
-            <div className="pt-8">
-              <div className="border-t border-slate-200 pt-6">
-                <div className="flex items-start justify-between gap-4 mb-4">
-                  <div>
-                    <h2 className="text-sm font-semibold text-slate-900">Legal Hold</h2>
-                    <p className="text-xs text-slate-500">Owners/admins only.</p>
-                  </div>
-                  {workspaceName && (
-                    <span className="text-xs text-slate-500 bg-white border border-slate-200 rounded-full px-3 py-1">
-                      {workspaceName}
-                    </span>
-                  )}
-                </div>
-                <div className="border border-slate-200 rounded-lg bg-white p-3 text-xs text-slate-600">
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-700">Status</span>
-                    {legalHoldLoading ? (
-                      <span className="font-mono text-slate-500">Loading...</span>
-                    ) : legalHoldError ? (
-                      <span className="font-mono text-red-600">Unavailable</span>
-                    ) : legalHold?.active ? (
-                      <span className="font-mono text-green-700">Active</span>
-                    ) : (
-                      <span className="font-mono text-slate-500">Not active</span>
-                    )}
-                  </div>
-                  {legalHold?.active && (
-                    <div className="mt-2 space-y-1 text-[11px] text-slate-500">
-                      <div>
-                        <span className="font-semibold text-slate-600">Active Since:</span>{" "}
-                        <span className="font-mono">{new Date(legalHold.created_at).toLocaleString()}</span>
-                      </div>
-                      {legalHold.reason && (
-                        <div>
-                          <span className="font-semibold text-slate-600">Reason:</span>{" "}
-                          <span className="font-mono">{legalHold.reason}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {!legalHoldLoading && !legalHoldError && !legalHold?.active && (
-                    <p className="mt-2 text-[11px] text-slate-400">No active legal hold.</p>
-                  )}
-                  {legalHoldError && (
-                    <p className="mt-2 text-[11px] text-red-600">{legalHoldError}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {user && canViewAuditLogs && (
-            <div className="pt-8">
-              <div className="border-t border-slate-200 pt-6">
-                <div className="flex items-start justify-between gap-4 mb-4">
-                  <div>
-                    <h2 className="text-sm font-semibold text-slate-900">Audit Logs</h2>
-                    <p className="text-xs text-slate-500">
-                      Read-only workspace activity for owners/admins on Team plans.
-                    </p>
-                  </div>
-                  {workspaceName && (
-                    <span className="text-xs text-slate-500 bg-white border border-slate-200 rounded-full px-3 py-1">
-                      {workspaceName}
-                    </span>
-                  )}
-                </div>
-
-                {auditError && (
-                  <div className="mb-4 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">
-                    {auditError}
-                  </div>
-                )}
-
-                {!auditError && auditLoading && auditLogs.length === 0 && (
-                  <div className="text-xs text-slate-500">Loading audit logs...</div>
-                )}
-
-                {!auditLoading && auditLogs.length === 0 && !auditError && (
-                  <div className="text-xs text-slate-500">No audit activity recorded yet.</div>
-                )}
-
-                {auditLogs.length > 0 && (
-                  <div className="space-y-3">
-                    {auditLogs.map((entry) => (
-                      <div key={entry.id} className="border border-slate-200 rounded-lg bg-white p-3">
-                        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                          <div className="text-xs font-semibold text-slate-800">{entry.action}</div>
-                          <div className="text-[11px] text-slate-400">
-                            {new Date(entry.created_at).toLocaleString()}
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-500">
-                          <div>
-                            <span className="font-semibold text-slate-600">Actor:</span>{" "}
-                            <span className="font-mono">{entry.actor_id ?? "System"}</span>
-                          </div>
-                          <div>
-                            <span className="font-semibold text-slate-600">Target:</span>{" "}
-                            <span className="font-mono">{entry.target_resource ?? "—"}</span>
-                          </div>
-                        </div>
-                        {entry.details && (
-                          <pre className="mt-2 bg-slate-50 border border-slate-200 rounded p-2 text-[10px] text-slate-500 overflow-x-auto">
-                            {JSON.stringify(entry.details, null, 2)}
-                          </pre>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {auditNextCursor && (
-                  <button
-                    type="button"
-                    onClick={() => fetchAuditLogs({ append: true, cursor: auditNextCursor, cursorId: auditNextCursorId })}
-                    disabled={auditLoading}
-                    className="mt-4 w-full text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg py-2 hover:bg-slate-50 disabled:opacity-50"
-                  >
-                    {auditLoading ? 'Loading...' : 'Load more'}
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
+          {/* Legal Hold + Audit Logs removed from generator */}
         </div>
       </div>
 
