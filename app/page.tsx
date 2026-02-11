@@ -5,6 +5,7 @@ import Hero from '../components/Hero';
 
 const Features = dynamic(() => import('../components/Features'));
 const HowItWorks = dynamic(() => import('../components/HowItWorks'));
+const SampleCertificate = dynamic(() => import('../components/SampleCertificate'));
 const Trust = dynamic(() => import('../components/Trust'));
 const FAQ = dynamic(() => import('../components/FAQ'));
 const BlogPreview = dynamic(() => import('../components/BlogPreview'));
@@ -45,6 +46,7 @@ export default function Home() {
       />
       <Navbar />
       <Hero />
+      <SampleCertificate />
       <HowItWorks />
       <Features />
       <Trust />

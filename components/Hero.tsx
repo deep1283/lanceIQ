@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
-import { motion, useScroll, useTransform, useSpring } from "framer-motion";
+import { motion, useScroll, useTransform, useSpring, useReducedMotion } from "framer-motion";
 import Link from "next/link";
 import DarkVeil from "./DarkVeil";
 import ElectricBorder from "./ElectricBorder";
@@ -10,6 +10,7 @@ import { ShieldCheck, FileCheck, Lock } from "lucide-react";
 // Coding Terminal Component to replace the dashboard image
 const CodeTerminal = () => {
     const [lines, setLines] = useState<string[]>([]);
+    const prefersReducedMotion = useReducedMotion();
     
     // Auto-typing effect simulation
     useEffect(() => {
@@ -23,7 +24,11 @@ const CodeTerminal = () => {
             "> Certificate ID: cert_89234x9",
             "> [SUCCESS] PDF Generated & Saved to Workspace."
         ];
-        
+        if (prefersReducedMotion) {
+            setLines(sequence);
+            return;
+        }
+
         let timeoutId: NodeJS.Timeout;
         let currentIndex = 0;
 
@@ -47,7 +52,7 @@ const CodeTerminal = () => {
         timeoutId = setTimeout(typeNextLine, 800);
         
         return () => clearTimeout(timeoutId);
-    }, []);
+    }, [prefersReducedMotion]);
 
     return (
         <div className="w-full h-full bg-[#0a0a0a] rounded-lg p-4 font-mono text-sm sm:text-base overflow-hidden flex flex-col shadow-2xl">
@@ -71,13 +76,15 @@ const CodeTerminal = () => {
                     </motion.div>
                     );
                 })}
-                <motion.div 
-                    animate={{ opacity: [0, 1, 0] }}
-                    transition={{ repeat: Infinity, duration: 0.8 }}
-                    className="inline-block w-2 h-4 bg-gray-500 ml-1"
-                >
-                  _
-                </motion.div>
+                {!prefersReducedMotion && (
+                  <motion.div 
+                      animate={{ opacity: [0, 1, 0] }}
+                      transition={{ repeat: Infinity, duration: 0.8 }}
+                      className="inline-block w-2 h-4 bg-gray-500 ml-1"
+                  >
+                    _
+                  </motion.div>
+                )}
             </div>
         </div>
     );
@@ -85,6 +92,7 @@ const CodeTerminal = () => {
 
 const ScrollTiltTerminal: React.FC = () => {
   const ref = useRef<HTMLDivElement>(null);
+  const prefersReducedMotion = useReducedMotion();
   const { scrollYProgress } = useScroll({
     target: ref,
     offset: ["start end", "end start"],
@@ -102,7 +110,7 @@ const ScrollTiltTerminal: React.FC = () => {
       style={{
         transformStyle: "preserve-3d",
         transformOrigin: "center center",
-        rotateX,
+        rotateX: prefersReducedMotion ? 0 : rotateX,
         perspective: "1000px",
       }}
     >
@@ -114,6 +122,7 @@ const ScrollTiltTerminal: React.FC = () => {
 };
 
 const Hero: React.FC = () => {
+  const prefersReducedMotion = useReducedMotion();
   return (
     <>
       {/* Hero Section */}
@@ -128,7 +137,7 @@ const Hero: React.FC = () => {
 
           <motion.h1
             className="text-white text-5xl sm:text-7xl md:text-8xl font-bold tracking-tight mb-6"
-            initial={{ opacity: 0, y: 20 }}
+            initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.8 }}
           >
@@ -140,25 +149,42 @@ const Hero: React.FC = () => {
 
           <motion.p
             className="text-gray-400 text-lg sm:text-xl md:text-2xl max-w-2xl mx-auto font-light leading-relaxed mb-10"
-            initial={{ opacity: 0 }}
+            initial={prefersReducedMotion ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4, duration: 0.8 }}
           >
-            Turn raw webhook payloads into clean, professional PDF certificates. Perfect for documentation, debugging, and client communication.
+            Generate audit-ready webhook receipt records with payload hashes, optional signature checks, and verification links.
           </motion.p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <Link href="/tool">
                 <motion.button
                 className="rounded-full py-4 px-8 text-base font-bold bg-white text-black hover:bg-gray-200 transition-all duration-300 shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,255,255,0.5)] active:scale-95"
-                initial={{ opacity: 0, y: 10 }}
+                initial={prefersReducedMotion ? false : { opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.6 }}
                 >
                 Generate Certificate Now
                 </motion.button>
             </Link>
+            <Link href="#sample">
+                <motion.button
+                className="rounded-full py-4 px-8 text-base font-semibold bg-white/10 text-white border border-white/20 hover:bg-white/20 transition-all duration-300"
+                initial={prefersReducedMotion ? false : { opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.7 }}
+                >
+                View Sample Certificate
+                </motion.button>
+            </Link>
 
+          </div>
+
+          <div className="mt-8 flex flex-wrap justify-center gap-2 text-xs text-gray-400">
+            <span className="px-3 py-1 rounded-full border border-white/10 bg-white/5">Stripe</span>
+            <span className="px-3 py-1 rounded-full border border-white/10 bg-white/5">Razorpay</span>
+            <span className="px-3 py-1 rounded-full border border-white/10 bg-white/5">Lemon Squeezy</span>
+            <span className="px-3 py-1 rounded-full border border-white/10 bg-white/5">Any Webhook</span>
           </div>
         </div>
       </div>
