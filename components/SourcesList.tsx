@@ -132,21 +132,21 @@ export function SourcesList({
     <div className="space-y-8">
       {/* Sources Section */}
       <div>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-          <Terminal className="w-5 h-5 text-slate-500 dark:text-zinc-400" />
+        <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+          <Terminal className="w-5 h-5 dashboard-text-muted" />
           Active Sources
         </h2>
         <div className="grid grid-cols-1 gap-6">
           {loading && sources.length === 0 ? (
-            <div className="text-center py-10 text-slate-500 dark:text-zinc-400">Loading sources...</div>
+            <div className="text-center py-10 dashboard-text-muted">Loading sources...</div>
           ) : sources.length === 0 ? (
-            <Card className="bg-slate-50 dark:bg-zinc-800 border-dashed border-2 shadow-none">
+            <Card className="dashboard-panel-muted border-dashed border-2 shadow-none">
                <div className="flex flex-col items-center justify-center py-12 text-center">
-                 <div className="bg-white dark:bg-zinc-800 p-3 rounded-full shadow-sm mb-4">
-                   <Terminal className="w-6 h-6 text-slate-400 dark:text-zinc-500" />
+                 <div className="dashboard-panel-elevated p-3 rounded-full mb-4">
+                   <Terminal className="w-6 h-6 dashboard-text-subtle" />
                  </div>
-                 <h3 className="font-semibold text-slate-900 dark:text-white mb-1">No Sources Yet</h3>
-                 <p className="text-sm text-slate-500 dark:text-zinc-400 max-w-sm mb-6">
+                 <h3 className="font-semibold text-slate-900 mb-1">No Sources Yet</h3>
+                 <p className="text-sm dashboard-text-muted max-w-sm mb-6">
                    Create a source to get a unique API URL for receiving webhooks.
                  </p>
                </div>
@@ -172,24 +172,30 @@ export function SourcesList({
       {/* History Section */}
       <div>
          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-              <Archive className="w-5 h-5 text-slate-500 dark:text-zinc-400" />
+            <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+              <Archive className="w-5 h-5 dashboard-text-muted" />
               Recent Ingestion Events
             </h2>
-            <Button variant="ghost" size="sm" onClick={loadData} disabled={loading}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={loadData}
+              disabled={loading}
+              className="dashboard-button-ghost"
+            >
               <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
          </div>
 
-         <div className="bg-white dark:bg-zinc-800 rounded-xl border border-slate-200 dark:border-zinc-700 shadow-sm overflow-hidden">
+         <div className="dashboard-panel rounded-xl overflow-hidden">
             {history.length === 0 ? (
-               <div className="p-8 text-center text-slate-500 dark:text-zinc-400 text-sm">
+               <div className="p-8 text-center dashboard-text-muted text-sm">
                  No events received yet. Send a webhook to one of your sources to see it here.
                </div>
             ) : (
-              <table className="w-full text-sm text-left">
-                <thead className="bg-slate-50 dark:bg-zinc-800 border-b border-slate-200 dark:border-zinc-700 text-xs uppercase text-slate-500 dark:text-zinc-400 font-semibold">
+              <table className="w-full text-sm text-left dashboard-table">
+                <thead className="border-b dashboard-border text-xs uppercase font-semibold">
                   <tr>
                     <th className="px-4 py-3">Time</th>
                     <th className="px-4 py-3">Source</th>
@@ -197,42 +203,42 @@ export function SourcesList({
                     <th className="px-4 py-3">Details</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-zinc-700">
+                <tbody className="divide-y divide-[var(--dash-border)]">
                   {history.map((event) => (
-                    <tr key={event.id} className="hover:bg-slate-50 dark:hover:bg-zinc-800 dark:bg-zinc-800">
-                      <td className="px-4 py-3 text-slate-500 dark:text-zinc-400 font-mono text-xs">
+                    <tr key={event.id} className="dashboard-row">
+                      <td className="px-4 py-3 dashboard-text-muted font-mono text-xs">
                         {formatDistanceToNow(new Date(event.received_at))} ago
                       </td>
-                      <td className="px-4 py-3 font-medium text-slate-900 dark:text-white">
+                      <td className="px-4 py-3 font-medium text-slate-900">
                         {event.source_name}
                       </td>
                       <td className="px-4 py-3">
                          {event.signature_status === 'verified' && (
-                            <Badge variant="outline" className="bg-violet-50 text-violet-700 border-violet-200 gap-1">
+                            <Badge variant="outline" className="dashboard-accent-chip gap-1">
                               <ShieldCheck className="w-3 h-3" /> Verified
                             </Badge>
                          )}
                          {event.signature_status === 'failed' && (
-                            <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 gap-1">
+                            <Badge variant="outline" className="bg-red-500/10 text-red-400 border-red-500/20 gap-1">
                               <ShieldAlert className="w-3 h-3" /> Failed
                             </Badge>
                          )}
                          {event.signature_status === 'not_verified' && (
-                            <Badge variant="outline" className="bg-slate-50 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-zinc-700 gap-1">
+                            <Badge variant="outline" className="dashboard-chip gap-1">
                               <AlertTriangle className="w-3 h-3" /> Not Verified
                             </Badge>
                          )}
                       </td>
-                      <td className="px-4 py-3 text-slate-500 dark:text-zinc-400 max-w-xs truncate">
+                      <td className="px-4 py-3 dashboard-text-muted max-w-xs truncate">
                         {event.signature_reason ? (
-                          <span className="font-mono text-xs bg-slate-100 dark:bg-zinc-700 px-1.5 py-0.5 rounded text-slate-600 dark:text-zinc-400">
+                          <span className="font-mono text-xs bg-[var(--dash-surface-2)] px-1.5 py-0.5 rounded text-slate-600">
                             {event.signature_reason}
                           </span>
                         ) : (
-                          <span className="text-xs text-slate-400 dark:text-zinc-500">-</span>
+                          <span className="text-xs dashboard-text-subtle">-</span>
                         )}
-                        <span className="mx-2 text-slate-300 dark:text-zinc-600">|</span>
-                        <span className="font-mono text-xs text-slate-400 dark:text-zinc-500" title={event.raw_body_sha256}>
+                        <span className="mx-2 dashboard-text-subtle">|</span>
+                        <span className="font-mono text-xs dashboard-text-subtle" title={event.raw_body_sha256}>
                            SHA256: {event.raw_body_sha256.substring(0, 8)}...
                         </span>
                       </td>
@@ -290,29 +296,29 @@ function SourceCard({
   };
 
   return (
-    <Card>
+    <Card className="dashboard-panel">
       <CardContent className="p-6">
         <div className="flex items-start justify-between">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <h3 className="font-bold text-slate-900 dark:text-white">{source.name}</h3>
-              <Badge variant="secondary" className="font-normal capitalize text-slate-600 dark:text-zinc-400 bg-slate-100 dark:bg-zinc-700">
+              <h3 className="font-semibold text-slate-900">{source.name}</h3>
+              <Badge variant="secondary" className="dashboard-chip font-normal capitalize">
                 {source.provider}
               </Badge>
               {source.store_raw_body && (
-                 <Badge variant="outline" className="text-[10px] text-violet-600 border-violet-200 bg-violet-50">
+                 <Badge variant="outline" className="dashboard-accent-chip text-[10px]">
                     Raw Storage
                  </Badge>
               )}
             </div>
-            <p className="text-sm text-slate-500 dark:text-zinc-400">Created {formatDistanceToNow(new Date(source.created_at))} ago</p>
+            <p className="text-sm dashboard-text-muted">Created {formatDistanceToNow(new Date(source.created_at))} ago</p>
           </div>
           
           {canManageSources && (
             <Button 
               variant="ghost" 
               size="sm" 
-              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              className="text-red-500 hover:text-red-400 hover:bg-red-500/10"
               onClick={onDelete}
               disabled={isDeleting}
             >
@@ -321,67 +327,67 @@ function SourceCard({
           )}
         </div>
 
-        <div className="mt-4 pt-4 border-t border-slate-100 dark:border-zinc-700 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="mt-4 pt-4 border-t dashboard-border grid grid-cols-1 md:grid-cols-2 gap-4">
            <div>
-              <p className="text-xs font-semibold text-violet-600 uppercase tracking-wider mb-2">Endpoint URL Structure</p>
-              <div className="flex items-center gap-2 bg-slate-50 dark:bg-zinc-800 p-2 rounded border border-slate-200 dark:border-zinc-700">
-                <code className="text-xs font-mono text-slate-600 dark:text-zinc-400 flex-1 truncate">
+              <p className="text-xs font-semibold uppercase tracking-wider dashboard-text-subtle mb-2">Endpoint URL Structure</p>
+              <div className="flex items-center gap-2 bg-[var(--dash-surface-2)] p-2 rounded border dashboard-border">
+                <code className="text-xs font-mono dashboard-text-muted flex-1 truncate">
                   {baseUrl}
-                  <span className="font-bold text-slate-900 dark:text-white">API_KEY</span>
+                  <span className="font-semibold text-slate-900">API_KEY</span>
                 </code>
-                 <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCopyUrl}>
-                  {copied ? <Check className="w-3 h-3 text-violet-600" /> : <Copy className="w-3 h-3" />}
+                 <Button size="icon" variant="ghost" className="h-6 w-6 dashboard-button-ghost" onClick={handleCopyUrl}>
+                  {copied ? <Check className="w-3 h-3 dashboard-accent-text" /> : <Copy className="w-3 h-3" />}
                 </Button>
               </div>
            </div>
            
            <div>
-               <p className="text-xs font-semibold text-violet-600 uppercase tracking-wider mb-2">Key ID</p>
+               <p className="text-xs font-semibold uppercase tracking-wider dashboard-text-subtle mb-2">Key ID</p>
                <div className="flex items-center gap-2">
-                 <div className="font-mono text-sm text-slate-700 dark:text-zinc-300 bg-slate-50 dark:bg-zinc-800 px-2 py-1 rounded border border-slate-200 dark:border-zinc-700">
+                 <div className="font-mono text-sm text-slate-900 bg-[var(--dash-surface-2)] px-2 py-1 rounded border dashboard-border">
                    ...{source.api_key_last4}
                  </div>
-                 <span className="text-xs text-slate-400 dark:text-zinc-500">
+                 <span className="text-xs dashboard-text-subtle">
                    (Full key hidden)
                  </span>
                </div>
                <div className="mt-3 space-y-3">
                  {canRotateKeys ? (
                    <>
-                     <Button size="sm" variant="outline" onClick={() => setShowRotate((prev) => !prev)}>
+                     <Button size="sm" variant="outline" className="dashboard-button-secondary" onClick={() => setShowRotate((prev) => !prev)}>
                        {showRotate ? 'Hide Rotation' : 'Rotate API Key'}
                      </Button>
                      {showRotate && (
-                       <div className="rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 p-3 space-y-3">
+                       <div className="rounded-lg border dashboard-border bg-[var(--dash-surface-2)] p-3 space-y-3">
                          <div>
-                           <label className="block text-xs font-semibold text-slate-500 dark:text-zinc-400 mb-1">Reason (optional)</label>
+                           <label className="block text-xs font-semibold dashboard-text-muted mb-1">Reason (optional)</label>
                            <input
                              value={rotateReason}
                              onChange={(e) => setRotateReason(e.target.value)}
                              placeholder="Scheduled rotation"
-                             className="w-full text-sm bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-md px-3 py-2 text-slate-700 dark:text-zinc-300"
+                             className="w-full text-sm rounded-md px-3 py-2 dashboard-input"
                            />
                          </div>
                          <div className="flex items-center gap-2">
-                           <Button size="sm" onClick={() => onRotateKey(rotateReason)} disabled={rotating}>
+                           <Button size="sm" className="dashboard-button-primary" onClick={() => onRotateKey(rotateReason)} disabled={rotating}>
                              {rotating ? 'Rotating...' : 'Confirm Rotation'}
                            </Button>
-                           <span className="text-xs text-slate-500 dark:text-zinc-400">Old keys remain valid for 24 hours.</span>
+                           <span className="text-xs dashboard-text-muted">Old keys remain valid for 24 hours.</span>
                          </div>
                          {rotateError && (
-                           <p className="text-xs text-red-600">{rotateError}</p>
+                           <p className="text-xs text-red-400">{rotateError}</p>
                          )}
                          {rotatedKey && (
-                           <div className="rounded-md border border-violet-200 bg-violet-50 p-3">
-                             <p className="text-[11px] uppercase text-violet-700 font-semibold mb-2">New API Key (shown once)</p>
+                           <div className="rounded-md border dashboard-accent-border dashboard-accent-soft p-3">
+                             <p className="text-[11px] uppercase dashboard-accent-text font-semibold mb-2">New API Key (shown once)</p>
                              <div className="flex items-center gap-2">
-                               <code className="flex-1 text-xs font-mono text-violet-900 break-all">{rotatedKey}</code>
-                               <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleCopyKey}>
-                                 {copiedKey ? <Check className="w-3 h-3 text-violet-700" /> : <Copy className="w-3 h-3 text-violet-700" />}
+                               <code className="flex-1 text-xs font-mono dashboard-accent-text break-all">{rotatedKey}</code>
+                               <Button size="icon" variant="ghost" className="h-7 w-7 dashboard-button-ghost" onClick={handleCopyKey}>
+                                 {copiedKey ? <Check className="w-3 h-3 dashboard-accent-text" /> : <Copy className="w-3 h-3 dashboard-accent-text" />}
                                </Button>
                              </div>
                              {rotatedAt && (
-                               <p className="mt-2 text-[11px] text-violet-700">Rotated at {new Date(rotatedAt).toLocaleString()}</p>
+                               <p className="mt-2 text-[11px] dashboard-accent-text">Rotated at {new Date(rotatedAt).toLocaleString()}</p>
                              )}
                            </div>
                          )}
@@ -389,24 +395,24 @@ function SourceCard({
                      )}
                    </>
                  ) : (
-                   <span className="text-xs text-slate-400 dark:text-zinc-500">Only owners can rotate keys.</span>
+                   <span className="text-xs dashboard-text-subtle">Only owners can rotate keys.</span>
                  )}
                </div>
            </div>
 
            <div>
-               <p className="text-xs font-semibold text-violet-600 uppercase tracking-wider mb-2">Secret</p>
+               <p className="text-xs font-semibold uppercase tracking-wider dashboard-text-subtle mb-2">Secret</p>
                {source.secret_last4 ? (
                   <div className="flex items-center gap-2">
-                     <div className="font-mono text-sm text-slate-700 dark:text-zinc-300 bg-slate-50 dark:bg-zinc-800 px-2 py-1 rounded border border-slate-200 dark:border-zinc-700">
+                     <div className="font-mono text-sm text-slate-900 bg-[var(--dash-surface-2)] px-2 py-1 rounded border dashboard-border">
                        •••• {source.secret_last4}
                      </div>
-                     <Badge variant="outline" className="text-[10px] text-violet-600 border-violet-200 bg-violet-50">
+                     <Badge variant="outline" className="dashboard-accent-chip text-[10px]">
                         Encrypted
                      </Badge>
                   </div>
                ) : (
-                  <div className="text-sm text-slate-400 dark:text-zinc-500 italic py-1">
+                  <div className="text-sm dashboard-text-subtle italic py-1">
                     Not configured (Header required)
                   </div>
                )}

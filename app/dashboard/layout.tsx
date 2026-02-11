@@ -11,7 +11,7 @@ export default function DashboardLayout({
     <DashboardThemeProvider>
       <div className="min-h-screen flex">
         <DashboardSidebar />
-        <div className="flex-1 pl-14">
+        <div className="flex-1 pl-16">
           <DashboardNavbar />
           {children}
         </div>

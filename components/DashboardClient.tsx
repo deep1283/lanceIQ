@@ -29,12 +29,12 @@ export function DashboardClient({ children, workspaceRole, initialTab = 'certifi
 
   return (
     <>
-      <div className="pt-24 pb-4 px-4 max-w-5xl mx-auto">
+      <div className="pt-20 pb-6 px-4 max-w-5xl mx-auto">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Dashboard</h1>
-            <p className="text-slate-500 dark:text-zinc-400 text-sm mt-1">
+            <h1 className="text-3xl font-semibold text-slate-900">Dashboard</h1>
+            <p className="dashboard-text-muted text-sm mt-1">
               Manage your webhook verifications and ingestion sources.
             </p>
           </div>
@@ -42,7 +42,7 @@ export function DashboardClient({ children, workspaceRole, initialTab = 'certifi
           <div className="flex gap-2">
             {activeTab === 'sources' ? (
               canAddSource ? (
-                <Button onClick={() => setIsAddSourceOpen(true)}>
+                <Button onClick={() => setIsAddSourceOpen(true)} className="dashboard-button-primary">
                   <Plus className="w-4 h-4 mr-2" />
                   Add Source
                 </Button>
@@ -50,7 +50,7 @@ export function DashboardClient({ children, workspaceRole, initialTab = 'certifi
             ) : (
               canGenerate ? (
                 <Link href="/tool">
-                  <Button>
+                  <Button className="dashboard-button-primary">
                     <Plus className="w-4 h-4 mr-2" />
                     Generate New
                   </Button>
@@ -61,9 +61,19 @@ export function DashboardClient({ children, workspaceRole, initialTab = 'certifi
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="mb-6">
-            <TabsTrigger value="certificates">My Certificates</TabsTrigger>
-            <TabsTrigger value="sources">Sources & Ingestion</TabsTrigger>
+          <TabsList className="mb-6 dashboard-panel-muted border dashboard-border rounded-full p-1 h-10">
+            <TabsTrigger
+              value="certificates"
+              className="rounded-full px-4 text-[var(--dash-muted)] hover:text-[var(--dash-text)] data-[state=active]:bg-[var(--dash-surface)] data-[state=active]:text-[var(--dash-text)] data-[state=active]:shadow-[0_0_0_1px_var(--dash-border)]"
+            >
+              My Certificates
+            </TabsTrigger>
+            <TabsTrigger
+              value="sources"
+              className="rounded-full px-4 text-[var(--dash-muted)] hover:text-[var(--dash-text)] data-[state=active]:bg-[var(--dash-surface)] data-[state=active]:text-[var(--dash-text)] data-[state=active]:shadow-[0_0_0_1px_var(--dash-border)]"
+            >
+              Sources & Ingestion
+            </TabsTrigger>
           </TabsList>
           
           <TabsContent value="certificates">

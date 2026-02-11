@@ -615,15 +615,15 @@ export default function SettingsClient({
   const statusBadge = (status: string | null | undefined) => {
     const normalized = (status || 'unknown').toLowerCase();
     if (normalized === 'healthy' || normalized === 'completed' || normalized === 'pass') {
-      return 'bg-emerald-900/30 text-emerald-300';
+      return 'dashboard-accent-chip';
     }
     if (normalized === 'lagging' || normalized === 'warning' || normalized === 'running') {
-      return 'bg-amber-900/30 text-amber-300';
+      return 'bg-amber-500/15 text-amber-500 border border-amber-500/20';
     }
     if (normalized === 'broken' || normalized === 'failed' || normalized === 'error') {
-      return 'bg-red-900/30 text-red-300';
+      return 'bg-red-500/15 text-red-400 border border-red-500/20';
     }
-    return 'bg-zinc-800 text-zinc-300';
+    return 'bg-[var(--dash-surface-2)] text-slate-500 border dashboard-border';
   };
 
   const retentionScopes = Array.from(
@@ -646,123 +646,35 @@ export default function SettingsClient({
   };
 
   return (
-    <div className="max-w-4xl mx-auto py-10 px-6">
-      <h1 className="text-3xl font-bold mb-2">Workspace Admin</h1>
-      <p className="text-sm text-zinc-400 mb-8">Operational controls for alerts, audit logs, identity, and compliance.</p>
-
-      {/* Tab Navigation */}
-      <div className="flex space-x-6 border-b border-zinc-800 mb-8">
-        {canManage && (
-          <button
-            onClick={() => setActiveTab('alerts')}
-            className={`pb-3 text-sm font-medium transition-colors border-b-2 ${
-              activeTab === 'alerts' 
-                ? 'border-blue-500 text-blue-400' 
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            Smart Alerts
-          </button>
-        )}
-        {canViewAudit && (
-          <button
-            onClick={() => setActiveTab('audit')}
-            className={`pb-3 text-sm font-medium transition-colors border-b-2 ${
-              activeTab === 'audit'
-                ? 'border-blue-500 text-blue-400'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            Audit Logs
-          </button>
-        )}
-        {canViewLegalHold && (
-          <button
-            onClick={() => setActiveTab('legal')}
-            className={`pb-3 text-sm font-medium transition-colors border-b-2 ${
-              activeTab === 'legal'
-                ? 'border-blue-500 text-blue-400'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            Legal Hold
-          </button>
-        )}
-        {canManage && (
-          <button
-            onClick={() => setActiveTab('members')}
-            className={`pb-3 text-sm font-medium transition-colors border-b-2 ${
-              activeTab === 'members' 
-                ? 'border-blue-500 text-blue-400' 
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            Team Members
-          </button>
-        )}
-        {canViewSso && (
-          <button
-            onClick={() => setActiveTab('identity')}
-            className={`pb-3 text-sm font-medium transition-colors border-b-2 ${
-              activeTab === 'identity'
-                ? 'border-blue-500 text-blue-400'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            SSO & SCIM
-          </button>
-        )}
-        {canViewAccessReviews && (
-          <button
-            onClick={() => setActiveTab('access')}
-            className={`pb-3 text-sm font-medium transition-colors border-b-2 ${
-              activeTab === 'access'
-                ? 'border-blue-500 text-blue-400'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            Access Reviews
-          </button>
-        )}
-        {canViewOps && (
-          <button
-            onClick={() => setActiveTab('ops')}
-            className={`pb-3 text-sm font-medium transition-colors border-b-2 ${
-              activeTab === 'ops'
-                ? 'border-blue-500 text-blue-400'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            SLA & Incidents
-          </button>
-        )}
-      </div>
+    <div className="max-w-5xl mx-auto py-12 px-6">
+      <h1 className="text-3xl font-semibold text-slate-900 mb-2">Workspace Admin</h1>
+      <p className="text-sm dashboard-text-muted mb-8">Operational controls for alerts, audit logs, identity, and compliance.</p>
 
       {/* Tab Content */}
       {activeTab === 'alerts' && canManage ? (
         <div className="relative">
-          <div className={`bg-zinc-900 border border-zinc-800 rounded-xl p-6 ${!canUseAlerts && 'opacity-50 pointer-events-none blur-[1px]'}`}>
-            <h2 className="text-xl font-semibold text-white mb-6">Smart Alerts</h2>
+          <div className={`dashboard-panel rounded-xl p-6 ${!canUseAlerts && 'opacity-50 pointer-events-none blur-[1px]'}`}>
+            <h2 className="text-xl font-semibold text-slate-900 mb-6">Smart Alerts</h2>
             
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-zinc-400 mb-2">Destination (Email)</label>
+                <label className="block text-sm font-medium dashboard-text-muted mb-2">Destination (Email)</label>
                 <input 
                   type="email" 
                   value={settings.destination}
                   onChange={(e) => setSettings({...settings, destination: e.target.value})}
                   placeholder="alerts@company.com"
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-4 py-2.5 text-zinc-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                  className="w-full rounded-md px-4 py-2.5 dashboard-input"
                 />
               </div>
               
               <div className="grid grid-cols-2 gap-4">
                  <div>
-                   <label className="block text-sm font-medium text-zinc-400 mb-2">Threshold (Failures)</label>
+                   <label className="block text-sm font-medium dashboard-text-muted mb-2">Threshold (Failures)</label>
                    <select 
                      value={settings.critical_fail_count}
                      onChange={(e) => setSettings({...settings, critical_fail_count: Number(e.target.value)})}
-                     className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-4 py-2.5 text-zinc-200"
+                     className="w-full rounded-md px-4 py-2.5 dashboard-select"
                    >
                      <option value="1">1 Failure</option>
                      <option value="3">3 Failures (Recommended)</option>
@@ -771,11 +683,11 @@ export default function SettingsClient({
                    </select>
                  </div>
                  <div>
-                    <label className="block text-sm font-medium text-zinc-400 mb-2">Time Window</label>
+                    <label className="block text-sm font-medium dashboard-text-muted mb-2">Time Window</label>
                     <select 
                      value={settings.window_minutes}
                      onChange={(e) => setSettings({...settings, window_minutes: Number(e.target.value)})}
-                     className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-4 py-2.5 text-zinc-200"
+                     className="w-full rounded-md px-4 py-2.5 dashboard-select"
                    >
                      <option value="5">5 Minutes</option>
                      <option value="10">10 Minutes</option>
@@ -787,19 +699,19 @@ export default function SettingsClient({
 
               <div className="flex items-center justify-between pt-4">
                  <div className="flex items-center gap-3">
-                   <button 
+                   <button
                       onClick={() => setSettings({...settings, enabled: !settings.enabled})}
-                      className={`w-11 h-6 rounded-full transition-colors relative ${settings.enabled ? 'bg-green-500' : 'bg-zinc-700'}`}
+                      className={`w-11 h-6 rounded-full transition-colors relative border dashboard-border ${settings.enabled ? 'bg-[var(--dash-accent)]' : 'bg-[var(--dash-surface-2)]'}`}
                    >
-                      <span className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${settings.enabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                      <span className={`absolute top-1 left-1 bg-[var(--dash-surface)] w-4 h-4 rounded-full transition-transform ${settings.enabled ? 'translate-x-5' : 'translate-x-0'}`} />
                    </button>
-                   <span className="text-zinc-400 text-sm">Alerts Enabled</span>
+                   <span className="dashboard-text-muted text-sm">Alerts Enabled</span>
                  </div>
                  
                  <button 
                    onClick={handleSave}
                    disabled={saving}
-                   className="bg-zinc-100 hover:bg-white text-zinc-900 px-6 py-2 rounded-md font-medium transition-colors disabled:opacity-50"
+                   className="dashboard-button-primary px-6 py-2 rounded-md font-medium transition-colors disabled:opacity-50"
                  >
                    {saving ? 'Saving...' : 'Save Changes'}
                  </button>
@@ -809,13 +721,13 @@ export default function SettingsClient({
           
           {!canUseAlerts && (
             <div className="absolute inset-0 flex items-center justify-center z-10">
-              <div className="bg-zinc-950/90 border border-zinc-800 p-8 rounded-xl text-center backdrop-blur-sm max-w-sm mx-4">
-                <div className="w-12 h-12 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="bg-[var(--dash-bg)] border dashboard-border p-8 rounded-xl text-center backdrop-blur-sm max-w-sm mx-4">
+                <div className="w-12 h-12 dashboard-accent-soft dashboard-accent-text rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
                 </div>
-                <h3 className="text-xl font-bold text-white mb-2">Smart Alerts are Locked</h3>
-                <p className="text-zinc-400 mb-6 text-sm">Upgrade to the Team plan to enable real-time critical alerts via email.</p>
-                <a href="/contact" className="block w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-md transition-colors">
+                <h3 className="text-xl font-semibold text-slate-900 mb-2">Smart Alerts are Locked</h3>
+                <p className="dashboard-text-muted mb-6 text-sm">Upgrade to the Team plan to enable real-time critical alerts via email.</p>
+                <a href="/contact" className="block w-full dashboard-button-primary font-semibold py-2.5 rounded-md transition-colors">
                   Contact Sales
                 </a>
               </div>
@@ -824,50 +736,50 @@ export default function SettingsClient({
         </div>
       ) : activeTab === 'audit' && canViewAudit ? (
         /* Audit Logs Tab */
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-sm relative">
-          <div className="p-6 border-b border-zinc-800 flex justify-between items-center">
+        <div className="dashboard-panel rounded-xl overflow-hidden relative">
+          <div className="p-6 border-b dashboard-border flex justify-between items-center">
              <div>
-               <h2 className="text-xl font-semibold text-white mb-1">Audit Log</h2>
-               <p className="text-zinc-400 text-sm">Track all critical actions in your workspace.</p>
+               <h2 className="text-xl font-semibold text-slate-900 mb-1">Audit Log</h2>
+               <p className="dashboard-text-muted text-sm">Track all critical actions in your workspace.</p>
              </div>
              {/* Simple export button placeholder */}
-             <button className="text-sm text-zinc-400 hover:text-white transition-colors flex items-center gap-2" disabled={!isTeam}>
+             <button className="text-sm dashboard-button-ghost transition-colors flex items-center gap-2" disabled={!isTeam}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                 Export CSV
              </button>
           </div>
           
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-zinc-950/50 border-b border-zinc-800">
+            <table className="w-full text-left text-sm dashboard-table">
+              <thead className="border-b dashboard-border">
                 <tr>
-                   <th className="px-6 py-4 font-medium text-zinc-400">Action</th>
-                   <th className="px-6 py-4 font-medium text-zinc-400">Actor</th>
-                   <th className="px-6 py-4 font-medium text-zinc-400">Resource</th>
-                   <th className="px-6 py-4 font-medium text-zinc-400">Details</th>
-                   <th className="px-6 py-4 font-medium text-zinc-400 text-right">Date</th>
+                   <th className="px-6 py-4 font-medium">Action</th>
+                   <th className="px-6 py-4 font-medium">Actor</th>
+                   <th className="px-6 py-4 font-medium">Resource</th>
+                   <th className="px-6 py-4 font-medium">Details</th>
+                   <th className="px-6 py-4 font-medium text-right">Date</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800">
+              <tbody className="divide-y divide-[var(--dash-border)]">
                 {initialAuditLogs.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-zinc-500">
+                    <td colSpan={5} className="px-6 py-12 text-center dashboard-text-muted">
                       No audit events recorded yet.
                     </td>
                   </tr>
                 ) : (
                   initialAuditLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-zinc-800/30 transition-colors">
-                      <td className="px-6 py-4 font-mono text-zinc-300">{log.action}</td>
-                      <td className="px-6 py-4 text-zinc-300">
+                    <tr key={log.id} className="dashboard-row">
+                      <td className="px-6 py-4 font-mono text-slate-900">{log.action}</td>
+                      <td className="px-6 py-4 text-slate-900">
                          {/* We only have actor_id, ideally we'd join with users or show ID snippet */}
-                         <span className="bg-zinc-800 px-2 py-1 rounded text-xs">{log.actor_id ? log.actor_id.slice(0, 8) + '...' : 'System'}</span>
+                         <span className="bg-[var(--dash-surface-2)] px-2 py-1 rounded text-xs dashboard-text-muted">{log.actor_id ? log.actor_id.slice(0, 8) + '...' : 'System'}</span>
                       </td>
-                      <td className="px-6 py-4 text-zinc-400">{log.target_resource || '-'}</td>
-                      <td className="px-6 py-4 text-zinc-400 max-w-xs truncate">
+                      <td className="px-6 py-4 dashboard-text-muted">{log.target_resource || '-'}</td>
+                      <td className="px-6 py-4 dashboard-text-muted max-w-xs truncate">
                         {JSON.stringify(log.details)}
                       </td>
-                      <td className="px-6 py-4 text-right text-zinc-500 whitespace-nowrap">
+                      <td className="px-6 py-4 text-right dashboard-text-subtle whitespace-nowrap">
                         {new Date(log.created_at).toLocaleString()}
                       </td>
                     </tr>
@@ -879,13 +791,13 @@ export default function SettingsClient({
 
           {!isTeam && (
             <div className="absolute inset-0 flex items-center justify-center z-10">
-              <div className="bg-zinc-950/90 border border-zinc-800 p-8 rounded-xl text-center backdrop-blur-sm max-w-sm mx-4">
-                <div className="w-12 h-12 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="bg-[var(--dash-bg)] border dashboard-border p-8 rounded-xl text-center backdrop-blur-sm max-w-sm mx-4">
+                <div className="w-12 h-12 dashboard-accent-soft dashboard-accent-text rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
                 </div>
-                <h3 className="text-xl font-bold text-white mb-2">Audit Log is Locked</h3>
-                <p className="text-zinc-400 mb-6 text-sm">Upgrade to the Team plan to access audit logs.</p>
-                <a href="/contact" className="block w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-md transition-colors">
+                <h3 className="text-xl font-semibold text-slate-900 mb-2">Audit Log is Locked</h3>
+                <p className="dashboard-text-muted mb-6 text-sm">Upgrade to the Team plan to access audit logs.</p>
+                <a href="/contact" className="block w-full dashboard-button-primary font-semibold py-2.5 rounded-md transition-colors">
                   Contact Sales
                 </a>
               </div>
@@ -893,35 +805,35 @@ export default function SettingsClient({
           )}
         </div>
       ) : activeTab === 'legal' && canViewLegalHold ? (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm">
+        <div className="dashboard-panel rounded-xl p-6">
           <div className="flex items-start justify-between gap-4 mb-4">
             <div>
-              <h2 className="text-xl font-semibold text-white mb-1">Legal Hold</h2>
-              <p className="text-zinc-400 text-sm">Status of active legal holds for this workspace.</p>
+              <h2 className="text-xl font-semibold text-slate-900 mb-1">Legal Hold</h2>
+              <p className="dashboard-text-muted text-sm">Status of active legal holds for this workspace.</p>
             </div>
           </div>
 
-          <div className="border border-zinc-800 rounded-lg bg-zinc-950 p-4 text-sm text-zinc-300">
+          <div className="dashboard-panel-muted rounded-lg p-4 text-sm text-slate-900">
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-zinc-200">Status</span>
+              <span className="font-semibold text-slate-900">Status</span>
               {initialLegalHold?.active ? (
-                <span className="font-mono text-emerald-400">Active</span>
+                <span className="font-mono dashboard-accent-text">Active</span>
               ) : (
-                <span className="font-mono text-zinc-400">Not active</span>
+                <span className="font-mono dashboard-text-muted">Not active</span>
               )}
             </div>
 
             {initialLegalHold?.active && (
-              <div className="mt-3 space-y-2 text-xs text-zinc-400">
+              <div className="mt-3 space-y-2 text-xs dashboard-text-muted">
                 {initialLegalHold.created_at && (
                   <div>
-                    <span className="font-semibold text-zinc-300">Active Since:</span>{' '}
+                    <span className="font-semibold text-slate-900">Active Since:</span>{' '}
                     <span className="font-mono">{new Date(initialLegalHold.created_at).toLocaleString()}</span>
                   </div>
                 )}
                 {initialLegalHold.reason && (
                   <div>
-                    <span className="font-semibold text-zinc-300">Reason:</span>{' '}
+                    <span className="font-semibold text-slate-900">Reason:</span>{' '}
                     <span className="font-mono">{initialLegalHold.reason}</span>
                   </div>
                 )}
@@ -929,21 +841,21 @@ export default function SettingsClient({
             )}
 
             {!initialLegalHold?.active && (
-              <p className="mt-3 text-xs text-zinc-500">No active legal hold.</p>
+              <p className="mt-3 text-xs dashboard-text-subtle">No active legal hold.</p>
             )}
           </div>
         </div>
       ) : activeTab === 'members' && canManage ? (
         /* Team Members Tab */
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm relative">
-           <h2 className="text-xl font-semibold text-white mb-6">Team Members</h2>
+        <div className="dashboard-panel rounded-xl p-6 relative">
+           <h2 className="text-xl font-semibold text-slate-900 mb-6">Team Members</h2>
            
            {!isTeam && (
-             <div className="absolute inset-0 flex items-center justify-center z-10 bg-zinc-950/90 rounded-xl backdrop-blur-sm">
-                <div className="text-center p-8 border border-zinc-800 rounded-xl bg-zinc-950 max-w-sm">
-                   <h3 className="text-xl font-bold text-white mb-2">Team Management Locked</h3>
-                   <p className="text-zinc-400 mb-6 text-sm">Collaborate with your team by upgrading to the Team plan.</p>
-                   <a href="/contact" className="block w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-md transition-colors">
+             <div className="absolute inset-0 flex items-center justify-center z-10 bg-[var(--dash-bg)] rounded-xl backdrop-blur-sm">
+                <div className="text-center p-8 border dashboard-border rounded-xl bg-[var(--dash-surface)] max-w-sm">
+                   <h3 className="text-xl font-semibold text-slate-900 mb-2">Team Management Locked</h3>
+                   <p className="dashboard-text-muted mb-6 text-sm">Collaborate with your team by upgrading to the Team plan.</p>
+                   <a href="/contact" className="block w-full dashboard-button-primary font-semibold py-2.5 rounded-md transition-colors">
                       Contact Sales
                    </a>
                 </div>
@@ -953,8 +865,8 @@ export default function SettingsClient({
            <div className={`${!isTeam && 'opacity-20 pointer-events-none'}`}>
              {/* Invite Form */}
              {canInvite && (
-               <div className="mb-8 bg-zinc-950 p-4 rounded-lg border border-zinc-800">
-                 <h3 className="text-sm font-medium text-zinc-300 mb-4">Invite New Member</h3>
+               <div className="mb-8 dashboard-panel-muted p-4 rounded-lg">
+                 <h3 className="text-sm font-medium text-slate-900 mb-4">Invite New Member</h3>
                  <form onSubmit={handleInvite} className="flex gap-3">
                    <input 
                      type="email" 
@@ -962,28 +874,28 @@ export default function SettingsClient({
                      onChange={(e) => setInviteEmail(e.target.value)}
                      placeholder="colleague@example.com"
                      required
-                     className="flex-1 bg-zinc-900 border border-zinc-700 rounded-md px-4 py-2 text-zinc-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                     className="flex-1 rounded-md px-4 py-2 dashboard-input"
                    />
                    <button 
                      type="submit" 
                      disabled={inviting}
-                     className="bg-zinc-100 hover:bg-white text-zinc-900 px-4 py-2 rounded-md font-medium transition-colors disabled:opacity-50"
+                     className="dashboard-button-primary px-4 py-2 rounded-md font-medium transition-colors disabled:opacity-50"
                    >
                      {inviting ? 'Adding...' : 'Add Member'}
                    </button>
                  </form>
                  {inviteError && <p className="text-red-400 text-sm mt-2">{inviteError}</p>}
-                 {inviteSuccess && <p className="text-green-400 text-sm mt-2">{inviteSuccess}</p>}
-                 <p className="text-xs text-zinc-500 mt-2">
+                 {inviteSuccess && <p className="dashboard-accent-text text-sm mt-2">{inviteSuccess}</p>}
+                 <p className="text-xs dashboard-text-muted mt-2">
                    Note: The user must already be signed up for LanceIQ.
                  </p>
                </div>
              )}
 
              {/* Member List */}
-             <div className="overflow-hidden border border-zinc-800 rounded-lg">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-zinc-950 text-zinc-400">
+             <div className="overflow-hidden border dashboard-border rounded-lg">
+                <table className="w-full text-left text-sm dashboard-table">
+                  <thead className="border-b dashboard-border">
                     <tr>
                       <th className="px-4 py-3 font-medium">Email</th>
                       <th className="px-4 py-3 font-medium">Role</th>
@@ -991,30 +903,30 @@ export default function SettingsClient({
                       <th className="px-4 py-3 font-medium text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-800">
+                  <tbody className="divide-y divide-[var(--dash-border)]">
                     {initialMembers.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="px-4 py-8 text-center text-zinc-500">
+                        <td colSpan={4} className="px-4 py-8 text-center dashboard-text-muted">
                           No other members found.
                         </td>
                       </tr>
                     ) : (
                       initialMembers.map((member) => (
-                        <tr key={member.user_id} className="hover:bg-zinc-800/30">
-                          <td className="px-4 py-3 text-zinc-200">{member.email}</td>
+                        <tr key={member.user_id} className="dashboard-row">
+                          <td className="px-4 py-3 text-slate-900">{member.email}</td>
                           <td className="px-4 py-3">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                              member.role === 'owner' ? 'bg-purple-900/30 text-purple-400' : 'bg-zinc-800 text-zinc-300'
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${
+                              member.role === 'owner' ? 'dashboard-accent-chip' : 'bg-[var(--dash-surface-2)] text-slate-500 border-[var(--dash-border)]'
                             }`}>
                               {member.role}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-zinc-500">{new Date(member.joined_at).toLocaleDateString()}</td>
+                          <td className="px-4 py-3 dashboard-text-muted">{new Date(member.joined_at).toLocaleDateString()}</td>
                           <td className="px-4 py-3 text-right">
                             {canRemove && member.user_id !== currentUserId && (
                               <button 
                                 onClick={() => handleRemove(member.user_id)}
-                                className="text-red-400 hover:text-red-300 text-xs font-medium"
+                                className="text-red-500 hover:text-red-400 text-xs font-medium"
                               >
                                 Remove
                               </button>
@@ -1030,39 +942,39 @@ export default function SettingsClient({
         </div>
       ) : activeTab === 'identity' && canViewSso ? (
         <div className="space-y-8">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm">
+          <div className="dashboard-panel rounded-xl p-6">
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-white mb-1">SSO Setup</h2>
-                <p className="text-zinc-400 text-sm">Configure SAML metadata and domain mapping for your IdP.</p>
+                <h2 className="text-xl font-semibold text-slate-900 mb-1">SSO Setup</h2>
+                <p className="dashboard-text-muted text-sm">Configure SAML metadata and domain mapping for your IdP.</p>
               </div>
-              <div className="text-xs text-zinc-500">SAML 2.0</div>
+              <div className="text-xs dashboard-text-subtle">SAML 2.0</div>
             </div>
 
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4">
-                <p className="text-xs uppercase tracking-wider text-zinc-500 mb-2">Metadata URL</p>
-                <p className="text-sm font-mono text-zinc-200">/api/sso/saml/metadata</p>
+              <div className="dashboard-panel-muted rounded-lg p-4">
+                <p className="text-xs uppercase tracking-wider dashboard-text-subtle mb-2">Metadata URL</p>
+                <p className="text-sm font-mono text-slate-900">/api/sso/saml/metadata</p>
               </div>
-              <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4">
-                <p className="text-xs uppercase tracking-wider text-zinc-500 mb-2">ACS URL</p>
-                <p className="text-sm font-mono text-zinc-200">/api/sso/saml/acs</p>
+              <div className="dashboard-panel-muted rounded-lg p-4">
+                <p className="text-xs uppercase tracking-wider dashboard-text-subtle mb-2">ACS URL</p>
+                <p className="text-sm font-mono text-slate-900">/api/sso/saml/acs</p>
               </div>
             </div>
 
             <div className="mt-6">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-zinc-200">Identity Providers</h3>
-                <span className="text-xs text-zinc-500">{initialSsoProviders.length} configured</span>
+                <h3 className="text-sm font-semibold text-slate-900">Identity Providers</h3>
+                <span className="text-xs dashboard-text-subtle">{initialSsoProviders.length} configured</span>
               </div>
               {initialSsoProviders.length === 0 ? (
-                <div className="text-sm text-zinc-500 border border-dashed border-zinc-800 rounded-lg p-4">
+                <div className="text-sm dashboard-text-muted border border-dashed dashboard-border rounded-lg p-4">
                   No SSO providers configured yet.
                 </div>
               ) : (
-                <div className="overflow-hidden border border-zinc-800 rounded-lg">
-                  <table className="w-full text-left text-sm">
-                    <thead className="bg-zinc-950 text-zinc-400">
+                <div className="overflow-hidden border dashboard-border rounded-lg">
+                  <table className="w-full text-left text-sm dashboard-table">
+                    <thead className="border-b dashboard-border">
                       <tr>
                         <th className="px-4 py-3 font-medium">Domain</th>
                         <th className="px-4 py-3 font-medium">Status</th>
@@ -1070,30 +982,30 @@ export default function SettingsClient({
                         <th className="px-4 py-3 font-medium text-right">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-zinc-800">
+                    <tbody className="divide-y divide-[var(--dash-border)]">
                       {initialSsoProviders.map((provider) => (
-                        <tr key={provider.id} className="hover:bg-zinc-800/30">
-                          <td className="px-4 py-3 text-zinc-200">{provider.domain}</td>
+                        <tr key={provider.id} className="dashboard-row">
+                          <td className="px-4 py-3 text-slate-900">{provider.domain}</td>
                           <td className="px-4 py-3">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                              provider.enabled ? 'bg-emerald-900/30 text-emerald-300' : 'bg-zinc-800 text-zinc-300'
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${
+                              provider.enabled ? 'dashboard-accent-chip' : 'bg-[var(--dash-surface-2)] text-slate-500 border-[var(--dash-border)]'
                             }`}>
                               {provider.enabled ? 'Enabled' : 'Disabled'}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-zinc-500">{formatDate(provider.updated_at)}</td>
+                          <td className="px-4 py-3 dashboard-text-muted">{formatDate(provider.updated_at)}</td>
                           <td className="px-4 py-3 text-right space-x-3">
                             {canManage && (
                               <>
                                 <button
                                   onClick={() => startEditProvider(provider)}
-                                  className="text-xs text-blue-400 hover:text-blue-300"
+                                  className="text-xs dashboard-accent-text hover:opacity-80"
                                 >
                                   Edit
                                 </button>
                                 <button
                                   onClick={() => handleToggleProvider(provider)}
-                                  className="text-xs text-zinc-400 hover:text-zinc-200"
+                                  className="text-xs dashboard-text-muted hover:text-[var(--dash-text)]"
                                 >
                                   {provider.enabled ? 'Disable' : 'Enable'}
                                 </button>
@@ -1109,96 +1021,96 @@ export default function SettingsClient({
             </div>
 
             {canManage ? (
-              <form onSubmit={handleSaveSsoProvider} className="mt-6 bg-zinc-950 border border-zinc-800 rounded-lg p-5 space-y-4">
+              <form onSubmit={handleSaveSsoProvider} className="mt-6 dashboard-panel-muted rounded-lg p-5 space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-zinc-200">
+                  <h3 className="text-sm font-semibold text-slate-900">
                     {ssoForm.providerId ? 'Update Provider' : 'Add Provider'}
                   </h3>
                   {ssoForm.providerId && (
                     <button
                       type="button"
                       onClick={() => setSsoForm({ providerId: null, domain: '', metadataXml: '', enabled: true })}
-                      className="text-xs text-zinc-400 hover:text-zinc-200"
+                      className="text-xs dashboard-text-muted hover:text-[var(--dash-text)]"
                     >
                       Cancel Edit
                     </button>
                   )}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-zinc-400 mb-2">Domain Mapping</label>
+                  <label className="block text-sm font-medium dashboard-text-muted mb-2">Domain Mapping</label>
                   <input
                     value={ssoForm.domain}
                     onChange={(e) => setSsoForm({ ...ssoForm, domain: e.target.value })}
                     placeholder="acme.com"
-                    className="w-full bg-zinc-900 border border-zinc-700 rounded-md px-4 py-2.5 text-zinc-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                    className="w-full rounded-md px-4 py-2.5 dashboard-input"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-zinc-400 mb-2">IdP Metadata XML</label>
+                  <label className="block text-sm font-medium dashboard-text-muted mb-2">IdP Metadata XML</label>
                   <textarea
                     value={ssoForm.metadataXml}
                     onChange={(e) => setSsoForm({ ...ssoForm, metadataXml: e.target.value })}
                     placeholder="Paste IdP metadata XML here"
                     rows={6}
-                    className="w-full bg-zinc-900 border border-zinc-700 rounded-md px-4 py-2.5 text-zinc-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-mono text-xs"
+                    className="w-full rounded-md px-4 py-2.5 dashboard-textarea font-mono text-xs"
                   />
                 </div>
                 <div className="flex items-center justify-between">
-                  <label className="flex items-center gap-3 text-sm text-zinc-400">
+                  <label className="flex items-center gap-3 text-sm dashboard-text-muted">
                     <button
                       type="button"
                       onClick={() => setSsoForm({ ...ssoForm, enabled: !ssoForm.enabled })}
-                      className={`w-11 h-6 rounded-full transition-colors relative ${ssoForm.enabled ? 'bg-emerald-500' : 'bg-zinc-700'}`}
+                      className={`w-11 h-6 rounded-full transition-colors relative border dashboard-border ${ssoForm.enabled ? 'bg-[var(--dash-accent)]' : 'bg-[var(--dash-surface-2)]'}`}
                     >
-                      <span className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${ssoForm.enabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                      <span className={`absolute top-1 left-1 bg-[var(--dash-surface)] w-4 h-4 rounded-full transition-transform ${ssoForm.enabled ? 'translate-x-5' : 'translate-x-0'}`} />
                     </button>
                     Provider Enabled
                   </label>
                   <button
                     type="submit"
                     disabled={ssoSaving}
-                    className="bg-zinc-100 hover:bg-white text-zinc-900 px-4 py-2 rounded-md font-medium transition-colors disabled:opacity-50"
+                    className="dashboard-button-primary px-4 py-2 rounded-md font-medium transition-colors disabled:opacity-50"
                   >
                     {ssoSaving ? 'Saving...' : 'Save Provider'}
                   </button>
                 </div>
                 {ssoError && <p className="text-red-400 text-sm">{ssoError}</p>}
-                {ssoSuccess && <p className="text-green-400 text-sm">{ssoSuccess}</p>}
+                {ssoSuccess && <p className="dashboard-accent-text text-sm">{ssoSuccess}</p>}
               </form>
             ) : (
-              <div className="mt-6 text-sm text-zinc-500">
+              <div className="mt-6 text-sm dashboard-text-muted">
                 You have read-only access to SSO configuration.
               </div>
             )}
           </div>
 
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm">
+          <div className="dashboard-panel rounded-xl p-6">
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-white mb-1">SCIM Tokens</h2>
-                <p className="text-zinc-400 text-sm">Provision users and groups with SCIM.</p>
+                <h2 className="text-xl font-semibold text-slate-900 mb-1">SCIM Tokens</h2>
+                <p className="dashboard-text-muted text-sm">Provision users and groups with SCIM.</p>
               </div>
-              <div className="text-xs text-zinc-500">Base URL: /api/scim/v2</div>
+              <div className="text-xs dashboard-text-subtle">Base URL: /api/scim/v2</div>
             </div>
 
             {!canManage && (
-              <div className="mt-4 text-sm text-zinc-500">
+              <div className="mt-4 text-sm dashboard-text-muted">
                 Only owners and admins can create or revoke SCIM tokens.
               </div>
             )}
 
             {canManage && (
-              <div className="mt-6 bg-zinc-950 border border-zinc-800 rounded-lg p-4">
+              <div className="mt-6 dashboard-panel-muted rounded-lg p-4">
                 {initialSsoProviders.length === 0 ? (
-                  <p className="text-sm text-zinc-500">Add an SSO provider before creating SCIM tokens.</p>
+                  <p className="text-sm dashboard-text-muted">Add an SSO provider before creating SCIM tokens.</p>
                 ) : (
                   <div className="flex flex-col gap-4">
                     <div className="flex items-center gap-3">
-                      <label className="text-sm text-zinc-400">Provider</label>
+                      <label className="text-sm dashboard-text-muted">Provider</label>
                       <select
                         value={selectedProviderId}
                         onChange={(e) => setSelectedProviderId(e.target.value)}
-                        className="bg-zinc-900 border border-zinc-700 rounded-md px-3 py-2 text-zinc-200"
+                        className="rounded-md px-3 py-2 dashboard-select"
                       >
                         {initialSsoProviders.map((provider) => (
                           <option key={provider.id} value={provider.id}>{provider.domain}</option>
@@ -1207,15 +1119,15 @@ export default function SettingsClient({
                       <button
                         onClick={handleCreateScimToken}
                         disabled={scimCreating || !selectedProviderId}
-                        className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50"
+                        className="dashboard-button-primary px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50"
                       >
                         {scimCreating ? 'Creating...' : 'Create Token'}
                       </button>
                     </div>
                     {newScimToken && (
-                      <div className="bg-zinc-900 border border-zinc-700 rounded-md p-4">
-                        <p className="text-xs uppercase text-zinc-500 mb-2">New SCIM Token (shown once)</p>
-                        <p className="text-sm font-mono text-zinc-200 break-all">{newScimToken}</p>
+                      <div className="dashboard-panel-elevated rounded-md p-4">
+                        <p className="text-xs uppercase dashboard-text-subtle mb-2">New SCIM Token (shown once)</p>
+                        <p className="text-sm font-mono text-slate-900 break-all">{newScimToken}</p>
                       </div>
                     )}
                     {scimError && <p className="text-sm text-red-400">{scimError}</p>}
@@ -1224,9 +1136,9 @@ export default function SettingsClient({
               </div>
             )}
 
-            <div className="mt-6 overflow-hidden border border-zinc-800 rounded-lg">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-zinc-950 text-zinc-400">
+            <div className="mt-6 overflow-hidden border dashboard-border rounded-lg">
+              <table className="w-full text-left text-sm dashboard-table">
+                <thead className="border-b dashboard-border">
                   <tr>
                     <th className="px-4 py-3 font-medium">Token Hash</th>
                     <th className="px-4 py-3 font-medium">Provider</th>
@@ -1236,7 +1148,7 @@ export default function SettingsClient({
                     <th className="px-4 py-3 font-medium text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800">
+                <tbody className="divide-y divide-[var(--dash-border)]">
                   {initialScimTokens.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-4 py-6 text-center text-zinc-500">
@@ -1245,7 +1157,7 @@ export default function SettingsClient({
                     </tr>
                   ) : (
                     initialScimTokens.map((token) => (
-                      <tr key={token.id} className="hover:bg-zinc-800/30">
+                      <tr key={token.id} className="dashboard-row">
                         <td className="px-4 py-3 text-zinc-200 font-mono">
                           {token.token_hash.slice(0, 12)}...
                         </td>
@@ -1253,8 +1165,10 @@ export default function SettingsClient({
                         <td className="px-4 py-3 text-zinc-500">{formatDate(token.created_at)}</td>
                         <td className="px-4 py-3 text-zinc-500">{formatDate(token.last_used_at)}</td>
                         <td className="px-4 py-3">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                            token.revoked_at ? 'bg-zinc-800 text-zinc-300' : 'bg-emerald-900/30 text-emerald-300'
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${
+                            token.revoked_at
+                              ? 'bg-[var(--dash-surface-2)] text-slate-500 border-[var(--dash-border)]'
+                              : 'dashboard-accent-chip'
                           }`}>
                             {token.revoked_at ? 'Revoked' : 'Active'}
                           </span>
@@ -1280,10 +1194,10 @@ export default function SettingsClient({
         </div>
       ) : activeTab === 'access' && canViewAccessReviews ? (
         <div className="space-y-8">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm">
+          <div className="dashboard-panel rounded-xl p-6">
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-white mb-1">Access Review Cycles</h2>
+                <h2 className="text-xl font-semibold text-slate-900 mb-1">Access Review Cycles</h2>
                 <p className="text-zinc-400 text-sm">Create review cycles and track attestations.</p>
               </div>
               {!canManage && (
@@ -1292,7 +1206,7 @@ export default function SettingsClient({
             </div>
 
             {canManage && (
-              <form onSubmit={handleCreateAccessReview} className="mt-6 bg-zinc-950 border border-zinc-800 rounded-lg p-4 space-y-4">
+              <form onSubmit={handleCreateAccessReview} className="mt-6 dashboard-panel-muted rounded-lg p-4 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-zinc-400 mb-2">Period Start</label>
@@ -1300,7 +1214,7 @@ export default function SettingsClient({
                       type="date"
                       value={accessPeriodStart}
                       onChange={(e) => setAccessPeriodStart(e.target.value)}
-                      className="w-full bg-zinc-900 border border-zinc-700 rounded-md px-4 py-2 text-zinc-200"
+                      className="w-full rounded-md px-4 py-2 dashboard-input"
                     />
                   </div>
                   <div>
@@ -1309,7 +1223,7 @@ export default function SettingsClient({
                       type="date"
                       value={accessPeriodEnd}
                       onChange={(e) => setAccessPeriodEnd(e.target.value)}
-                      className="w-full bg-zinc-900 border border-zinc-700 rounded-md px-4 py-2 text-zinc-200"
+                      className="w-full rounded-md px-4 py-2 dashboard-input"
                     />
                   </div>
                 </div>
@@ -1318,19 +1232,19 @@ export default function SettingsClient({
                   <button
                     type="submit"
                     disabled={accessCreating}
-                    className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50"
+                    className="dashboard-button-primary px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50"
                   >
                     {accessCreating ? 'Creating...' : 'Create Cycle'}
                   </button>
                 </div>
                 {accessError && <p className="text-sm text-red-400">{accessError}</p>}
-                {accessSuccess && <p className="text-sm text-green-400">{accessSuccess}</p>}
+                {accessSuccess && <p className="text-sm dashboard-accent-text">{accessSuccess}</p>}
               </form>
             )}
 
-            <div className="mt-6 overflow-hidden border border-zinc-800 rounded-lg">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-zinc-950 text-zinc-400">
+            <div className="mt-6 overflow-hidden border dashboard-border rounded-lg">
+              <table className="w-full text-left text-sm dashboard-table">
+                <thead className="border-b dashboard-border">
                   <tr>
                     <th className="px-4 py-3 font-medium">Cycle</th>
                     <th className="px-4 py-3 font-medium">Status</th>
@@ -1339,7 +1253,7 @@ export default function SettingsClient({
                     <th className="px-4 py-3 font-medium">Reviewer</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800">
+                <tbody className="divide-y divide-[var(--dash-border)]">
                   {initialAccessReviewCycles.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="px-4 py-6 text-center text-zinc-500">
@@ -1348,7 +1262,7 @@ export default function SettingsClient({
                     </tr>
                   ) : (
                     initialAccessReviewCycles.map((cycle) => (
-                      <tr key={cycle.id} className="hover:bg-zinc-800/30">
+                      <tr key={cycle.id} className="dashboard-row">
                         <td className="px-4 py-3 text-zinc-200 font-mono">{shortId(cycle.id)}</td>
                         <td className="px-4 py-3 text-zinc-400">{cycle.status || 'pending'}</td>
                         <td className="px-4 py-3 text-zinc-500">
@@ -1366,16 +1280,16 @@ export default function SettingsClient({
             </div>
           </div>
 
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm">
+          <div className="dashboard-panel rounded-xl p-6">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <h3 className="text-lg font-semibold text-white mb-1">Attestations</h3>
+                <h3 className="text-lg font-semibold text-slate-900 mb-1">Attestations</h3>
                 <p className="text-zinc-400 text-sm">Read-only record of access review decisions.</p>
               </div>
             </div>
-            <div className="overflow-hidden border border-zinc-800 rounded-lg">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-zinc-950 text-zinc-400">
+            <div className="overflow-hidden border dashboard-border rounded-lg">
+              <table className="w-full text-left text-sm dashboard-table">
+                <thead className="border-b dashboard-border">
                   <tr>
                     <th className="px-4 py-3 font-medium">Cycle</th>
                     <th className="px-4 py-3 font-medium">User</th>
@@ -1384,7 +1298,7 @@ export default function SettingsClient({
                     <th className="px-4 py-3 font-medium">Reviewed</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800">
+                <tbody className="divide-y divide-[var(--dash-border)]">
                   {initialAccessReviewDecisions.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="px-4 py-6 text-center text-zinc-500">
@@ -1393,7 +1307,7 @@ export default function SettingsClient({
                     </tr>
                   ) : (
                     initialAccessReviewDecisions.map((decision) => (
-                      <tr key={decision.id} className="hover:bg-zinc-800/30">
+                      <tr key={decision.id} className="dashboard-row">
                         <td className="px-4 py-3 text-zinc-200 font-mono">{shortId(decision.cycle_id)}</td>
                         <td className="px-4 py-3 text-zinc-500">{shortId(decision.target_user_id)}</td>
                         <td className="px-4 py-3 text-zinc-400">{decision.decision || '-'}</td>
@@ -1409,16 +1323,16 @@ export default function SettingsClient({
         </div>
       ) : activeTab === 'ops' && canViewOps ? (
         <div className="space-y-8">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm">
+          <div className="dashboard-panel rounded-xl p-6">
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-white mb-1">SLA Summary</h2>
+                <h2 className="text-xl font-semibold text-slate-900 mb-1">SLA Summary</h2>
                 <p className="text-zinc-400 text-sm">Uptime calculated over the last 30 days.</p>
               </div>
               <button
                 onClick={handleRefreshSla}
                 disabled={slaRefreshing}
-                className="text-sm text-zinc-400 hover:text-white transition-colors"
+                className="text-sm dashboard-text-muted hover:text-[var(--dash-text)] transition-colors"
               >
                 {slaRefreshing ? 'Refreshing...' : 'Refresh'}
               </button>
@@ -1427,15 +1341,15 @@ export default function SettingsClient({
             {slaError && <p className="text-sm text-red-400 mt-4">{slaError}</p>}
             {slaSummary ? (
               <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4">
+                <div className="dashboard-panel-muted rounded-lg p-4">
                   <p className="text-xs uppercase text-zinc-500 mb-2">Uptime</p>
-                  <p className="text-2xl font-semibold text-white">{slaSummary.uptime_percent.toFixed(2)}%</p>
+                  <p className="text-2xl font-semibold text-slate-900">{slaSummary.uptime_percent.toFixed(2)}%</p>
                 </div>
-                <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4">
+                <div className="dashboard-panel-muted rounded-lg p-4">
                   <p className="text-xs uppercase text-zinc-500 mb-2">Downtime</p>
-                  <p className="text-2xl font-semibold text-white">{Math.round(slaSummary.downtime_seconds / 60)} min</p>
+                  <p className="text-2xl font-semibold text-slate-900">{Math.round(slaSummary.downtime_seconds / 60)} min</p>
                 </div>
-                <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4">
+                <div className="dashboard-panel-muted rounded-lg p-4">
                   <p className="text-xs uppercase text-zinc-500 mb-2">Window</p>
                   <p className="text-sm text-zinc-200">{new Date(slaSummary.window_start).toLocaleDateString()} → {new Date(slaSummary.window_end).toLocaleDateString()}</p>
                 </div>
@@ -1445,18 +1359,18 @@ export default function SettingsClient({
             )}
 
             {slaSummary?.policies?.length ? (
-              <div className="mt-6 overflow-hidden border border-zinc-800 rounded-lg">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-zinc-950 text-zinc-400">
+              <div className="mt-6 overflow-hidden border dashboard-border rounded-lg">
+                <table className="w-full text-left text-sm dashboard-table">
+                  <thead className="border-b dashboard-border">
                     <tr>
                       <th className="px-4 py-3 font-medium">Policy</th>
                       <th className="px-4 py-3 font-medium">Target</th>
                       <th className="px-4 py-3 font-medium">Created</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-800">
+                  <tbody className="divide-y divide-[var(--dash-border)]">
                     {slaSummary.policies.map((policy) => (
-                      <tr key={policy.id} className="hover:bg-zinc-800/30">
+                      <tr key={policy.id} className="dashboard-row">
                         <td className="px-4 py-3 text-zinc-200">{policy.name}</td>
                         <td className="px-4 py-3 text-zinc-400">{policy.target_availability ? `${policy.target_availability}%` : '-'}</td>
                         <td className="px-4 py-3 text-zinc-500">{formatDate(policy.created_at)}</td>
@@ -1468,17 +1382,17 @@ export default function SettingsClient({
             ) : null}
           </div>
 
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm">
+          <div className="dashboard-panel rounded-xl p-6">
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-white mb-1">DR Replication Status</h2>
+                <h2 className="text-xl font-semibold text-slate-900 mb-1">DR Replication Status</h2>
                 <p className="text-zinc-400 text-sm">Replication health by region.</p>
               </div>
               {canManage ? (
                 <button
                   onClick={loadReplicationStatus}
                   disabled={replicationLoading}
-                  className="text-sm text-zinc-400 hover:text-white transition-colors"
+                  className="text-sm dashboard-text-muted hover:text-[var(--dash-text)] transition-colors"
                 >
                   {replicationLoading ? 'Refreshing...' : 'Refresh'}
                 </button>
@@ -1494,21 +1408,21 @@ export default function SettingsClient({
             ) : replicationStatus ? (
               <div className="mt-6 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4">
+                  <div className="dashboard-panel-muted rounded-lg p-4">
                     <p className="text-xs uppercase text-zinc-500 mb-2">Overall Status</p>
                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${statusBadge(replicationStatus.summary.overall_status)}`}>
                       {replicationStatus.summary.overall_status || 'unknown'}
                     </span>
                   </div>
-                  <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4">
+                  <div className="dashboard-panel-muted rounded-lg p-4">
                     <p className="text-xs uppercase text-zinc-500 mb-2">Max Lag</p>
-                    <p className="text-2xl font-semibold text-white">
+                    <p className="text-2xl font-semibold text-slate-900">
                       {replicationStatus.summary.max_lag_seconds !== null
                         ? `${replicationStatus.summary.max_lag_seconds}s`
                         : 'n/a'}
                     </p>
                   </div>
-                  <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4">
+                  <div className="dashboard-panel-muted rounded-lg p-4">
                     <p className="text-xs uppercase text-zinc-500 mb-2">Last Update</p>
                     <p className="text-sm text-zinc-200">
                       {replicationStatus.summary.last_updated_at ? new Date(replicationStatus.summary.last_updated_at).toLocaleString() : 'n/a'}
@@ -1516,9 +1430,9 @@ export default function SettingsClient({
                   </div>
                 </div>
 
-                <div className="overflow-hidden border border-zinc-800 rounded-lg">
-                  <table className="w-full text-left text-sm">
-                    <thead className="bg-zinc-950 text-zinc-400">
+                <div className="overflow-hidden border dashboard-border rounded-lg">
+                  <table className="w-full text-left text-sm dashboard-table">
+                    <thead className="border-b dashboard-border">
                       <tr>
                         <th className="px-4 py-3 font-medium">Region</th>
                         <th className="px-4 py-3 font-medium">Mode</th>
@@ -1527,7 +1441,7 @@ export default function SettingsClient({
                         <th className="px-4 py-3 font-medium">Updated</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-zinc-800">
+                    <tbody className="divide-y divide-[var(--dash-border)]">
                       {replicationStatus.regions.length === 0 ? (
                         <tr>
                           <td colSpan={5} className="px-4 py-6 text-center text-zinc-500">
@@ -1536,7 +1450,7 @@ export default function SettingsClient({
                         </tr>
                       ) : (
                         replicationStatus.regions.map((region) => (
-                          <tr key={region.config_id} className="hover:bg-zinc-800/30">
+                          <tr key={region.config_id} className="dashboard-row">
                             <td className="px-4 py-3 text-zinc-200">{region.region}</td>
                             <td className="px-4 py-3 text-zinc-400">{region.mode}</td>
                             <td className="px-4 py-3">
@@ -1558,16 +1472,16 @@ export default function SettingsClient({
             )}
           </div>
 
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm">
+          <div className="dashboard-panel rounded-xl p-6">
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-white mb-1">Runbook Checks</h2>
+                <h2 className="text-xl font-semibold text-slate-900 mb-1">Runbook Checks</h2>
                 <p className="text-zinc-400 text-sm">Latest runbook checks for global and workspace scopes.</p>
               </div>
               <button
                 onClick={loadRunbookChecks}
                 disabled={runbookLoading}
-                className="text-sm text-zinc-400 hover:text-white transition-colors"
+                className="text-sm dashboard-text-muted hover:text-[var(--dash-text)] transition-colors"
               >
                 {runbookLoading ? 'Refreshing...' : 'Refresh'}
               </button>
@@ -1577,9 +1491,9 @@ export default function SettingsClient({
             {runbookLoading && runbookChecks.length === 0 ? (
               <p className="text-sm text-zinc-500 mt-4">Loading runbook checks...</p>
             ) : (
-              <div className="mt-6 overflow-hidden border border-zinc-800 rounded-lg">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-zinc-950 text-zinc-400">
+              <div className="mt-6 overflow-hidden border dashboard-border rounded-lg">
+                <table className="w-full text-left text-sm dashboard-table">
+                  <thead className="border-b dashboard-border">
                     <tr>
                       <th className="px-4 py-3 font-medium">Check</th>
                       <th className="px-4 py-3 font-medium">Scope</th>
@@ -1588,7 +1502,7 @@ export default function SettingsClient({
                       <th className="px-4 py-3 font-medium">Executed</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-800">
+                  <tbody className="divide-y divide-[var(--dash-border)]">
                     {runbookChecks.length === 0 ? (
                       <tr>
                         <td colSpan={5} className="px-4 py-6 text-center text-zinc-500">
@@ -1597,7 +1511,7 @@ export default function SettingsClient({
                       </tr>
                     ) : (
                       runbookChecks.map((check) => (
-                        <tr key={check.id} className="hover:bg-zinc-800/30">
+                        <tr key={check.id} className="dashboard-row">
                           <td className="px-4 py-3 text-zinc-200">{check.check_type}</td>
                           <td className="px-4 py-3 text-zinc-400">{check.workspace_id ? 'Workspace' : 'Global'}</td>
                           <td className="px-4 py-3">
@@ -1616,10 +1530,10 @@ export default function SettingsClient({
             )}
           </div>
 
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm">
+          <div className="dashboard-panel rounded-xl p-6">
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-white mb-1">Retention Automation</h2>
+                <h2 className="text-xl font-semibold text-slate-900 mb-1">Retention Automation</h2>
                 <p className="text-zinc-400 text-sm">Last retention run status per scope.</p>
               </div>
             </div>
@@ -1627,9 +1541,9 @@ export default function SettingsClient({
             {!canManage ? (
               <p className="text-sm text-zinc-500 mt-4">Retention automation status is available to owners and admins.</p>
             ) : (
-              <div className="mt-6 overflow-hidden border border-zinc-800 rounded-lg">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-zinc-950 text-zinc-400">
+              <div className="mt-6 overflow-hidden border dashboard-border rounded-lg">
+                <table className="w-full text-left text-sm dashboard-table">
+                  <thead className="border-b dashboard-border">
                     <tr>
                       <th className="px-4 py-3 font-medium">Scope</th>
                       <th className="px-4 py-3 font-medium">Last Run</th>
@@ -1637,7 +1551,7 @@ export default function SettingsClient({
                       <th className="px-4 py-3 font-medium">Errors</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-800">
+                  <tbody className="divide-y divide-[var(--dash-border)]">
                     {retentionScopes.length === 0 ? (
                       <tr>
                         <td colSpan={4} className="px-4 py-6 text-center text-zinc-500">
@@ -1651,7 +1565,7 @@ export default function SettingsClient({
                         const lastRun = execution?.executed_at || job?.completed_at || job?.started_at || job?.scheduled_at || null;
                         const status = job?.status || (execution ? 'completed' : 'unknown');
                         return (
-                          <tr key={scope} className="hover:bg-zinc-800/30">
+                          <tr key={scope} className="dashboard-row">
                             <td className="px-4 py-3 text-zinc-200">{scope}</td>
                             <td className="px-4 py-3 text-zinc-500">{formatDate(lastRun)}</td>
                             <td className="px-4 py-3">
@@ -1670,25 +1584,29 @@ export default function SettingsClient({
             )}
           </div>
 
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm">
+          <div className="dashboard-panel rounded-xl p-6">
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-white mb-1">Incidents</h2>
+                <h2 className="text-xl font-semibold text-slate-900 mb-1">Incidents</h2>
                 <p className="text-zinc-400 text-sm">View workspace and global incident reports.</p>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setIncludeGlobal(true)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    includeGlobal ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-400'
+                  className={`px-3 py-1 rounded-full text-xs font-medium border ${
+                    includeGlobal
+                      ? 'dashboard-accent-chip'
+                      : 'bg-[var(--dash-surface-2)] text-slate-500 border-[var(--dash-border)]'
                   }`}
                 >
                   Workspace + Global
                 </button>
                 <button
                   onClick={() => setIncludeGlobal(false)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    !includeGlobal ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-400'
+                  className={`px-3 py-1 rounded-full text-xs font-medium border ${
+                    !includeGlobal
+                      ? 'dashboard-accent-chip'
+                      : 'bg-[var(--dash-surface-2)] text-slate-500 border-[var(--dash-border)]'
                   }`}
                 >
                   Workspace Only
@@ -1700,9 +1618,9 @@ export default function SettingsClient({
             {incidentsLoading ? (
               <p className="text-sm text-zinc-500 mt-4">Loading incidents...</p>
             ) : (
-              <div className="mt-6 overflow-hidden border border-zinc-800 rounded-lg">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-zinc-950 text-zinc-400">
+              <div className="mt-6 overflow-hidden border dashboard-border rounded-lg">
+                <table className="w-full text-left text-sm dashboard-table">
+                  <thead className="border-b dashboard-border">
                     <tr>
                       <th className="px-4 py-3 font-medium">Title</th>
                       <th className="px-4 py-3 font-medium">Scope</th>
@@ -1712,7 +1630,7 @@ export default function SettingsClient({
                       <th className="px-4 py-3 font-medium">Resolved</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-800">
+                  <tbody className="divide-y divide-[var(--dash-border)]">
                     {incidents.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="px-4 py-6 text-center text-zinc-500">
@@ -1721,7 +1639,7 @@ export default function SettingsClient({
                       </tr>
                     ) : (
                       incidents.map((incident) => (
-                        <tr key={incident.id} className="hover:bg-zinc-800/30">
+                        <tr key={incident.id} className="dashboard-row">
                           <td className="px-4 py-3 text-zinc-200">{incident.title}</td>
                           <td className="px-4 py-3 text-zinc-400">{incident.workspace_id ? 'Workspace' : 'Global'}</td>
                           <td className="px-4 py-3 text-zinc-400">{incident.severity || '-'}</td>
@@ -1738,7 +1656,7 @@ export default function SettingsClient({
           </div>
         </div>
       ) : (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 text-zinc-400">
+        <div className="dashboard-panel rounded-xl p-6 dashboard-text-muted">
           Your role does not grant access to workspace settings.
         </div>
       )}

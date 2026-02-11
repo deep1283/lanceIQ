@@ -83,20 +83,20 @@ export default async function DashboardPage({
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   return (
-    <main className="min-h-screen bg-slate-50">
+    <main className="min-h-screen bg-transparent">
       <DashboardClient workspaceRole={workspaceRole} initialTab={initialTab}>
         {/* Stats */}
         <div className="flex items-center justify-between mb-6">
           <Link 
             href="/tool"
-            className="flex items-center gap-2 text-slate-600 hover:text-indigo-600 transition-colors text-sm font-medium"
+            className="flex items-center gap-2 dashboard-text-muted hover:text-[var(--dash-text)] transition-colors text-sm font-medium"
           >
             ← Back to Generator
           </Link>
           {limits.canExport && canExport && (
             <a
               href="/api/certificates/export"
-              className="flex items-center gap-2 text-slate-600 hover:text-indigo-600 transition-colors text-sm font-medium"
+              className="flex items-center gap-2 dashboard-text-muted hover:text-[var(--dash-text)] transition-colors text-sm font-medium"
             >
               <Download className="w-4 h-4" />
               Export CSV
@@ -105,34 +105,34 @@ export default async function DashboardPage({
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-8">
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-            <p className="text-sm text-slate-500">Total Certificates</p>
-            <p className="text-2xl font-bold text-slate-900">{totalCount}</p>
+          <div className="dashboard-panel rounded-xl p-6">
+            <p className="text-sm dashboard-text-muted">Total Certificates</p>
+            <p className="text-2xl font-semibold text-slate-900">{totalCount}</p>
           </div>
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-            <p className="text-sm text-slate-500">This Month</p>
-            <p className="text-2xl font-bold text-slate-900">{thisMonthCount}</p>
+          <div className="dashboard-panel rounded-xl p-6">
+            <p className="text-sm dashboard-text-muted">This Month</p>
+            <p className="text-2xl font-semibold text-slate-900">{thisMonthCount}</p>
           </div>
         </div>
 
         {/* Certificates List */}
         {!certificates || certificates.length === 0 ? (
-          <div className="bg-white rounded-xl p-12 border border-slate-200 text-center">
-            <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+          <div className="dashboard-panel rounded-xl p-12 text-center">
+            <FileText className="w-12 h-12 text-slate-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-slate-900 mb-2">No certificates yet</h3>
-            <p className="text-slate-500 mb-6">Generate your first webhook certificate to see it here.</p>
+            <p className="dashboard-text-muted mb-6">Generate your first webhook certificate to see it here.</p>
             <Link
               href="/tool"
-              className="inline-flex items-center gap-2 bg-black hover:bg-zinc-800 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+              className="inline-flex items-center gap-2 dashboard-button-primary px-6 py-3 rounded-lg font-medium transition-colors"
             >
               <Plus className="w-4 h-4" />
               Generate Certificate
             </Link>
           </div>
         ) : (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-slate-50 border-b border-slate-200">
+          <div className="dashboard-panel rounded-xl overflow-hidden">
+            <table className="w-full dashboard-table">
+              <thead className="border-b dashboard-border">
                 <tr>
                   <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     Report ID
@@ -151,9 +151,9 @@ export default async function DashboardPage({
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-[var(--dash-border)]">
                 {certificates.map((cert) => (
-                  <tr key={cert.id} className="hover:bg-slate-50 transition-colors">
+                  <tr key={cert.id} className="dashboard-row">
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
                         <FileText className="w-4 h-4 text-slate-400" />
@@ -163,26 +163,26 @@ export default async function DashboardPage({
                       </div>
                     </td>
                     <td className="py-3 px-4 hidden sm:table-cell">
-                      <div className="flex items-center gap-2 text-sm text-slate-500">
+                      <div className="flex items-center gap-2 text-sm dashboard-text-muted">
                         <Calendar className="w-3 h-3" />
                         {new Date(cert.created_at).toLocaleDateString()}
                       </div>
                     </td>
                     <td className="py-3 px-4">
                         {cert.signature_status === 'verified' && (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-violet-50 text-violet-700 text-xs font-medium rounded-full border border-violet-200" title={`Verified with ${cert.verification_method}`}>
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 dashboard-accent-chip text-xs font-medium rounded-full" title={`Verified with ${cert.verification_method}`}>
                                 <ShieldCheck className="w-3 h-3" />
                                 Verified
                             </span>
                         )}
                         {cert.signature_status === 'failed' && (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-50 text-red-700 text-xs font-medium rounded-full border border-red-200" title={cert.verification_error || 'Verification Failed'}>
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-500/10 text-red-400 text-xs font-medium rounded-full border border-red-500/20" title={cert.verification_error || 'Verification Failed'}>
                                 <ShieldAlert className="w-3 h-3" />
                                 Failed
                             </span>
                         )}
                         {(cert.signature_status === 'not_verified' || !cert.signature_status) && (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-600 text-xs font-medium rounded-full border border-slate-200" title="No signature verification performed">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 dashboard-chip text-xs font-medium rounded-full" title="No signature verification performed">
                                 <AlertTriangle className="w-3 h-3 text-slate-400" />
                                 Unverified
                             </span>
@@ -190,12 +190,12 @@ export default async function DashboardPage({
                     </td>
                     <td className="py-3 px-4">
                       {cert.is_pro ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-violet-50 text-violet-700 text-xs font-medium rounded-full border border-violet-100">
+                        <span className="inline-flex items-center gap-1 px-2 py-1 dashboard-accent-chip text-xs font-medium rounded-full">
                           <CheckCircle className="w-3 h-3" />
                           Pro
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-slate-50 text-slate-600 text-xs font-medium rounded-full border border-slate-200">
+                        <span className="inline-flex items-center gap-1 px-2 py-1 dashboard-chip text-xs font-medium rounded-full">
                           Free
                         </span>
                       )}
@@ -204,7 +204,7 @@ export default async function DashboardPage({
                       <div className="inline-flex items-center gap-3">
                         <Link
                           href={`/tool?id=${cert.report_id}`}
-                          className="inline-flex items-center gap-1 text-slate-600 hover:text-indigo-600 text-sm font-medium transition-colors"
+                          className="inline-flex items-center gap-1 dashboard-text-muted hover:text-[var(--dash-text)] text-sm font-medium transition-colors"
                         >
                           <ExternalLink className="w-3 h-3" />
                           Open
@@ -212,7 +212,7 @@ export default async function DashboardPage({
                         {canExport && (
                           <a
                             href={`/tool?id=${cert.report_id}&download=1`}
-                            className="inline-flex items-center gap-1 text-slate-600 hover:text-indigo-600 text-sm font-medium transition-colors"
+                            className="inline-flex items-center gap-1 dashboard-text-muted hover:text-[var(--dash-text)] text-sm font-medium transition-colors"
                           >
                             <Download className="w-3 h-3" />
                             PDF
@@ -227,38 +227,38 @@ export default async function DashboardPage({
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200 bg-slate-50">
-                <p className="text-sm text-slate-500">
+              <div className="flex items-center justify-between px-4 py-3 border-t dashboard-border bg-[var(--dash-surface-2)]">
+                <p className="text-sm dashboard-text-muted">
                   Showing {offset + 1}–{Math.min(offset + PAGE_SIZE, totalCount)} of {totalCount}
                 </p>
                 <div className="flex items-center gap-2">
                   {page > 1 ? (
                     <Link
                       href={`/dashboard?page=${page - 1}`}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-slate-600 hover:text-indigo-600 bg-white border border-slate-200 rounded-lg transition-colors"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium dashboard-button-secondary rounded-lg transition-colors"
                     >
                       <ChevronLeft className="w-4 h-4" />
                       Prev
                     </Link>
                   ) : (
-                    <span className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-slate-300 bg-white border border-slate-100 rounded-lg cursor-not-allowed">
+                    <span className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-slate-400 bg-[var(--dash-surface)] border dashboard-border rounded-lg cursor-not-allowed">
                       <ChevronLeft className="w-4 h-4" />
                       Prev
                     </span>
                   )}
-                  <span className="text-sm text-slate-500">
+                  <span className="text-sm dashboard-text-muted">
                     Page {page} of {totalPages}
                   </span>
                   {page < totalPages ? (
                     <Link
                       href={`/dashboard?page=${page + 1}`}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-slate-600 hover:text-indigo-600 bg-white border border-slate-200 rounded-lg transition-colors"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium dashboard-button-secondary rounded-lg transition-colors"
                     >
                       Next
                       <ChevronRight className="w-4 h-4" />
                     </Link>
                   ) : (
-                    <span className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-slate-300 bg-white border border-slate-100 rounded-lg cursor-not-allowed">
+                    <span className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-slate-400 bg-[var(--dash-surface)] border dashboard-border rounded-lg cursor-not-allowed">
                       Next
                       <ChevronRight className="w-4 h-4" />
                     </span>

@@ -16,9 +16,9 @@ const DashboardNavbar: React.FC = () => {
   };
 
   return (
-    <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-6 shadow-sm mb-6">
+    <header className="sticky top-0 z-30 h-16 flex items-center justify-between px-6 border-b dashboard-border bg-[var(--dash-surface)] mb-8">
       <div className="flex items-center gap-6">
-        <Link href="/" className="font-bold text-xl text-slate-900 tracking-tight">
+        <Link href="/" className="font-semibold text-lg tracking-tight text-slate-900">
           LanceIQ
         </Link>
       </div>
@@ -26,13 +26,13 @@ const DashboardNavbar: React.FC = () => {
       <div className="flex items-center gap-4">
         <Link
           href="/dashboard/settings"
-          className="text-slate-600 hover:text-slate-900 transition-colors text-sm font-medium"
+          className="text-sm font-medium dashboard-text-muted hover:text-[var(--dash-text)] transition-colors"
         >
           Settings
         </Link>
         <button
           onClick={handleLogout}
-          className="flex items-center gap-2 text-slate-600 hover:text-red-600 transition-colors text-sm font-medium"
+          className="flex items-center gap-2 text-sm font-medium dashboard-text-muted hover:text-red-500 transition-colors"
         >
           <LogOut className="w-4 h-4" />
           Sign Out

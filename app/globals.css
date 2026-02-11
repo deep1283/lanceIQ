@@ -137,114 +137,244 @@ body {
 
 /* Dashboard-only theme overrides */
 .dashboard-theme {
-  background-color: #fafaf9;
-  color: #1f2937;
+  --dash-bg: #f5f7f9;
+  --dash-surface: #ffffff;
+  --dash-surface-2: #f1f5f9;
+  --dash-surface-3: #e7edf2;
+  --dash-border: #e2e8f0;
+  --dash-border-strong: #d4dbe5;
+  --dash-text: #0f172a;
+  --dash-muted: #64748b;
+  --dash-muted-2: #94a3b8;
+  --dash-accent: #7c3aed;
+  --dash-accent-foreground: #f8fafc;
+  --dash-accent-soft: rgba(124, 58, 237, 0.16);
+  --dash-accent-border: rgba(124, 58, 237, 0.35);
+  --dash-danger: #ef4444;
+  --dash-warning: #f59e0b;
+  --dash-success: #22c55e;
+  --dash-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 6px 16px rgba(15, 23, 42, 0.06);
+
+  --background: var(--dash-bg);
+  --foreground: var(--dash-text);
+  --card: var(--dash-surface);
+  --card-foreground: var(--dash-text);
+  --popover: var(--dash-surface);
+  --popover-foreground: var(--dash-text);
+  --primary: var(--dash-accent);
+  --primary-foreground: var(--dash-accent-foreground);
+  --secondary: var(--dash-surface-2);
+  --secondary-foreground: var(--dash-text);
+  --muted: var(--dash-surface-2);
+  --muted-foreground: var(--dash-muted);
+  --accent: var(--dash-accent-soft);
+  --accent-foreground: var(--dash-text);
+  --destructive: var(--dash-danger);
+  --border: var(--dash-border);
+  --input: var(--dash-border);
+  --ring: var(--dash-accent);
+  --sidebar: var(--dash-surface);
+  --sidebar-foreground: var(--dash-text);
+  --sidebar-accent: var(--dash-surface-2);
+  --sidebar-accent-foreground: var(--dash-text);
+  --sidebar-border: var(--dash-border);
+  --sidebar-ring: var(--dash-accent);
+
+  background-color: var(--dash-bg);
+  color: var(--dash-text);
+}
+
+.dashboard-theme.dashboard-dark {
+  --dash-bg: #0b0f13;
+  --dash-surface: #10161c;
+  --dash-surface-2: #151c24;
+  --dash-surface-3: #1b232d;
+  --dash-border: #1f2a37;
+  --dash-border-strong: #2a3646;
+  --dash-text: #e5eef8;
+  --dash-muted: #94a3b8;
+  --dash-muted-2: #6b7280;
+  --dash-accent: #a78bfa;
+  --dash-accent-foreground: #0b0f13;
+  --dash-accent-soft: rgba(167, 139, 250, 0.18);
+  --dash-accent-border: rgba(167, 139, 250, 0.35);
+  --dash-danger: #f87171;
+  --dash-warning: #fbbf24;
+  --dash-success: #34d399;
+  --dash-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 16px 32px rgba(0, 0, 0, 0.35);
+
+  background-color: var(--dash-bg);
+  color: var(--dash-text);
+}
+
+.dashboard-panel {
+  background-color: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  box-shadow: var(--dash-shadow);
+}
+
+.dashboard-panel-muted {
+  background-color: var(--dash-surface-2);
+  border: 1px solid var(--dash-border);
+}
+
+.dashboard-panel-elevated {
+  background-color: var(--dash-surface-3);
+  border: 1px solid var(--dash-border-strong);
+}
+
+.dashboard-border {
+  border-color: var(--dash-border);
+}
+
+.dashboard-border-strong {
+  border-color: var(--dash-border-strong);
+}
+
+.dashboard-text-muted {
+  color: var(--dash-muted);
+}
+
+.dashboard-text-subtle {
+  color: var(--dash-muted-2);
+}
+
+.dashboard-button-primary {
+  background: var(--dash-accent);
+  color: var(--dash-accent-foreground) !important;
+  border: 1px solid transparent;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.04);
+}
+
+.dashboard-button-primary:hover {
+  filter: brightness(1.05);
+}
+
+.dashboard-button-secondary {
+  background: var(--dash-surface-2);
+  color: var(--dash-text);
+  border: 1px solid var(--dash-border);
+}
+
+.dashboard-button-secondary:hover {
+  background: var(--dash-surface-3);
+}
+
+.dashboard-button-ghost {
+  color: var(--dash-muted);
+}
+
+.dashboard-button-ghost:hover {
+  background: var(--dash-surface-2);
+  color: var(--dash-text);
+}
+
+.dashboard-accent-chip {
+  background: var(--dash-accent-soft);
+  color: var(--dash-accent);
+  border: 1px solid var(--dash-accent-border);
+}
+
+.dashboard-accent-text {
+  color: var(--dash-accent);
+}
+
+.dashboard-accent-border {
+  border-color: var(--dash-accent-border);
+}
+
+.dashboard-accent-soft {
+  background: var(--dash-accent-soft);
+}
+
+.dashboard-focus-ring {
+  outline: none;
+}
+
+.dashboard-focus-ring:focus-visible {
+  box-shadow: 0 0 0 3px var(--dash-accent-soft);
+}
+
+.dashboard-input,
+.dashboard-select,
+.dashboard-textarea {
+  background: var(--dash-surface-2);
+  color: var(--dash-text);
+  border: 1px solid var(--dash-border);
+}
+
+.dashboard-input:focus,
+.dashboard-select:focus,
+.dashboard-textarea:focus {
+  border-color: var(--dash-accent);
+  box-shadow: 0 0 0 3px var(--dash-accent-soft);
+  outline: none;
+}
+
+.dashboard-table thead {
+  background: var(--dash-surface-2);
+  color: var(--dash-muted);
+}
+
+.dashboard-row {
+  transition: background-color 150ms ease;
+}
+
+.dashboard-row:hover {
+  background-color: var(--dash-surface-2);
+}
+
+.dashboard-chip {
+  background: var(--dash-surface-2);
+  border: 1px solid var(--dash-border);
+  color: var(--dash-muted);
 }
 
 .dashboard-theme .bg-zinc-950,
 .dashboard-theme .bg-zinc-900 {
-  background-color: #ffffff !important;
+  background-color: var(--dash-surface) !important;
 }
 
 .dashboard-theme .bg-zinc-800 {
-  background-color: #f3f4f6 !important;
+  background-color: var(--dash-surface-2) !important;
 }
 
-.dashboard-theme .border-zinc-800 {
-  border-color: #e5e7eb !important;
+.dashboard-theme .bg-slate-50,
+.dashboard-theme .bg-slate-100 {
+  background-color: var(--dash-surface-2) !important;
 }
 
-.dashboard-theme .border-zinc-900 {
-  border-color: #e5e7eb !important;
+.dashboard-theme .border-zinc-800,
+.dashboard-theme .border-zinc-900,
+.dashboard-theme .border-slate-200,
+.dashboard-theme .border-slate-100 {
+  border-color: var(--dash-border) !important;
+}
+
+.dashboard-theme .text-zinc-200,
+.dashboard-theme .text-zinc-300,
+.dashboard-theme .text-slate-900,
+.dashboard-theme .text-slate-800 {
+  color: var(--dash-text) !important;
+}
+
+.dashboard-theme .text-zinc-400,
+.dashboard-theme .text-zinc-500,
+.dashboard-theme .text-slate-600,
+.dashboard-theme .text-slate-500,
+.dashboard-theme .text-slate-400 {
+  color: var(--dash-muted) !important;
 }
 
 .dashboard-theme .text-white {
-  color: #111827 !important;
+  color: var(--dash-text) !important;
+}
+
+.dashboard-theme .bg-white {
+  background-color: var(--dash-surface) !important;
 }
 
 .dashboard-theme .bg-black.text-white,
 .dashboard-theme a.bg-black {
-  color: #ffffff !important;
-}
-
-.dashboard-theme .text-zinc-200,
-.dashboard-theme .text-zinc-300 {
-  color: #374151 !important;
-}
-
-.dashboard-theme .text-zinc-400,
-.dashboard-theme .text-zinc-500 {
-  color: #6b7280 !important;
-}
-
-.dashboard-theme.dashboard-dark {
-  background-color: #121212;
-  color: #e5e7eb;
-}
-
-.dashboard-theme.dashboard-dark .bg-zinc-950 {
-  background-color: #121212 !important;
-}
-
-.dashboard-theme.dashboard-dark .bg-zinc-900 {
-  background-color: #1b1b1b !important;
-}
-
-.dashboard-theme.dashboard-dark .bg-zinc-800 {
-  background-color: #242424 !important;
-}
-
-.dashboard-theme.dashboard-dark .bg-slate-900,
-.dashboard-theme.dashboard-dark .bg-slate-800 {
-  background-color: #1a1a1a !important;
-}
-
-.dashboard-theme.dashboard-dark .bg-white {
-  background-color: #1f1f1f !important;
-}
-
-.dashboard-theme.dashboard-dark .bg-slate-50 {
-  background-color: #202020 !important;
-}
-
-.dashboard-theme.dashboard-dark .bg-slate-100 {
-  background-color: #262626 !important;
-}
-
-.dashboard-theme.dashboard-dark .border-slate-200,
-.dashboard-theme.dashboard-dark .border-slate-100,
-.dashboard-theme.dashboard-dark .border-zinc-800 {
-  border-color: #2a2a2a !important;
-}
-
-.dashboard-theme.dashboard-dark .border-zinc-900 {
-  border-color: #2a2a2a !important;
-}
-
-.dashboard-theme.dashboard-dark .text-white {
-  color: #f9fafb !important;
-}
-
-.dashboard-theme.dashboard-dark .text-zinc-200,
-.dashboard-theme.dashboard-dark .text-zinc-300 {
-  color: #e5e7eb !important;
-}
-
-.dashboard-theme.dashboard-dark .text-zinc-400,
-.dashboard-theme.dashboard-dark .text-zinc-500 {
-  color: #9ca3af !important;
-}
-
-.dashboard-theme.dashboard-dark .text-slate-900 {
-  color: #f3f4f6 !important;
-}
-
-.dashboard-theme.dashboard-dark .text-slate-700,
-.dashboard-theme.dashboard-dark .text-slate-600 {
-  color: #d1d5db !important;
-}
-
-.dashboard-theme.dashboard-dark .text-slate-500,
-.dashboard-theme.dashboard-dark .text-slate-400 {
-  color: #9ca3af !important;
+  color: var(--dash-accent-foreground) !important;
 }

@@ -35,11 +35,11 @@ export default async function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950">
+    <div className="min-h-screen bg-transparent">
       <div className="max-w-4xl mx-auto px-6 pt-6">
         <Link
           href="/dashboard"
-          className="inline-flex items-center text-sm text-zinc-400 hover:text-white transition-colors"
+          className="inline-flex items-center text-sm dashboard-text-muted hover:text-[var(--dash-text)] transition-colors"
         >
           ← Back to Dashboard
         </Link>
