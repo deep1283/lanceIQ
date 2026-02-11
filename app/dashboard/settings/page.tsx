@@ -92,6 +92,29 @@ type SlaSummary = {
   policies: SlaPolicy[];
 };
 
+type RetentionJob = {
+  id: string;
+  workspace_id: string;
+  scope: string;
+  scheduled_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  status: string | null;
+  error_summary: string | null;
+  created_at: string;
+};
+
+type RetentionExecution = {
+  id: string;
+  job_id: string | null;
+  workspace_id: string;
+  scope: string;
+  rows_pruned: number;
+  rows_blocked_by_hold: number;
+  proof_hash: string | null;
+  executed_at: string;
+};
+
 export default async function SettingsPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -243,6 +266,26 @@ export default async function SettingsPage() {
     policies: (slaPolicies || []) as SlaPolicy[],
   };
 
+  let retentionJobs: RetentionJob[] = [];
+  let retentionExecutions: RetentionExecution[] = [];
+  if (canManage) {
+    const { data: jobsData } = await supabase
+      .from('retention_jobs')
+      .select('*')
+      .eq('workspace_id', workspace.id)
+      .order('scheduled_at', { ascending: false })
+      .limit(50);
+    retentionJobs = jobsData || [];
+
+    const { data: executionData } = await supabase
+      .from('retention_executions')
+      .select('*')
+      .eq('workspace_id', workspace.id)
+      .order('executed_at', { ascending: false })
+      .limit(50);
+    retentionExecutions = executionData || [];
+  }
+
   return (
     <SettingsClient 
       workspace={workspace} 
@@ -258,6 +301,8 @@ export default async function SettingsPage() {
       initialKeyRotations={keyRotations}
       initialIncidents={initialIncidents}
       initialSlaSummary={initialSlaSummary}
+      initialRetentionJobs={retentionJobs}
+      initialRetentionExecutions={retentionExecutions}
     />
   );
 }

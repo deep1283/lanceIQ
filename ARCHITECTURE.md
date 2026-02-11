@@ -51,9 +51,9 @@ Webhook Provider
 5. Corrections are implemented as new records with linkage, never in-place edits.
 
 ## Time Credibility Plan
-1. Current: timestamps reflect LanceIQ system time.
-2. Near-term: append-only event log anchoring at regular intervals.
-3. Enterprise: RFC-3161 timestamp authority or equivalent external anchoring.
+1. Current: RFC-3161 timestamp authority anchoring on ingest (best-effort).
+2. Near-term: scheduled anchoring with retries and monitoring.
+3. Enterprise: external attestations and published anchoring policy.
 
 ## Security and Access Control
 1. RLS enforced for all workspace-scoped data.
@@ -62,11 +62,13 @@ Webhook Provider
 4. Audit logs are immutable and restricted to owners and admins.
 
 ## Role Model
-1. Current roles: owner, admin, member.
+1. Current roles: owner, admin, member, viewer, exporter, legal_hold_manager.
 2. Owners can manage workspace settings, members, and audit visibility.
 3. Admins can manage operational settings but cannot delete the workspace.
 4. Members have read access to evidence scoped by workspace.
-5. Planned roles: viewer, exporter, legal-hold manager, each with explicit policy gates.
+5. Viewer: read-only access to evidence.
+6. Exporter: read-only + export access.
+7. legal_hold_manager: can create holds; only owner/admin can deactivate.
 
 ## Storage Strategy
 1. Postgres is the system of record for evidence and metadata.
@@ -76,7 +78,7 @@ Webhook Provider
 ## Scalability Assumptions
 1. Initial target: 1 to 10 million events per month.
 2. Retention target: 1 to 3 years for business, 3 to 7 years for enterprise.
-3. Single-region in early stages with a path to multi-region replication.
+3. Single-region with DR/replication status; multi-region failover planned.
 
 ## Out of Scope
 1. Proving that the provider sent the webhook.

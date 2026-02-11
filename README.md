@@ -31,6 +31,13 @@ Before making changes, read:
 - ⚡ **Fast & Simple** — No complex setup, works immediately
 - 🎨 **Professional Design** — Clean, audit-ready document format
 
+## Enterprise Features
+
+- 🔐 **SSO + SCIM** — Okta/Azure AD ready, automated provisioning
+- 🧾 **RFC‑3161 Timestamp Proofs** — Evidence anchoring for time credibility
+- 📊 **SLA + Incident Tracking** — Workspace and global incident visibility
+- 🔎 **Access Reviews** — Cycles and attestations with audit logs
+
 ## Quick Start
 
 ### Hosted Version (Easiest)
@@ -56,28 +63,7 @@ Visit [lanceiq.com](https://lanceiq.com) — no setup required.
    ```
 
 4. **Set up Supabase** (for auth & storage)
-   ```sql
-   -- Run in Supabase SQL Editor
-   create table public.certificates (
-     id uuid default gen_random_uuid() primary key,
-     user_id uuid references auth.users(id) not null,
-     created_at timestamptz default now(),
-     report_id text not null,
-     payload jsonb,
-     headers jsonb,
-     hash text,
-    payload_hash text,
-    is_pro boolean default false
-   );
-
-   alter table public.certificates enable row level security;
-
-   create policy "Users can view own certificates"
-     on public.certificates for select using (auth.uid() = user_id);
-
-   create policy "Users can insert own certificates"
-     on public.certificates for insert with check (auth.uid() = user_id);
-   ```
+   Run the migrations in `/Users/deepmishra/vscode/LanceIQ/supabase/migrations` in order.
 
 5. **Run locally**
    ```bash
@@ -111,6 +97,9 @@ Visit [lanceiq.com](https://lanceiq.com) — no setup required.
 | `RESEND_API_KEY` | No (Phase 4 alerts) | Resend API key for email alerts |
 | `RESEND_FROM_EMAIL` | No | Alert sender address (default: onboarding@resend.dev) |
 | `SITE_URL` | No | Base URL used in alert links |
+| `TSA_URL` | No | RFC‑3161 Timestamp Authority URL |
+| `TSA_AUTH_HEADER` | No | RFC‑3161 auth header value |
+| `TSA_TIMEOUT_MS` | No | RFC‑3161 request timeout in ms |
 
 ## Raw Body Retention Cleanup
 

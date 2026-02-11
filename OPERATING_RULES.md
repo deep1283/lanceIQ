@@ -11,6 +11,7 @@ Before making changes, every chat must read:
 4. CONTRACTS.md
 5. DECISIONS.md
 6. STATUS.md
+7. OPERATING_RULES.md
 
 ## Evidence Discipline
 1. Never claim behavior unless it is verified in code or a doc.

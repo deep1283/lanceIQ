@@ -1,6 +1,6 @@
 # LanceIQ Status
 
-Last updated: 2026-02-07
+Last updated: 2026-02-10
 Owner: Product Owner (You)
 
 ## Current State
@@ -46,27 +46,33 @@ Owner: Product Owner (You)
 35. V4 DB: SSO/SCIM identity mappings, access reviews, SLA/incidents, key rotation, retention policies, and RLS.
 36. V4 Frontend: SSO/SCIM, SLA/Incidents, Access Reviews, and Key Rotation UI shipped.
 37. V4 Frontend: retention placeholders removed in certificate and verification views.
+38. V5 Backend: batch ingest processed/failed counts updated idempotently.
+39. V5 DB: retention/legal hold enforcement, DR replication status, runbook checks, and batch ingest counters.
+40. V5 Backend: replication status API, runbook checks API, retention runner endpoint.
+41. V5 Frontend: DR replication status, runbook checks, and retention automation UI.
+42. Provider expansion: Lemon Squeezy added (verification + provider selection).
 
 ## In Progress
 1. None active (ready to start next phase).
 
-## Next Up (V1 to V2)
-1. Expand verification support for additional providers (PayPal/JWS).
-2. Add ingest request size limits and structured error codes.
+## Next Up (V6 Provider Expansion)
+1. Add low-effort providers (Paddle).
+2. Add enterprise providers (PayPal/JWS, Adyen) as a second wave.
+3. Wire non-email access review notifications (Slack/webhook) after config is defined.
 
-## Enterprise Roadmap (V3)
-1. Time credibility: external anchoring or RFC-3161 timestamping.
-2. Stronger role model: viewer, exporter, legal-hold manager.
-3. Compliance package: SOC2 controls mapping, DPA, SLA templates.
+## Enterprise Roadmap (Post-V5)
+1. External audit/attestation (SOC2 Type II).
+2. Multi-region DR drills with published RTO/RPO.
+3. Provider verification expansion.
 
 ## Risks / Gaps
-1. No external timestamp anchoring yet.
-2. No legal hold implementation yet.
-3. Retention visibility not yet surfaced in UI/exports.
+1. External audit/attestation not completed yet.
+2. Provider verification limited to Stripe and Razorpay.
+3. Non-email access review notifications not wired yet.
 
 ## Readiness
 1. V1: Complete.
 2. V2: Complete.
 3. V3: Complete.
 4. V4: Complete.
-5. V5: Planned.
+5. V5: Complete.

@@ -27,11 +27,6 @@ Decision: Start with system timestamps and move toward external anchoring or RFC
 Why: Enterprise trust requires credible timestamps.
 Alternatives rejected: Relying solely on internal timestamps for enterprise tier.
 
-## 2026-02-07: Ingest Response Contract Alignment
-Decision: Ensure ingest endpoints return `id` and correct status codes per CONTRACTS.md.
-Why: Contract compliance and reliable client parsing.
-Backward compatibility: Responses still include `status` and `verified`; clients must accept 200 or 202.
-Alternatives rejected: Leaving inconsistent responses and undocumented behavior.
 
 ## 2026-02-07: Legal Hold Semantics (V2)
 Decision: Legal holds are workspace-scoped, auditable, and block retention pruning while active.
@@ -105,6 +100,12 @@ Why: Reduces customer downtime during key propagation.
 Backward compatibility: Additive; existing keys behavior unchanged.
 Alternatives rejected: Immediate revocation.
 
+## 2026-02-10: Batch Ingest + Workspace Counters (V5)
+Decision: Use ingest_batches metadata and workspace_ingest_counters for scalable ingest/quota enforcement.
+Why: COUNT(*) on ingested_events does not scale; counters and batch metadata provide predictable performance and operational visibility.
+Backward compatibility: Existing single-event ingest remains supported; batch fields are optional and additive; counters are derived from inserts.
+Alternatives rejected: Per-request COUNT(*) and no batch tracking due to performance risk at enterprise scale.
+
 ## 2026-02-08: Strict Evidence Immutability with Retention Exception
 Decision: Enforce database-level immutability on ingested evidence with a narrow retention exception for raw bodies.
 Why: Evidence integrity is paramount; updates to evidence fields are prohibited to preserve auditability and legal posture.
@@ -112,7 +113,8 @@ Exception: raw_body may be set to NULL only after raw_body_expires_at has passed
 Backward compatibility: Existing rows become immutable. Retention workflows must prune raw_body via UPDATE raw_body = NULL (not delete) when permitted; full deletes are allowed only when retention policy permits and no legal hold exists.
 Alternatives rejected: Allowing in-place updates to evidence fields or soft-deletes, which weaken immutability guarantees.
 
-## 2026-02-08: Align ingest responses with API contract
-Decision: Update /api/ingest and /api/ingest/[apiKey] responses to include id and follow contract status codes (202 for queued, 200 for duplicate). Also align plan quota gating between both endpoints.
-Why: Current responses omit required fields and use inconsistent status codes, which breaks the published contract and weakens enterprise integration reliability.
-Backward-compatibility: Response bodies remain additive (status, id, and existing verified fields preserved). Clients treating any 2xx as success remain compatible; 202 indicates queued while 200 remains used for duplicates.
+## 2026-02-07: Align Ingest Responses with API Contract
+Decision: Ensure ingest endpoints return `id` and correct status codes per CONTRACTS.md (202 for queued, 200 for duplicate). Align plan quota gating between both endpoints.
+Why: Current responses omitted required fields and used inconsistent status codes, breaking the published contract and weakening enterprise integration reliability.
+Backward compatibility: Response bodies remain additive (status, id, and existing verified fields preserved). Clients treating any 2xx as success remain compatible.
+Alternatives rejected: Leaving inconsistent responses and undocumented behavior.

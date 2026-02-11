@@ -20,7 +20,7 @@ export async function createWorkspace(data: {
   if (name.length > 120) {
     return { error: 'Workspace name must be 120 characters or fewer.' };
   }
-  const allowedProviders = new Set(['stripe', 'razorpay', 'generic']);
+  const allowedProviders = new Set(['stripe', 'razorpay', 'lemon_squeezy', 'generic']);
   if (!allowedProviders.has(data.provider)) {
     return { error: 'Unsupported provider.' };
   }

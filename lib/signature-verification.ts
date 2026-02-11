@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 
-export type Provider = 'stripe' | 'razorpay' | 'paypal' | 'unknown';
+export type Provider = 'stripe' | 'razorpay' | 'lemon_squeezy' | 'paypal' | 'unknown';
 
 export type StatusReason = 
   | 'missing_header' 
@@ -62,6 +62,8 @@ export function verifySignature(
       return verifyStripeSignature(rawBody, normalizedHeaders, secret, secretHint);
     case 'razorpay':
       return verifyRazorpaySignature(rawBody, normalizedHeaders, secret, secretHint);
+    case 'lemon_squeezy':
+      return verifyLemonSqueezySignature(rawBody, normalizedHeaders, secret, secretHint);
     case 'paypal':
       // Phase 1: Not supported (requires server-to-server API calls)
       return { 
@@ -221,6 +223,51 @@ export function verifyRazorpaySignature(
 }
 
 /**
+ * Verify Lemon Squeezy webhook signature (HMAC-SHA256)
+ * Format: X-Signature: signature_hash (hex)
+ * Docs: https://docs.lemonsqueezy.com/help/webhooks/signing-requests
+ */
+export function verifyLemonSqueezySignature(
+  rawBody: string,
+  headers: Record<string, string>,
+  secret: string,
+  secretHint: string
+): VerificationResult {
+  const sigHeader = headers['x-signature'];
+  if (!sigHeader) {
+    return {
+      status: 'not_verified',
+      reason: 'missing_header',
+      error: 'Missing X-Signature header.',
+      secretHint
+    };
+  }
+
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(rawBody)
+    .digest('hex');
+
+  if (safeCompare(sigHeader, expectedSignature)) {
+    const providerEventId = extractEventId('lemon_squeezy', rawBody);
+    return {
+      status: 'verified',
+      method: 'hmac_sha256_lemon_squeezy',
+      secretHint,
+      providerEventId: providerEventId ?? undefined
+    };
+  } else {
+    return {
+      status: 'failed',
+      reason: 'mismatch',
+      error: 'Signature mismatch. Ensure raw payload is exact.',
+      secretHint,
+      method: 'hmac_sha256_lemon_squeezy'
+    };
+  }
+}
+
+/**
  * Timing-safe string comparison to prevent side-channel attacks.
  * Only compares if both inputs are valid hex with equal byte length.
  */
@@ -282,6 +329,7 @@ export function detectProvider(headers: Record<string, string>): Provider {
   const keys = Object.keys(headers).map(k => k.toLowerCase());
   if (keys.includes('stripe-signature')) return 'stripe';
   if (keys.includes('x-razorpay-signature')) return 'razorpay';
+  if (keys.includes('x-event-name') && keys.includes('x-signature')) return 'lemon_squeezy';
   if (keys.some(k => k.includes('paypal'))) return 'paypal';
   return 'unknown';
 }
@@ -312,6 +360,15 @@ export function extractEventId(provider: Provider, rawBody: string): string | nu
               : undefined;
           return typeof entityId === 'string' ? entityId : null;
         }
+      }
+      return null;
+    }
+    
+    if (provider === 'lemon_squeezy') {
+      const data = (json as Record<string, unknown>)?.data;
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        const id = (data as Record<string, unknown>)?.id;
+        return typeof id === 'string' ? id : null;
       }
       return null;
     }

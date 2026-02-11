@@ -119,6 +119,68 @@ interface SlaSummary {
   policies: SlaPolicy[];
 }
 
+interface RetentionJob {
+  id: string;
+  workspace_id: string;
+  scope: string;
+  scheduled_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  status: string | null;
+  error_summary: string | null;
+  created_at: string;
+}
+
+interface RetentionExecution {
+  id: string;
+  job_id: string | null;
+  workspace_id: string;
+  scope: string;
+  rows_pruned: number;
+  rows_blocked_by_hold: number;
+  proof_hash: string | null;
+  executed_at: string;
+}
+
+interface ReplicationSummary {
+  overall_status: string;
+  max_lag_seconds: number | null;
+  last_updated_at: string | null;
+}
+
+interface ReplicationRegion {
+  config_id: string;
+  region: string;
+  mode: string;
+  enabled: boolean;
+  status: string;
+  lag_seconds: number | null;
+  updated_at: string | null;
+  details: Record<string, unknown> | null;
+}
+
+interface ReplicationStatusResponse {
+  workspace_id: string;
+  summary: ReplicationSummary;
+  regions: ReplicationRegion[];
+}
+
+interface RunbookResult {
+  status: string | null;
+  summary: string | null;
+  executed_at: string | null;
+}
+
+interface RunbookCheck {
+  id: string;
+  workspace_id: string | null;
+  check_type: string;
+  status: string | null;
+  details: Record<string, unknown> | null;
+  created_at: string;
+  latest_result: RunbookResult | null;
+}
+
 export default function SettingsClient({ 
   workspace, 
   initialSettings,
@@ -132,7 +194,9 @@ export default function SettingsClient({
   initialAccessReviewDecisions,
   initialKeyRotations,
   initialIncidents,
-  initialSlaSummary
+  initialSlaSummary,
+  initialRetentionJobs,
+  initialRetentionExecutions
 }: { 
   workspace: Workspace, 
   initialSettings: AlertSetting | null,
@@ -146,7 +210,9 @@ export default function SettingsClient({
   initialAccessReviewDecisions: AccessReviewDecision[],
   initialKeyRotations: KeyRotation[],
   initialIncidents: Incident[],
-  initialSlaSummary: SlaSummary | null
+  initialSlaSummary: SlaSummary | null,
+  initialRetentionJobs: RetentionJob[],
+  initialRetentionExecutions: RetentionExecution[]
 }) {
   const router = useRouter();
   const isPaid = workspace.plan !== 'free';
@@ -225,6 +291,16 @@ export default function SettingsClient({
   const [rotateError, setRotateError] = useState<string | null>(null);
   const [rotateResult, setRotateResult] = useState<{ apiKey: string; rotatedAt: string } | null>(null);
 
+  const [replicationStatus, setReplicationStatus] = useState<ReplicationStatusResponse | null>(null);
+  const [replicationLoading, setReplicationLoading] = useState(false);
+  const [replicationError, setReplicationError] = useState<string | null>(null);
+
+  const [runbookChecks, setRunbookChecks] = useState<RunbookCheck[]>([]);
+  const [runbookLoading, setRunbookLoading] = useState(false);
+  const [runbookError, setRunbookError] = useState<string | null>(null);
+  const runbookLoadedRef = useRef(false);
+  const replicationLoadedRef = useRef(false);
+
   async function handleSave() {
     if (!canUseAlerts) return; // Strict gating
     setSaving(true);
@@ -283,6 +359,57 @@ export default function SettingsClient({
       setSelectedProviderId(initialSsoProviders[0].id);
     }
   }, [initialSsoProviders, selectedProviderId]);
+
+  async function loadReplicationStatus() {
+    if (!canManage) return;
+    setReplicationLoading(true);
+    setReplicationError(null);
+    try {
+      const params = new URLSearchParams({ workspace_id: workspace.id });
+      const res = await fetch(`/api/ops/replication/status?${params.toString()}`);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to load replication status.');
+      }
+      setReplicationStatus(data);
+    } catch (error) {
+      setReplicationError(error instanceof Error ? error.message : 'Failed to load replication status.');
+    } finally {
+      setReplicationLoading(false);
+    }
+  }
+
+  async function loadRunbookChecks() {
+    setRunbookLoading(true);
+    setRunbookError(null);
+    try {
+      const params = new URLSearchParams({ workspace_id: workspace.id });
+      const res = await fetch(`/api/ops/runbooks/checks?${params.toString()}`);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to load runbook checks.');
+      }
+      setRunbookChecks(data.checks || []);
+    } catch (error) {
+      setRunbookError(error instanceof Error ? error.message : 'Failed to load runbook checks.');
+    } finally {
+      setRunbookLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab !== 'ops') return;
+
+    if (!runbookLoadedRef.current) {
+      runbookLoadedRef.current = true;
+      loadRunbookChecks();
+    }
+
+    if (!replicationLoadedRef.current && canManage) {
+      replicationLoadedRef.current = true;
+      loadReplicationStatus();
+    }
+  }, [activeTab, canManage, workspace.id]);
 
   useEffect(() => {
     if (!incidentsLoadedRef.current) {
@@ -504,6 +631,39 @@ export default function SettingsClient({
 
   const shortId = (value: string | null | undefined) =>
     value ? `${value.slice(0, 8)}...` : '-';
+
+  const statusBadge = (status: string | null | undefined) => {
+    const normalized = (status || 'unknown').toLowerCase();
+    if (normalized === 'healthy' || normalized === 'completed' || normalized === 'pass') {
+      return 'bg-emerald-900/30 text-emerald-300';
+    }
+    if (normalized === 'lagging' || normalized === 'warning' || normalized === 'running') {
+      return 'bg-amber-900/30 text-amber-300';
+    }
+    if (normalized === 'broken' || normalized === 'failed' || normalized === 'error') {
+      return 'bg-red-900/30 text-red-300';
+    }
+    return 'bg-zinc-800 text-zinc-300';
+  };
+
+  const retentionScopes = Array.from(
+    new Set([
+      ...initialRetentionJobs.map((job) => job.scope),
+      ...initialRetentionExecutions.map((execution) => execution.scope),
+    ])
+  );
+
+  const latestRetentionJob = (scope: string) => {
+    return initialRetentionJobs
+      .filter((job) => job.scope === scope)
+      .sort((a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime())[0];
+  };
+
+  const latestRetentionExecution = (scope: string) => {
+    return initialRetentionExecutions
+      .filter((exec) => exec.scope === scope)
+      .sort((a, b) => new Date(b.executed_at).getTime() - new Date(a.executed_at).getTime())[0];
+  };
 
   return (
     <div className="max-w-4xl mx-auto py-10 px-6">
@@ -1336,6 +1496,208 @@ export default function SettingsClient({
                 </table>
               </div>
             ) : null}
+          </div>
+
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm">
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-white mb-1">DR Replication Status</h2>
+                <p className="text-zinc-400 text-sm">Replication health by region.</p>
+              </div>
+              {canManage ? (
+                <button
+                  onClick={loadReplicationStatus}
+                  disabled={replicationLoading}
+                  className="text-sm text-zinc-400 hover:text-white transition-colors"
+                >
+                  {replicationLoading ? 'Refreshing...' : 'Refresh'}
+                </button>
+              ) : null}
+            </div>
+
+            {!canManage ? (
+              <p className="text-sm text-zinc-500 mt-4">Replication status is available to owners and admins.</p>
+            ) : replicationError ? (
+              <p className="text-sm text-red-400 mt-4">{replicationError}</p>
+            ) : replicationLoading && !replicationStatus ? (
+              <p className="text-sm text-zinc-500 mt-4">Loading replication status...</p>
+            ) : replicationStatus ? (
+              <div className="mt-6 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4">
+                    <p className="text-xs uppercase text-zinc-500 mb-2">Overall Status</p>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${statusBadge(replicationStatus.summary.overall_status)}`}>
+                      {replicationStatus.summary.overall_status || 'unknown'}
+                    </span>
+                  </div>
+                  <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4">
+                    <p className="text-xs uppercase text-zinc-500 mb-2">Max Lag</p>
+                    <p className="text-2xl font-semibold text-white">
+                      {replicationStatus.summary.max_lag_seconds !== null
+                        ? `${replicationStatus.summary.max_lag_seconds}s`
+                        : 'n/a'}
+                    </p>
+                  </div>
+                  <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4">
+                    <p className="text-xs uppercase text-zinc-500 mb-2">Last Update</p>
+                    <p className="text-sm text-zinc-200">
+                      {replicationStatus.summary.last_updated_at ? new Date(replicationStatus.summary.last_updated_at).toLocaleString() : 'n/a'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="overflow-hidden border border-zinc-800 rounded-lg">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-zinc-950 text-zinc-400">
+                      <tr>
+                        <th className="px-4 py-3 font-medium">Region</th>
+                        <th className="px-4 py-3 font-medium">Mode</th>
+                        <th className="px-4 py-3 font-medium">Status</th>
+                        <th className="px-4 py-3 font-medium">Lag</th>
+                        <th className="px-4 py-3 font-medium">Updated</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800">
+                      {replicationStatus.regions.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-4 py-6 text-center text-zinc-500">
+                            No replication regions configured.
+                          </td>
+                        </tr>
+                      ) : (
+                        replicationStatus.regions.map((region) => (
+                          <tr key={region.config_id} className="hover:bg-zinc-800/30">
+                            <td className="px-4 py-3 text-zinc-200">{region.region}</td>
+                            <td className="px-4 py-3 text-zinc-400">{region.mode}</td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${statusBadge(region.status)}`}>
+                                {region.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-zinc-400">{region.lag_seconds !== null ? `${region.lag_seconds}s` : 'n/a'}</td>
+                            <td className="px-4 py-3 text-zinc-500">{formatDate(region.updated_at)}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-zinc-500 mt-4">No replication status available yet.</p>
+            )}
+          </div>
+
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm">
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-white mb-1">Runbook Checks</h2>
+                <p className="text-zinc-400 text-sm">Latest runbook checks for global and workspace scopes.</p>
+              </div>
+              <button
+                onClick={loadRunbookChecks}
+                disabled={runbookLoading}
+                className="text-sm text-zinc-400 hover:text-white transition-colors"
+              >
+                {runbookLoading ? 'Refreshing...' : 'Refresh'}
+              </button>
+            </div>
+
+            {runbookError && <p className="text-sm text-red-400 mt-4">{runbookError}</p>}
+            {runbookLoading && runbookChecks.length === 0 ? (
+              <p className="text-sm text-zinc-500 mt-4">Loading runbook checks...</p>
+            ) : (
+              <div className="mt-6 overflow-hidden border border-zinc-800 rounded-lg">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-zinc-950 text-zinc-400">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">Check</th>
+                      <th className="px-4 py-3 font-medium">Scope</th>
+                      <th className="px-4 py-3 font-medium">Status</th>
+                      <th className="px-4 py-3 font-medium">Last Result</th>
+                      <th className="px-4 py-3 font-medium">Executed</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800">
+                    {runbookChecks.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-6 text-center text-zinc-500">
+                          No runbook checks available.
+                        </td>
+                      </tr>
+                    ) : (
+                      runbookChecks.map((check) => (
+                        <tr key={check.id} className="hover:bg-zinc-800/30">
+                          <td className="px-4 py-3 text-zinc-200">{check.check_type}</td>
+                          <td className="px-4 py-3 text-zinc-400">{check.workspace_id ? 'Workspace' : 'Global'}</td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${statusBadge(check.status || check.latest_result?.status || 'unknown')}`}>
+                              {check.latest_result?.status || check.status || 'unknown'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-zinc-400">{check.latest_result?.summary || '-'}</td>
+                          <td className="px-4 py-3 text-zinc-500">{formatDate(check.latest_result?.executed_at)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm">
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-white mb-1">Retention Automation</h2>
+                <p className="text-zinc-400 text-sm">Last retention run status per scope.</p>
+              </div>
+            </div>
+
+            {!canManage ? (
+              <p className="text-sm text-zinc-500 mt-4">Retention automation status is available to owners and admins.</p>
+            ) : (
+              <div className="mt-6 overflow-hidden border border-zinc-800 rounded-lg">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-zinc-950 text-zinc-400">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">Scope</th>
+                      <th className="px-4 py-3 font-medium">Last Run</th>
+                      <th className="px-4 py-3 font-medium">Status</th>
+                      <th className="px-4 py-3 font-medium">Errors</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800">
+                    {retentionScopes.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-6 text-center text-zinc-500">
+                          No retention jobs recorded yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      retentionScopes.map((scope) => {
+                        const job = latestRetentionJob(scope);
+                        const execution = latestRetentionExecution(scope);
+                        const lastRun = execution?.executed_at || job?.completed_at || job?.started_at || job?.scheduled_at || null;
+                        const status = job?.status || (execution ? 'completed' : 'unknown');
+                        return (
+                          <tr key={scope} className="hover:bg-zinc-800/30">
+                            <td className="px-4 py-3 text-zinc-200">{scope}</td>
+                            <td className="px-4 py-3 text-zinc-500">{formatDate(lastRun)}</td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${statusBadge(status)}`}>
+                                {status || 'unknown'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-zinc-500">{job?.error_summary || '-'}</td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 shadow-sm">

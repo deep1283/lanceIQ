@@ -28,8 +28,10 @@ Can evolve but may not break contracts.
 1. app/api/certificates
 2. app/api/verify
 3. app/api/audit-logs
-4. lib/pdf/*
-5. lib/providers/*
+4. app/api/access-review
+5. app/api/ops
+6. lib/pdf/*
+7. lib/providers/*
 
 ## Tier 3 — Flexible
 UX may change; evidence must not.

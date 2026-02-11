@@ -121,6 +121,7 @@ export function AddSourceModal({ isOpen, onClose, onSuccess }: AddSourceModalPro
                 <SelectContent>
                   <SelectItem value="stripe">Stripe</SelectItem>
                   <SelectItem value="razorpay">Razorpay</SelectItem>
+                  <SelectItem value="lemon_squeezy">Lemon Squeezy</SelectItem>
                   <SelectItem value="generic">Generic (Other)</SelectItem>
                 </SelectContent>
               </Select>

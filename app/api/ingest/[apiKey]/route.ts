@@ -16,6 +16,7 @@ const DEDUP_EVENT_TTL_SEC = 24 * 60 * 60; // 24h
 const DEDUP_HASH_TTL_SEC = 6 * 60 * 60; // 6h
 const DEFAULT_MAX_INGEST_BYTES = 1024 * 1024; // 1 MiB
 const KEY_ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
+const VALID_BATCH_STATUSES = new Set(['uploading', 'processing', 'completed', 'failed']);
 
 export async function POST(
   req: NextRequest, 
@@ -109,19 +110,19 @@ export async function POST(
     }
 
     // 3.5. Enforce Monthly Limits (Plan Quota)
-    // Avoid heavy COUNT(*) on every request by caching or using estimates if scale is huge.
-    // For now, simple count is fine for <10k scale.
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    
-    // Check usage
-    const { count: usageCount, error: countError } = await supabase
-      .from('ingested_events')
-      .select('id', { count: 'exact', head: true })
-      .eq('workspace_id', workspace.id)
-      .gte('received_at', startOfMonth);
+    const startOfMonth = getMonthKey(now);
 
-    if (!countError && usageCount !== null) {
+    const { data: usageData, error: usageError } = await supabase
+      .from('workspace_ingest_counters')
+      .select('event_count')
+      .eq('workspace_id', workspace.id)
+      .eq('month', startOfMonth)
+      .maybeSingle();
+
+    const usageCount = usageData?.event_count || 0;
+
+    if (!usageError || usageError.code === 'PGRST116') {
        // Import limits dynamically or fallback
        const limits = {
          free: 100,
@@ -139,6 +140,17 @@ export async function POST(
             'quota_exceeded'
           );
        }
+    }
+
+    const { meta: batchMeta, error: batchError } = parseBatchMetadata(req.headers);
+    if (batchError) {
+      return errorResponse(batchError, 400, 'invalid_batch_metadata');
+    }
+    if (batchMeta) {
+      const batchUpsertError = await ensureBatchRow(supabase, workspace.id, batchMeta);
+      if (batchUpsertError) {
+        return errorResponse(batchUpsertError, 500, 'batch_metadata_failed');
+      }
     }
 
     // 4. Process Payload
@@ -208,7 +220,7 @@ export async function POST(
       // Verify!
       const configuredProvider = workspace.provider as string | null | undefined;
       const providerToVerify: Provider =
-        configuredProvider === 'stripe' || configuredProvider === 'razorpay'
+        configuredProvider === 'stripe' || configuredProvider === 'razorpay' || configuredProvider === 'lemon_squeezy'
           ? configuredProvider
           : detectProvider(sanitizedHeaders);
 
@@ -223,9 +235,7 @@ export async function POST(
 
     const providerEventId = verificationResult.providerEventId || extractedEventId;
 
-    const { data: event, error: insertError } = await supabase
-      .from('ingested_events')
-      .insert({
+    const insertPayload: Record<string, any> = {
         workspace_id: workspace.id,
         payload: parsedPayload,
         headers: sanitizedHeaders,
@@ -238,7 +248,18 @@ export async function POST(
         signature_reason: verificationResult.reason,
         provider_event_id: providerEventId,
         is_duplicate: isDuplicate
-      })
+      };
+
+    if (batchMeta) {
+      insertPayload.batch_id = batchMeta.id;
+      if (typeof batchMeta.size === 'number') insertPayload.batch_size = batchMeta.size;
+      if (batchMeta.status) insertPayload.batch_status = batchMeta.status;
+      if (batchMeta.receivedAt) insertPayload.batch_received_at = batchMeta.receivedAt;
+    }
+
+    const { data: event, error: insertError } = await supabase
+      .from('ingested_events')
+      .insert(insertPayload)
       .select('id')
       .single();
 
@@ -262,6 +283,10 @@ export async function POST(
       }
       console.error('Ingest Insert Error:', insertError);
       return errorResponse('Storage failed', 500, 'storage_failed');
+    }
+
+    if (batchMeta) {
+      await updateBatchProgress(supabase, batchMeta.id);
     }
 
     void anchorIngestedEvent({
@@ -382,4 +407,151 @@ function getMaxIngestBytes() {
     return Math.floor(parsed);
   }
   return DEFAULT_MAX_INGEST_BYTES;
+}
+
+function getMonthKey(date: Date) {
+  const first = new Date(date.getFullYear(), date.getMonth(), 1);
+  return first.toISOString().slice(0, 10);
+}
+
+type BatchMeta = {
+  id: string;
+  size?: number;
+  status?: string;
+  receivedAt?: string;
+};
+
+function parseBatchMetadata(headers: Headers): { meta: BatchMeta | null; error?: string } {
+  const batchId = headers.get('x-lanceiq-batch-id')?.trim() || '';
+  const batchSizeRaw = headers.get('x-lanceiq-batch-size')?.trim() || '';
+  const batchStatusRaw = headers.get('x-lanceiq-batch-status')?.trim() || '';
+  const batchReceivedRaw = headers.get('x-lanceiq-batch-received-at')?.trim() || '';
+
+  const hasAny = Boolean(batchId || batchSizeRaw || batchStatusRaw || batchReceivedRaw);
+  if (!hasAny) return { meta: null };
+
+  if (!batchId) return { meta: null, error: 'batch_id required when batch metadata is provided' };
+  if (!isValidUuid(batchId)) return { meta: null, error: 'Invalid batch_id' };
+
+  const meta: BatchMeta = { id: batchId };
+
+  if (batchSizeRaw) {
+    const parsed = Number(batchSizeRaw);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      return { meta: null, error: 'Invalid batch_size' };
+    }
+    meta.size = Math.floor(parsed);
+  }
+
+  if (batchStatusRaw) {
+    const normalized = batchStatusRaw.toLowerCase();
+    if (!VALID_BATCH_STATUSES.has(normalized)) {
+      return { meta: null, error: 'Invalid batch_status' };
+    }
+    meta.status = normalized;
+  }
+
+  if (batchReceivedRaw) {
+    const parsedDate = new Date(batchReceivedRaw);
+    if (Number.isNaN(parsedDate.getTime())) {
+      return { meta: null, error: 'Invalid batch_received_at' };
+    }
+    meta.receivedAt = parsedDate.toISOString();
+  }
+
+  return { meta };
+}
+
+function isValidUuid(value: string) {
+  return /^[0-9a-fA-F-]{36}$/.test(value);
+}
+
+async function ensureBatchRow(
+  supabase: ReturnType<typeof createClient>,
+  workspaceId: string,
+  meta: BatchMeta
+): Promise<string | null> {
+  const { data: existing, error: existingError } = await supabase
+    .from('ingest_batches')
+    .select('id, workspace_id')
+    .eq('id', meta.id)
+    .maybeSingle();
+
+  if (existingError) {
+    console.error('Batch lookup failed:', existingError);
+    return 'Failed to validate batch';
+  }
+
+  if (existing?.workspace_id && existing.workspace_id !== workspaceId) {
+    return 'Batch does not belong to workspace';
+  }
+
+  if (!existing?.id) {
+    const payload: Record<string, any> = {
+      id: meta.id,
+      workspace_id: workspaceId,
+    };
+    if (meta.status) payload.status = meta.status;
+    if (typeof meta.size === 'number') payload.total_events = meta.size;
+
+    const { error } = await supabase.from('ingest_batches').insert(payload);
+    if (error) {
+      console.error('Batch insert failed:', error);
+      return 'Failed to create batch';
+    }
+    return null;
+  }
+
+  if (meta.status || typeof meta.size === 'number') {
+    const payload: Record<string, any> = {};
+    if (meta.status) payload.status = meta.status;
+    if (typeof meta.size === 'number') payload.total_events = meta.size;
+    const { error } = await supabase
+      .from('ingest_batches')
+      .update(payload)
+      .eq('id', meta.id);
+    if (error) {
+      console.error('Batch update failed:', error);
+      return 'Failed to update batch';
+    }
+  }
+
+  return null;
+}
+
+async function updateBatchProgress(
+  supabase: ReturnType<typeof createClient>,
+  batchId: string
+) {
+  const { count: processedCount, error: processedError } = await supabase
+    .from('ingested_events')
+    .select('id', { count: 'exact', head: true })
+    .eq('batch_id', batchId);
+
+  if (processedError || processedCount === null) {
+    console.error('Batch progress count failed:', processedError);
+    return;
+  }
+
+  const { count: failedCount, error: failedError } = await supabase
+    .from('ingested_events')
+    .select('id', { count: 'exact', head: true })
+    .eq('batch_id', batchId)
+    .eq('signature_status', 'failed');
+
+  if (failedError || failedCount === null) {
+    console.error('Batch failed count failed:', failedError);
+  }
+
+  const payload: Record<string, any> = { processed_events: processedCount };
+  if (failedCount !== null) payload.failed_events = failedCount;
+
+  const { error: updateError } = await supabase
+    .from('ingest_batches')
+    .update(payload)
+    .eq('id', batchId);
+
+  if (updateError) {
+    console.error('Batch progress update failed:', updateError);
+  }
 }

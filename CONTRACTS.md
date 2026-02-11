@@ -20,6 +20,7 @@ Minimum response fields:
 1. status
 2. id
 3. error when applicable
+4. error_code when applicable
 Idempotency:
 1. If provider_event_id is present and already stored for the same workspace+provider, return 200 with existing id.
 2. If provider_event_id is absent, best-effort dedupe may occur, but no DB guarantee.
@@ -38,6 +39,7 @@ Minimum response fields:
 1. status
 2. id
 3. error when applicable
+4. error_code when applicable
 Idempotency:
 1. If provider_event_id is present and already stored for the same workspace+provider, return 200 with existing id.
 2. If provider_event_id is absent, best-effort dedupe may occur, but no DB guarantee.
@@ -80,7 +82,7 @@ Response:
 1. verification status
 2. reason if failed
 
-### GET /api/audit-logs (Planned)
+### GET /api/audit-logs
 Purpose: Fetch audit logs for a workspace.
 Auth: Owner or admin.
 Query:
