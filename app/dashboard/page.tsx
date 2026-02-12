@@ -9,6 +9,15 @@ import { pickPrimaryWorkspace } from "@/lib/workspace";
 import { canExportCertificates } from "@/lib/roles";
 
 const PAGE_SIZE = 50;
+type DashboardCertificate = {
+  id: string;
+  report_id: string;
+  created_at: string;
+  signature_status: 'verified' | 'failed' | 'not_verified' | null;
+  verification_method: string | null;
+  verification_error: string | null;
+  is_pro: boolean | null;
+};
 
 export default async function DashboardPage({
   searchParams,
@@ -42,7 +51,7 @@ export default async function DashboardPage({
   const limits = getPlanLimits(plan);
 
   const nowIso = new Date().toISOString();
-  let certificates: any[] | null = [];
+  let certificates: DashboardCertificate[] | null = [];
   let totalCount = 0;
   let thisMonthCount = 0;
 
@@ -198,7 +207,7 @@ export default async function DashboardPage({
                         <span className="inline-flex items-center gap-1 px-2 py-1 dashboard-chip text-xs font-medium rounded-full">
                           Free
                         </span>
-                      )}
+                        )}
                     </td>
                     <td className="py-3 px-4 text-right">
                       <div className="inline-flex items-center gap-3">

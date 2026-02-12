@@ -30,7 +30,7 @@ export default function DashboardThemeProvider({
     if (typeof window === "undefined") return;
     const stored = window.localStorage.getItem(STORAGE_KEY);
     if (stored === "dark") {
-      setIsDark(true);
+      setIsDark(true); // eslint-disable-line react-hooks/set-state-in-effect
     }
   }, []);
 

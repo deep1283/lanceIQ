@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { updateAlertSettings } from '@/app/actions/alert-settings';
 import { inviteMember, removeMember } from '@/app/actions/members';
@@ -237,7 +237,7 @@ export default function SettingsClient({
   ].filter((tab): tab is AdminTab => Boolean(tab));
 
   const searchParams = useSearchParams();
-  const sectionParam = searchParams.get('section');
+  const sectionParam = searchParams?.get('section');
   const initialTab = sectionParam && availableTabs.includes(sectionParam as AdminTab)
     ? (sectionParam as AdminTab)
     : (availableTabs[0] || 'alerts');
@@ -369,7 +369,7 @@ export default function SettingsClient({
     }
   }, [initialSsoProviders, selectedProviderId]);
 
-  async function loadReplicationStatus() {
+  const loadReplicationStatus = useCallback(async () => {
     if (!canManage) return;
     setReplicationLoading(true);
     setReplicationError(null);
@@ -386,9 +386,9 @@ export default function SettingsClient({
     } finally {
       setReplicationLoading(false);
     }
-  }
+  }, [canManage, workspace.id]);
 
-  async function loadRunbookChecks() {
+  const loadRunbookChecks = useCallback(async () => {
     setRunbookLoading(true);
     setRunbookError(null);
     try {
@@ -404,7 +404,7 @@ export default function SettingsClient({
     } finally {
       setRunbookLoading(false);
     }
-  }
+  }, [workspace.id]);
 
   useEffect(() => {
     if (activeTab !== 'ops') return;
@@ -418,7 +418,7 @@ export default function SettingsClient({
       replicationLoadedRef.current = true;
       loadReplicationStatus();
     }
-  }, [activeTab, canManage, workspace.id]);
+  }, [activeTab, canManage, loadReplicationStatus, loadRunbookChecks]);
 
   useEffect(() => {
     if (!incidentsLoadedRef.current) {

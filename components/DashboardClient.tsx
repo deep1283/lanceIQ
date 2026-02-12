@@ -60,7 +60,7 @@ export function DashboardClient({ children, workspaceRole, initialTab = 'certifi
           </div>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
           <TabsList className="mb-6 dashboard-panel-muted border dashboard-border rounded-full p-1 h-10">
             <TabsTrigger
               value="certificates"

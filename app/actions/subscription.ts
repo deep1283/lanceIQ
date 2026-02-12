@@ -2,7 +2,7 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
-import { type PlanTier, type PlanEntitlements, getPlanEntitlements } from "@/lib/plan";
+import { type PlanTier, getPlanEntitlements } from "@/lib/plan";
 
 const GRACE_PERIOD_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
 

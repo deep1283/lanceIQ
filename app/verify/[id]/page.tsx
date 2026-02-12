@@ -20,6 +20,28 @@ type TimestampReceipt = {
   createdAt: string | null;
 };
 
+type VerificationCertificate = {
+  created_at: string | null;
+  payload: unknown;
+  headers: Record<string, string> | null;
+  payload_hash: string | null;
+  signature_status: 'verified' | 'failed' | 'not_verified' | null;
+  signature_status_reason?: string | null;
+  verification_method?: string | null;
+  verification_error?: string | null;
+  signature_secret_hint?: string | null;
+  stripe_timestamp_tolerance_sec?: number | null;
+  provider?: string | null;
+  verified_at?: string | null;
+  raw_body_sha256?: string | null;
+  raw_body_expires_at?: string | null;
+  rawBodyExpiresAt?: string | null;
+  raw_body_present?: boolean | null;
+  rawBodyPresent?: boolean | null;
+  retention_policy_label?: string | null;
+  retentionPolicyLabel?: string | null;
+};
+
 async function fetchTimestampReceipt(reportId: string, rawBodySha256: string | null) {
   if (!rawBodySha256) {
     return { receipt: null as TimestampReceipt | null, error: null as string | null };
@@ -127,8 +149,7 @@ export default async function VerifyPage({ params }: { params: Promise<{ id: str
     );
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const cert = result.data as any;
+  const cert = result.data as VerificationCertificate;
   const formattedDate = cert.created_at ? format(new Date(cert.created_at), "PPpp") : "Unknown Date";
   const payloadHash = cert.raw_body_sha256 || cert.payload_hash || "Legacy Record (No Hash Stored)";
   const rawBodyHashForReceipt =

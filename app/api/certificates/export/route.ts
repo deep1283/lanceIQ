@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { checkProStatus } from "@/app/actions/subscription";
 import { pickPrimaryWorkspace } from "@/lib/workspace";
@@ -19,7 +19,7 @@ function retentionPolicyLabel(storeRawBody?: boolean | null, retentionDays?: num
   return 'raw_body_retained';
 }
 
-export async function GET(_request: NextRequest) {
+export async function GET() {
   const supabase = await createClient();
 
   // 1. Auth Check

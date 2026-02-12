@@ -92,6 +92,75 @@ Response:
 1. audit log entries
 2. pagination cursor
 
+### GET /api/sso/saml/metadata
+Purpose: Expose SP metadata for IdP configuration.
+Auth: Public.
+Response:
+1. XML metadata document
+2. `WantAssertionsSigned="true"`
+
+### POST /api/sso/saml/acs
+Purpose: Handle SAML login assertion and create session link.
+Auth: Public endpoint with cryptographic SAML validation.
+Request body:
+1. `SAMLResponse` (base64), form-encoded or JSON
+Security requirements:
+1. Signed assertion required
+2. Issuer must match configured provider metadata entity id
+3. Audience must match SP entity id
+4. Destination/recipient must match ACS URL
+5. Conditions and subject-confirmation time window checks required
+6. Replay blocked by one-time assertion id + issuer
+Provider resolution:
+1. Email domain from assertion is normalized
+2. Provider must be enabled and domain-verified
+Role assignment:
+1. Default role is `member`
+2. Elevated mapping allowed only through explicit allowlist configuration
+Response:
+1. `302` redirect to generated auth link on success
+2. `401` on signature or assertion validation failure
+3. `404` when provider is missing/disabled/unverified
+4. `409` on replay detection
+
+### POST /api/dodo/webhook
+Purpose: Process billing events and mutate workspace plan state.
+Auth: Dodo signature verification required.
+Trust boundary:
+1. Plan mutation is allowed only through verified webhook events.
+2. Activation events require workspace-bound metadata proof.
+Response:
+1. `200` with `received: true` on accepted webhook
+2. `400` for invalid signature or missing required proof for activation events
+
+### POST /api/dodo/verify
+Purpose: Legacy email-based unlock endpoint.
+Status: Deprecated for security.
+Response:
+1. `410` with `status: "deprecated"`
+2. Must not change any workspace plan
+
+### POST /api/dodo/verify-payment
+Purpose: Verify payment proof for authenticated workspace context.
+Auth:
+1. Authenticated user required
+2. Workspace membership required for supplied `workspace_id`
+Request body:
+1. `payment_id`
+2. `workspace_id`
+Proof requirements:
+1. Payment status must be succeeded
+2. Payment metadata must include matching `workspace_id` and `user_id`
+Response:
+1. `200` with `paid`, `verified`, `workspace_plan_active`, `plan_changed: false` on proof success
+2. `401` unauthorized when not logged in
+3. `403` for membership or metadata proof mismatch
+4. `400` for invalid payload or non-succeeded payment
+Privacy:
+1. Must not return customer PII (`email`, `name`)
+Mutation rule:
+1. Must not mutate workspace plan
+
 ### POST /api/cron/cleanup-raw-bodies
 Purpose: Remove raw bodies past retention.
 Auth: Cron secret.

@@ -21,24 +21,28 @@ export async function POST(req: NextRequest) {
 
     const event = JSON.parse(rawBody);
     const { type, data } = event;
+    if (typeof type !== 'string' || !data || typeof data !== 'object') {
+      return NextResponse.json({ error: 'Invalid webhook payload' }, { status: 400 });
+    }
 
     console.log(`Received Dodo Event: ${type}`, data.subscription_id);
 
-    // Extract Metadata (workspace_id is critical)
-    // Note: Dodo might nest metadata in `data.metadata` or similar
-    const workspaceId = await resolveWorkspaceId(data);
-
-    if (!workspaceId && type === 'subscription.created') {
-      throw new Error('Missing workspace_id in metadata');
+    const createdLikeEvent = type === 'subscription.created' || type === 'subscription.active';
+    const workspaceId = await resolveWorkspaceId(data, {
+      requireMetadata: createdLikeEvent,
+      allowSubscriptionLookup: !createdLikeEvent,
+    });
+    if (!workspaceId && createdLikeEvent) {
+      return NextResponse.json({ error: 'workspace_id metadata is required for activation events' }, { status: 400 });
     }
     
     // We need to map Dodo IDs to our DB
     // Common fields: data.subscription_id, data.customer_id, data.status
     
     // Support both .created and .active (some versions of Dodo use active for initial success)
-    if (type === 'subscription.created' || type === 'subscription.active') {
+    if (createdLikeEvent) {
       if (!workspaceId) {
-        throw new Error('Missing workspace_id in metadata');
+        return NextResponse.json({ error: 'workspace_id metadata is required for activation events' }, { status: 400 });
       }
       const resolvedWorkspaceId = workspaceId;
       const resolvedPlan = resolvePlanFromProductId(data.product_id);
@@ -174,6 +178,8 @@ export async function POST(req: NextRequest) {
              current_period_end: periodEndIso,
            },
          });
+       } else {
+         return NextResponse.json({ error: 'workspace proof missing for subscription update' }, { status: 400 });
        }
 
     } else if (type === 'payment.failed') {
@@ -244,29 +250,28 @@ function shouldBePro(status: string, isWithinPeriod: boolean): boolean {
   return false;
 }
 
-async function resolveWorkspaceId(data: Record<string, unknown>): Promise<string | null> {
+async function resolveWorkspaceId(
+  data: Record<string, unknown>,
+  options: { requireMetadata: boolean; allowSubscriptionLookup: boolean }
+): Promise<string | null> {
   const metadata = (data as { metadata?: { workspace_id?: string } }).metadata;
   const metadataId = metadata?.workspace_id;
   if (metadataId) return metadataId;
 
-  const subscriptionId = (data as { subscription_id?: string }).subscription_id;
-  if (subscriptionId) {
-    const { data: sub } = await supabase
-      .from('subscriptions')
-      .select('workspace_id')
-      .eq('dodo_subscription_id', subscriptionId)
-      .single();
-    if (sub?.workspace_id) return sub.workspace_id;
+  if (options.requireMetadata) {
+    return null;
   }
 
-  const customerId = (data as { customer_id?: string }).customer_id;
-  if (customerId) {
-    const { data: ws } = await supabase
-      .from('workspaces')
-      .select('id')
-      .eq('billing_customer_id', customerId)
-      .single();
-    if (ws?.id) return ws.id;
+  if (options.allowSubscriptionLookup) {
+    const subscriptionId = (data as { subscription_id?: string }).subscription_id;
+    if (subscriptionId) {
+      const { data: sub } = await supabase
+        .from('subscriptions')
+        .select('workspace_id')
+        .eq('dodo_subscription_id', subscriptionId)
+        .single();
+      if (sub?.workspace_id) return sub.workspace_id;
+    }
   }
 
   return null;

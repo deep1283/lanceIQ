@@ -4,7 +4,6 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 export type ScimContext = {
   workspaceId: string;
   providerId: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   admin: any;
 };
 

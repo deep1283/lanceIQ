@@ -13,27 +13,10 @@ import { useSearchParams } from "next/navigation";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { VerifySignatureModal } from "@/components/VerifySignatureModal";
 import type { VerificationApiResponse } from "@/lib/signature-verification";
-import { canExportCertificates, canManageWorkspace as canManageWorkspaceRole, canViewAuditLogs as canViewAuditLogsRole, canCreateLegalHold } from "@/lib/roles";
+import { canExportCertificates } from "@/lib/roles";
 import AppNavbar from "@/components/AppNavbar";
 
 const PROMO_END_LOCAL = new Date(2026, 1, 6, 23, 59, 59, 999);
-
-type AuditLogEntry = {
-  id: string;
-  actor_id: string | null;
-  action: string;
-  target_resource: string | null;
-  details: Record<string, unknown> | null;
-  ip_address: string | null;
-  created_at: string;
-};
-
-type LegalHoldStatus = {
-  id: string;
-  active: boolean;
-  reason: string | null;
-  created_at: string;
-};
 
 type TimestampReceipt = {
   anchoredHash: string | null;
@@ -67,25 +50,10 @@ export default function Home() {
   const [isWatermarkFree, setIsWatermarkFree] = useState(false);
   const [canRemoveWatermark, setCanRemoveWatermark] = useState(false);
   const [canExportPdf, setCanExportPdf] = useState(false);
-  const [canExportCsv, setCanExportCsv] = useState(false);
   const [canVerify, setCanVerify] = useState(false);
   const [isPromoActive, setIsPromoActive] = useState(false);
-  const [verifyEmail, setVerifyEmail] = useState("");
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [showVerifyModal, setShowVerifyModal] = useState(false);
-  const [verifyMessage, setVerifyMessage] = useState<string | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
-  const [workspaceName, setWorkspaceName] = useState<string | null>(null);
-  const [workspacePlan, setWorkspacePlan] = useState<string | null>(null);
   const [workspaceRole, setWorkspaceRole] = useState<string | null>(null);
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
-  const [auditNextCursor, setAuditNextCursor] = useState<string | null>(null);
-  const [auditNextCursorId, setAuditNextCursorId] = useState<string | null>(null);
-  const [auditLoading, setAuditLoading] = useState(false);
-  const [auditError, setAuditError] = useState<string | null>(null);
-  const [legalHold, setLegalHold] = useState<LegalHoldStatus | null>(null);
-  const [legalHoldLoading, setLegalHoldLoading] = useState(false);
-  const [legalHoldError, setLegalHoldError] = useState<string | null>(null);
   const [rawBodyExpiresAt, setRawBodyExpiresAt] = useState<string | null>(null);
   const [rawBodyPresent, setRawBodyPresent] = useState<boolean | null>(null);
   const [retentionPolicyLabel, setRetentionPolicyLabel] = useState<string | null>(null);
@@ -106,9 +74,6 @@ export default function Home() {
   const [showSigVerifyModal, setShowSigVerifyModal] = useState(false);
   const [verificationResult, setVerificationResult] = useState<VerificationApiResponse | null>(null);
 
-  const canManageWorkspace = canManageWorkspaceRole(workspaceRole);
-  const canViewAuditLogs = workspacePlan === 'team' && canViewAuditLogsRole(workspaceRole);
-  const canViewLegalHold = canManageWorkspace || canCreateLegalHold(workspaceRole);
   const canExportByRole = !user || canExportCertificates(workspaceRole);
   const canExportPdfAllowed = canExportByRole && canExportPdf;
 
@@ -122,7 +87,6 @@ export default function Home() {
         plan: planTier,
         canRemoveWatermark: watermarkEntitlement,
         canExportPdf: pdfEntitlement,
-        canExportCsv: csvEntitlement,
       } = await checkProStatus();
       const watermarkFree = promoActive || watermarkEntitlement;
       setIsPro(dbPro);
@@ -130,7 +94,6 @@ export default function Home() {
       setIsWatermarkFree(watermarkFree);
       setCanRemoveWatermark(watermarkEntitlement);
       setCanExportPdf(pdfEntitlement);
-      setCanExportCsv(csvEntitlement);
       setCanVerify(planTier !== 'free');
       return watermarkFree;
     } catch (err) {
@@ -140,7 +103,6 @@ export default function Home() {
       setIsWatermarkFree(promoActive);
       setCanRemoveWatermark(false);
       setCanExportPdf(false);
-      setCanExportCsv(false);
       setCanVerify(false);
       return promoActive;
     }
@@ -189,17 +151,7 @@ export default function Home() {
   useEffect(() => {
     if (!user) {
       setWorkspaceId(null);
-      setWorkspaceName(null);
-      setWorkspacePlan(null);
       setWorkspaceRole(null);
-      setAuditLogs([]);
-      setAuditNextCursor(null);
-      setAuditNextCursorId(null);
-      setAuditError(null);
-      setAuditLoading(false);
-      setLegalHold(null);
-      setLegalHoldError(null);
-      setLegalHoldLoading(false);
       setTimestampReceipt(null);
       setTimestampReceiptError(null);
       setTimestampReceiptLoading(false);
@@ -220,25 +172,12 @@ export default function Home() {
 
       if (membershipError || !membership) {
         setWorkspaceId(null);
-        setWorkspaceName(null);
-        setWorkspacePlan(null);
         setWorkspaceRole(null);
         return;
       }
 
       setWorkspaceId(membership.workspace_id);
       setWorkspaceRole(membership.role);
-
-      const { data: workspace } = await supabase
-        .from('workspaces')
-        .select('id, name, plan')
-        .eq('id', membership.workspace_id)
-        .single();
-
-      if (cancelled) return;
-
-      setWorkspaceName(workspace?.name ?? null);
-      setWorkspacePlan(workspace?.plan ?? null);
     };
 
     loadWorkspaceContext();
@@ -247,92 +186,6 @@ export default function Home() {
       cancelled = true;
     };
   }, [supabase, user]);
-
-  const fetchAuditLogs = async (options?: { append?: boolean; cursor?: string | null; cursorId?: string | null }) => {
-    if (!workspaceId) return;
-    setAuditLoading(true);
-    setAuditError(null);
-
-    try {
-      const params = new URLSearchParams({
-        workspace_id: workspaceId,
-        limit: '50',
-      });
-      if (options?.cursor) {
-        params.set('cursor', options.cursor);
-      }
-      if (options?.cursorId) {
-        params.set('cursor_id', options.cursorId);
-      }
-
-      const res = await fetch(`/api/audit-logs?${params.toString()}`);
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(payload.error || 'Failed to load audit logs.');
-      }
-
-      const entries = Array.isArray(payload.data) ? payload.data : [];
-      setAuditLogs((prev) => (options?.append ? [...prev, ...entries] : entries));
-      setAuditNextCursor(payload.next_cursor ?? null);
-      setAuditNextCursorId(payload.next_cursor_id ?? null);
-    } catch (err) {
-      setAuditError(err instanceof Error ? err.message : 'Failed to load audit logs.');
-    } finally {
-      setAuditLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!canViewAuditLogs || !workspaceId) {
-      setAuditLogs([]);
-      setAuditNextCursor(null);
-      setAuditNextCursorId(null);
-      return;
-    }
-
-    void fetchAuditLogs();
-  }, [canViewAuditLogs, workspaceId]);
-
-  useEffect(() => {
-    if (!canViewLegalHold || !workspaceId) {
-      setLegalHold(null);
-      setLegalHoldError(null);
-      setLegalHoldLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    setLegalHoldLoading(true);
-    setLegalHoldError(null);
-
-    const fetchLegalHoldStatus = async () => {
-      const { data, error } = await supabase
-        .from('workspace_legal_holds')
-        .select('id, active, reason, created_at')
-        .eq('workspace_id', workspaceId)
-        .eq('active', true)
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (cancelled) return;
-
-      if (error) {
-        setLegalHold(null);
-        setLegalHoldError(error.message || 'Failed to load legal hold status.');
-      } else {
-        const activeHold = Array.isArray(data) && data.length > 0 ? data[0] : null;
-        setLegalHold(activeHold ?? null);
-      }
-
-      setLegalHoldLoading(false);
-    };
-
-    void fetchLegalHoldStatus();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [canViewLegalHold, workspaceId, supabase]);
 
   useEffect(() => {
     if (!workspaceId || !isExistingCertificate || !hash) {
@@ -729,6 +582,7 @@ export default function Home() {
         window.location.href = "/dashboard";
       }, 1400);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoDownload, isExistingCertificate, autoDownloaded, isLoadingCertificate, reportId, timestamp, canExportPdfAllowed]);
 
   const parsedHeadersPreview: Record<string, string> = {};
@@ -738,44 +592,6 @@ export default function Home() {
           parsedHeadersPreview[key.trim()] = values.join(':').trim();
       }
   });
-
-  const handleVerifyPurchase = async () => {
-    if (!verifyEmail) {
-      setVerifyMessage("Please enter your email");
-      return;
-    }
-    
-    setIsVerifying(true);
-    setVerifyMessage(null);
-    
-    try {
-      const res = await fetch('/api/dodo/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: verifyEmail }),
-      });
-      
-      const data = await res.json();
-      
-      if (data.paid) {
-        if (!user) {
-          setVerifyMessage("Payment verified. Please log in to unlock Pro.");
-          return;
-        }
-
-        const proNow = await syncProStatus();
-        setVerifyMessage(proNow ? "✓ Purchase verified! Pro unlocked." : "Purchase verified. Pro will activate shortly.");
-        setShowVerifyModal(false);
-      } else {
-        setVerifyMessage(data.message || "No purchase found for this email");
-      }
-    } catch (e) {
-      console.error(e);
-      setVerifyMessage("Failed to verify. Please try again.");
-    } finally {
-      setIsVerifying(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-slate-100 font-sans pt-16">
@@ -912,44 +728,6 @@ export default function Home() {
                     </p>
                   </div>
                 )}
-
-                {/* PAYMENT UI - COMMENTED OUT UNTIL DODO VERIFICATION IS COMPLETE
-                {!isPro && (
-                  <div className="mt-4 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg border border-indigo-100">
-                    <p className="text-sm text-slate-700 mb-3 font-medium">Remove watermark forever for just $9.99</p>
-                    
-                    <input
-                      type="email"
-                      value={verifyEmail}
-                      onChange={(e) => setVerifyEmail(e.target.value)}
-                      placeholder="Enter your email"
-                      className="w-full p-3 border border-slate-200 rounded-lg mb-3 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm text-black"
-                    />
-                    {verifyMessage && !isVerifying && (
-                        <p className="text-sm text-red-600 mb-3 -mt-2">{verifyMessage}</p>
-                    )}
-                    
-                    <button
-                        onClick={handleBuy}
-                        className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition-colors disabled:opacity-50"
-                    >
-                        <CreditCard className="w-4 h-4" />
-                        Remove Watermark - $9.99
-                    </button>
-                    {checkoutError && (
-                        <p className="text-sm text-red-600 font-medium mt-2 text-center">{checkoutError}</p>
-                    )}
-
-                    <button
-                        onClick={() => setShowVerifyModal(true)}
-                        className="w-full flex items-center justify-center gap-2 text-indigo-600 hover:text-indigo-700 py-2 text-sm font-medium mt-2"
-                    >
-                        <Mail className="w-4 h-4" />
-                        Already purchased? Verify with email
-                    </button>
-                  </div>
-                )}
-                END PAYMENT UI */}
 
                 {!canExportPdfAllowed && user && (
                     <div className="mt-3 text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded p-2">
@@ -1091,46 +869,6 @@ export default function Home() {
           // Result is shown in modal. Let user close.
         }}
       />
-
-      {/* Verify Purchase Modal (Existing) */}
-      {showVerifyModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl">
-            <h3 className="text-lg font-bold text-slate-900 mb-4">Verify Your Purchase</h3>
-            <p className="text-sm text-slate-600 mb-4">Enter the email you used when purchasing to restore your PRO access.</p>
-            
-            <input
-              type="email"
-              value={verifyEmail}
-              onChange={(e) => setVerifyEmail(e.target.value)}
-              placeholder="your@email.com"
-              className="w-full p-3 border border-slate-200 rounded-lg mb-3 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-black"
-            />
-            
-            {verifyMessage && (
-              <p className={`text-sm mb-3 ${verifyMessage.includes('✓') ? 'text-green-600' : 'text-red-600'}`}>
-                {verifyMessage}
-              </p>
-            )}
-            
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowVerifyModal(false)}
-                className="flex-1 py-2 px-4 border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleVerifyPurchase}
-                disabled={isVerifying}
-                className="flex-1 py-2 px-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-              >
-                {isVerifying ? 'Verifying...' : 'Verify'}
-              </button>
-          </div>
-        </div>
-      </div>
-      )}
       </div>
     </div>
   );

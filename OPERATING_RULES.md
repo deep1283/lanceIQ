@@ -18,6 +18,12 @@ Before making changes, every chat must read:
 2. If the information is not in repo docs, ask for clarification.
 3. Do not infer legal claims; follow scope-of-proof language.
 
+## Security Boundaries
+1. Do not accept unsigned or weakly validated identity assertions in auth flows.
+2. Do not grant or upgrade plans from email-only or payment-id-only verification paths.
+3. Plan state changes must remain webhook and proof bound.
+4. Do not return customer PII from proof/verification endpoints unless explicitly contract-approved.
+
 ## Change Control
 1. Tier 1 changes require explicit approval.
 2. Contract changes require a decision record.

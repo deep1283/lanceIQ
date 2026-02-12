@@ -60,6 +60,14 @@ Webhook Provider
 2. Service Role is used only for trusted server-side workflows.
 3. Secrets are encrypted at rest where applicable.
 4. Audit logs are immutable and restricted to owners and admins.
+5. SAML SSO is fail-closed: signed assertion required, issuer/audience/destination/time-window checks required, replay-blocked by assertion id + issuer.
+6. Plan activation is webhook-driven and proof-bound; no email-only unlock flow is trusted.
+
+## Identity and Billing Trust Boundaries
+1. SSO provider resolution is domain-normalized and only enabled plus verified providers are accepted.
+2. Group claims are not trusted for privilege by default; least-privilege membership (`member`) is the default unless explicit allowlist mapping is configured.
+3. Payment verification endpoints may confirm proof only; they do not mutate workspace plan state.
+4. Workspace plan changes occur from verified billing webhook processing with workspace-bound metadata.
 
 ## Role Model
 1. Current roles: owner, admin, member, viewer, exporter, legal_hold_manager.

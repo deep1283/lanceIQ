@@ -95,8 +95,7 @@ export async function anchorIngestedEvent(params: {
       return;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: existing, error: existingError } = await (admin as any)
+    const { data: existing, error: existingError } = await admin
       .from('timestamp_receipts')
       .select('id')
       .eq('resource_type', 'ingested_event')
@@ -109,7 +108,7 @@ export async function anchorIngestedEvent(params: {
 
     const { transactionId, proofData } = await requestTimestampReceipt(params.rawBodySha256);
 
-    const { error } = await (admin as any)
+    const { error } = await admin
       .from('timestamp_receipts')
       .insert({
         workspace_id: params.workspaceId,

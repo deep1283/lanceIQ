@@ -130,3 +130,21 @@ Decision: Ensure ingest endpoints return `id` and correct status codes per CONTR
 Why: Current responses omitted required fields and used inconsistent status codes, breaking the published contract and weakening enterprise integration reliability.
 Backward compatibility: Response bodies remain additive (status, id, and existing verified fields preserved). Clients treating any 2xx as success remain compatible.
 Alternatives rejected: Leaving inconsistent responses and undocumented behavior.
+
+## 2026-02-12: Strict SAML Assertion Validation (Security Hardening)
+Decision: SAML ACS requires signed assertions and full assertion validation (issuer, audience, destination, time window) with replay protection at the DB layer.
+Why: Unsigned or weakly validated assertions allow forged login and role escalation.
+Backward compatibility: IdPs must provide signed assertions and valid metadata; insecure assertions are rejected.
+Alternatives rejected: Regex-only parsing, unsigned assertion acceptance, or soft validation warnings.
+
+## 2026-02-12: Billing Activation Trust Boundary
+Decision: Workspace plan activation is webhook-only and proof-bound; client verification endpoints cannot mutate plan state.
+Why: Email-only and payment-id-only flows can be abused for plan escalation.
+Backward compatibility: Legacy `/api/dodo/verify` remains as explicit deprecated `410` response; activation continues through webhook events.
+Alternatives rejected: Email lookup unlocks and direct plan mutation from verification endpoints.
+
+## 2026-02-12: Payment Verification Privacy Boundary
+Decision: `/api/dodo/verify-payment` requires authenticated workspace context and must not return customer PII.
+Why: Prevents payment-id probing and exposure of customer identity data.
+Backward compatibility: Response shape changed to proof status fields without PII; plan mutation removed from this endpoint.
+Alternatives rejected: Anonymous verification and responses including customer email/name.

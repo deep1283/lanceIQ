@@ -13,6 +13,7 @@ function getAdminClient() {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 }
+type AdminClient = NonNullable<ReturnType<typeof getAdminClient>>;
 
 function computeNextRun(rrule: string, base: Date, now: Date) {
   let next = nextRunFrom(rrule, base);
@@ -24,8 +25,7 @@ function computeNextRun(rrule: string, base: Date, now: Date) {
   return next;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function getWorkspaceName(admin: any, workspaceId: string) {
+async function getWorkspaceName(admin: AdminClient, workspaceId: string) {
   const { data } = await admin
     .from('workspaces')
     .select('name')
@@ -34,8 +34,7 @@ async function getWorkspaceName(admin: any, workspaceId: string) {
   return (data as { name?: string } | null)?.name || 'Workspace';
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function getOwnerAdminEmails(admin: any, workspaceId: string) {
+async function getOwnerAdminEmails(admin: AdminClient, workspaceId: string) {
   const { data: members, error } = await admin
     .from('workspace_members')
     .select('user_id, role')

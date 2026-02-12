@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
   }
 
   const checkIds = (checks || []).map((c) => c.id);
-  let resultsMap = new Map<string, any>();
+  const resultsMap = new Map<string, any>();
   if (checkIds.length) {
     const { data: results, error: resultsError } = await supabase
       .from('runbook_check_results')

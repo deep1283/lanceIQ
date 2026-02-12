@@ -9,7 +9,7 @@ interface Options {
 }
 
 export function rateLimit(options: Options) {
-  const tokenCache = new Map<string, number[]>();
+  const tokenCache = new Map<string, { timestamps: number[]; lastSeen: number }>();
   let lastCleanup = Date.now();
 
   return {
@@ -23,15 +23,25 @@ export function rateLimit(options: Options) {
           lastCleanup = now;
         }
 
-        const timestamps = tokenCache.get(token) || [];
+        const state = tokenCache.get(token);
+        const timestamps = state?.timestamps || [];
         // Filter out old timestamps
         const validTimestamps = timestamps.filter(t => now - t < options.interval);
-        
+
         if (validTimestamps.length >= limit) {
           reject();
         } else {
+          // Cap unique token cardinality to avoid unbounded memory growth.
+          if (!state && tokenCache.size >= options.uniqueTokenPerInterval) {
+            const oldestToken = tokenCache.keys().next().value;
+            if (oldestToken) {
+              tokenCache.delete(oldestToken);
+            }
+          }
+
           validTimestamps.push(now);
-          tokenCache.set(token, validTimestamps);
+          tokenCache.delete(token); // refresh insertion order (LRU-ish eviction)
+          tokenCache.set(token, { timestamps: validTimestamps, lastSeen: now });
           resolve();
         }
       }),

@@ -79,10 +79,10 @@ const footerItems = [
 ];
 
 export default function DashboardSidebar() {
-  const pathname = usePathname();
+  const pathname = usePathname() || '';
   const searchParams = useSearchParams();
-  const tab = searchParams.get('tab');
-  const section = searchParams.get('section') || 'alerts';
+  const tab = searchParams?.get('tab');
+  const section = searchParams?.get('section') || 'alerts';
 
   const isDashboard = pathname === '/dashboard';
   const isAdmin = pathname.startsWith('/dashboard/admin');

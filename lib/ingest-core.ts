@@ -52,15 +52,15 @@ export async function processIngestEvent(req: NextRequest, apiKey: string): Prom
     }
 
     // 3. Lookup Workspace
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const supabase = createClient(supabaseUrl, supabaseServiceKey) as any;
-    let { data: workspace, error: wsError } = await supabase
+    const workspaceLookup = await supabase
       .from('workspaces')
       .select('id, name, provider, store_raw_body, raw_body_retention_days, encrypted_secret, plan, subscription_status, subscription_current_period_end')
       .eq('api_key_hash', keyHash)
       .single();
+    let workspace = workspaceLookup.data;
 
-    if (wsError || !workspace) {
+    if (workspaceLookup.error || !workspace) {
       const graceCutoff = new Date(Date.now() - KEY_ROTATION_GRACE_MS).toISOString();
       const { data: rotation } = await supabase
         .from('api_key_rotations')
@@ -101,8 +101,7 @@ export async function processIngestEvent(req: NextRequest, apiKey: string): Prom
     if (!usageError || usageError.code === 'PGRST116') {
       const plan = (workspace.plan || 'free') as PlanTier;
       const limits = getPlanLimits(plan);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const limit = (limits as any).monthlyIngestEvents ?? (limits as any).monthlyCertificates ?? 100;
+      const limit = limits.monthlyIngestEvents;
 
       if (usageCount >= limit) {
         return errorResponse(
@@ -375,7 +374,7 @@ function getMaxIngestBytes() {
 }
 
 function getMonthKey(date: Date) {
-  const first = new Date(date.getFullYear(), date.getMonth(), 1);
+  const first = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
   return first.toISOString().slice(0, 10);
 }
 
@@ -432,7 +431,6 @@ function isValidUuid(value: string) {
 }
 
 async function ensureBatchRow(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
   workspaceId: string,
   meta: BatchMeta
@@ -486,7 +484,6 @@ async function ensureBatchRow(
 }
 
 async function updateBatchProgress(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
   batchId: string
 ) {
@@ -522,3 +519,14 @@ async function updateBatchProgress(
     console.error('Batch progress update failed:', updateError);
   }
 }
+
+// Pure helpers exposed for unit tests.
+export const ingestCoreTestUtils = {
+  canSendAlerts,
+  tryParseJson,
+  sanitizeHeaders,
+  getMaxIngestBytes,
+  getMonthKey,
+  parseBatchMetadata,
+  isValidUuid,
+};

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
 function getSiteUrl() {
   return (
@@ -9,14 +9,14 @@ function getSiteUrl() {
   );
 }
 
-export async function GET(_request: NextRequest) {
+export async function GET() {
   const siteUrl = getSiteUrl();
   const entityId = process.env.SAML_ENTITY_ID || `${siteUrl}/api/sso/saml/metadata`;
   const acsUrl = `${siteUrl}/api/sso/saml/acs`;
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" entityID="${entityId}">
-  <SPSSODescriptor AuthnRequestsSigned="false" WantAssertionsSigned="false" protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+  <SPSSODescriptor AuthnRequestsSigned="false" WantAssertionsSigned="true" protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
     <NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress</NameIDFormat>
     <AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="${acsUrl}" index="1" isDefault="true" />
   </SPSSODescriptor>

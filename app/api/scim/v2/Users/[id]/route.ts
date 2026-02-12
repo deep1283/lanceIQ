@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getScimContext, extractScimEmail, extractScimGroups, deriveRoleFromGroups } from '@/lib/scim/utils';
+import { getScimContext, extractScimEmail, deriveRoleFromGroups } from '@/lib/scim/utils';
 
 function scimError(status: number, detail: string) {
   return NextResponse.json(

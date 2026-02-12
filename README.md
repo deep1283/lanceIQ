@@ -38,6 +38,12 @@ Before making changes, read:
 - 📊 **SLA + Incident Tracking** — Workspace and global incident visibility
 - 🔎 **Access Reviews** — Cycles and attestations with audit logs
 
+## Security Notes
+
+1. SAML login is fail-closed: signed assertion required, plus issuer/audience/destination/time-window checks and replay protection.
+2. Billing plan activation is webhook-driven. Legacy email-based unlock flow is deprecated.
+3. `/api/dodo/verify-payment` verifies proof for authenticated workspace context and does not activate plans directly.
+
 ## Quick Start
 
 ### Hosted Version (Easiest)
@@ -100,6 +106,9 @@ Visit [lanceiq.com](https://lanceiq.com) — no setup required.
 | `TSA_URL` | No | RFC‑3161 Timestamp Authority URL |
 | `TSA_AUTH_HEADER` | No | RFC‑3161 auth header value |
 | `TSA_TIMEOUT_MS` | No | RFC‑3161 request timeout in ms |
+| `SAML_ENTITY_ID` | No | SP entity ID override for SAML audience validation |
+| `SAML_REDIRECT_URL` | No | Post-SSO redirect URL after magic-link generation |
+| `SAML_GROUP_ROLE_MAP_JSON` | No | JSON allowlist mapping of IdP groups to roles; default role is `member` |
 
 ## Raw Body Retention Cleanup
 

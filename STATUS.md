@@ -1,6 +1,6 @@
 # LanceIQ Status
 
-Last updated: 2026-02-10
+Last updated: 2026-02-12
 Owner: Product Owner (You)
 
 ## Current State
@@ -51,6 +51,13 @@ Owner: Product Owner (You)
 40. V5 Backend: replication status API, runbook checks API, retention runner endpoint.
 41. V5 Frontend: DR replication status, runbook checks, and retention automation UI.
 42. Provider expansion: Lemon Squeezy added (verification + provider selection).
+43. Security hardening: SAML verification is fail-closed (signed assertion, issuer/audience/destination/time checks, replay protection).
+44. Security hardening: `/api/dodo/verify` deprecated with explicit `410` and no plan mutation.
+45. Security hardening: `/api/dodo/verify-payment` requires auth + workspace-bound proof and no PII response fields.
+46. Security hardening: SSO provider domain normalization and verified-domain enforcement at DB level.
+47. Security hardening: in-memory rate limiter enforces `uniqueTokenPerInterval` cap.
+48. Frontend alignment: removed email-unlock purchase flow and aligned success flow to secure payment-proof contract.
+49. Security regression tests added for SAML, billing proof, and rate limiter behavior.
 
 ## In Progress
 1. None active (ready to start next phase).
@@ -67,7 +74,7 @@ Owner: Product Owner (You)
 
 ## Risks / Gaps
 1. External audit/attestation not completed yet.
-2. Provider verification limited to Stripe and Razorpay.
+2. Provider verification limited to Stripe, Razorpay, and Lemon Squeezy.
 3. Non-email access review notifications not wired yet.
 
 ## Readiness

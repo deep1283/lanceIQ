@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
-import { parseSamlResponse } from '@/lib/sso/saml';
+import {
+  deriveSamlRole,
+  extractUnverifiedEmailFromSamlResponseBase64,
+  storeSamlReplayAssertion,
+  toSamlSecurityError,
+  verifyAndExtractSamlAssertion,
+} from '@/lib/sso/saml';
+import { AUDIT_ACTIONS, logAuditAction } from '@/utils/audit';
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -18,15 +25,6 @@ function getSiteUrl() {
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined) ||
     'https://lanceiq.com'
   );
-}
-
-function deriveRole(groups: string[]) {
-  const normalized = groups.map((g) => g.toLowerCase());
-  if (normalized.includes('admin')) return 'admin';
-  if (normalized.includes('viewer')) return 'viewer';
-  if (normalized.includes('exporter')) return 'exporter';
-  if (normalized.includes('legal_hold_manager')) return 'legal_hold_manager';
-  return 'member';
 }
 
 export async function POST(request: NextRequest) {
@@ -50,38 +48,100 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing SAMLResponse' }, { status: 400 });
     }
 
-    const xml = Buffer.from(samlResponse, 'base64').toString('utf-8');
-    const { email, name, groups, externalId, rawAttributes } = parseSamlResponse(xml);
-
-    if (!email || !email.includes('@')) {
-      return NextResponse.json({ error: 'Missing email attribute in SAML response' }, { status: 400 });
+    const unverifiedEmail = extractUnverifiedEmailFromSamlResponseBase64(samlResponse);
+    if (!unverifiedEmail || !unverifiedEmail.includes('@')) {
+      return NextResponse.json({ error: 'Unable to resolve SSO provider from SAML response' }, { status: 400 });
     }
 
-    const domain = email.split('@')[1].toLowerCase();
+    const domain = unverifiedEmail.split('@')[1].trim().toLowerCase();
     const { data: provider, error: providerError } = await admin
       .from('sso_providers')
-      .select('id, workspace_id, domain, enabled')
+      .select('id, workspace_id, domain, enabled, metadata_xml, verified_at')
       .eq('domain', domain)
       .eq('enabled', true)
       .maybeSingle();
 
-    if (providerError || !provider) {
+    if (providerError || !provider || !provider.verified_at) {
       return NextResponse.json({ error: 'SSO provider not configured' }, { status: 404 });
     }
 
-    const { data: userList, error: userLookupError } = await admin.auth.admin.listUsers();
+    const siteUrl = getSiteUrl();
+    const expectedAcsUrl = `${siteUrl}/api/sso/saml/acs`;
+    const expectedAudience = process.env.SAML_ENTITY_ID || `${siteUrl}/api/sso/saml/metadata`;
+
+    let verified;
+    try {
+      verified = verifyAndExtractSamlAssertion({
+        samlResponseBase64: samlResponse,
+        metadataXml: provider.metadata_xml,
+        expectedAcsUrl,
+        expectedAudience,
+      });
+    } catch (err) {
+      const securityError = toSamlSecurityError(err);
+      await logAuditAction({
+        workspaceId: provider.workspace_id,
+        action: AUDIT_ACTIONS.AUTH_LOGIN,
+        targetResource: 'sso_providers',
+        details: {
+          status: 'rejected',
+          reason: securityError.code,
+          domain,
+        },
+      });
+      return NextResponse.json({ error: securityError.message }, { status: 401 });
+    }
+
+    if (verified.email.split('@')[1].trim().toLowerCase() !== domain) {
+      await logAuditAction({
+        workspaceId: provider.workspace_id,
+        action: AUDIT_ACTIONS.AUTH_LOGIN,
+        targetResource: 'sso_providers',
+        details: {
+          status: 'rejected',
+          reason: 'domain_mismatch',
+          asserted_domain: verified.email.split('@')[1].trim().toLowerCase(),
+          configured_domain: domain,
+        },
+      });
+      return NextResponse.json({ error: 'SAML email domain mismatch' }, { status: 401 });
+    }
+
+    try {
+      await storeSamlReplayAssertion(admin as any, {
+        assertionId: verified.assertionId,
+        issuer: verified.issuer,
+        expiresAt: verified.notOnOrAfter,
+      });
+    } catch (err) {
+      const securityError = toSamlSecurityError(err);
+      await logAuditAction({
+        workspaceId: provider.workspace_id,
+        action: AUDIT_ACTIONS.AUTH_LOGIN,
+        targetResource: 'saml_replay_cache',
+        details: {
+          status: 'rejected',
+          reason: securityError.code,
+          assertion_id: verified.assertionId,
+          issuer: verified.issuer,
+        },
+      });
+      return NextResponse.json({ error: securityError.message }, { status: 409 });
+    }
+
+    const { data: listData, error: userLookupError } = await admin.auth.admin.listUsers();
     if (userLookupError) {
       console.error('User lookup failed:', userLookupError);
       return NextResponse.json({ error: 'Failed to resolve user' }, { status: 500 });
     }
-    const existingUser = userList?.users?.find((u: { email?: string }) => u.email === email);
+    const existingUser = listData.users.find((u) => u.email === verified.email) ?? null;
 
     let userId = existingUser?.id;
     if (!userId) {
       const { data: created, error: createError } = await admin.auth.admin.createUser({
-        email,
+        email: verified.email,
         email_confirm: true,
-        user_metadata: name ? { name } : undefined,
+        user_metadata: verified.name ? { name: verified.name } : undefined,
       });
       if (createError || !created.user) {
         console.error('User create failed:', createError);
@@ -90,16 +150,21 @@ export async function POST(request: NextRequest) {
       userId = created.user.id;
     }
 
-    const role = deriveRole(groups || []);
+    const role = deriveSamlRole(verified.groups || []);
 
     const { error: mappingError } = await admin.from('identity_mappings').upsert(
       {
         workspace_id: provider.workspace_id,
         provider_id: provider.id,
         user_id: userId,
-        external_id: externalId || email,
-        external_email: email,
-        scim_attributes: { groups, attributes: rawAttributes },
+        external_id: verified.externalId || verified.email,
+        external_email: verified.email,
+        scim_attributes: {
+          groups: verified.groups,
+          attributes: verified.rawAttributes,
+          saml_assertion_id: verified.assertionId,
+          saml_issuer: verified.issuer,
+        },
         last_synced_at: new Date().toISOString(),
       },
       { onConflict: 'provider_id,external_id' }
@@ -127,7 +192,7 @@ export async function POST(request: NextRequest) {
     const redirectTo = process.env.SAML_REDIRECT_URL || `${getSiteUrl()}/dashboard`;
     const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
       type: 'magiclink',
-      email,
+      email: verified.email,
       options: { redirectTo },
     });
 
@@ -135,6 +200,20 @@ export async function POST(request: NextRequest) {
       console.error('Magic link generation failed:', linkError);
       return NextResponse.json({ error: 'Failed to create session link' }, { status: 500 });
     }
+
+    await logAuditAction({
+      workspaceId: provider.workspace_id,
+      action: AUDIT_ACTIONS.AUTH_LOGIN,
+      actorId: userId,
+      targetResource: 'sso_providers',
+      details: {
+        status: 'accepted',
+        provider_id: provider.id,
+        assertion_id: verified.assertionId,
+        issuer: verified.issuer,
+        role_assigned: role,
+      },
+    });
 
     return NextResponse.redirect(linkData.properties.action_link, { status: 302 });
   } catch (err) {
