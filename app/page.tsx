@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
+import { redirect } from 'next/navigation';
 import Navbar from '../components/Navbar';
 import Hero from '../components/Hero';
+import { createClient } from '@/utils/supabase/server';
 
 const Features = dynamic(() => import('../components/Features'));
 const HowItWorks = dynamic(() => import('../components/HowItWorks'));
@@ -22,7 +24,16 @@ export const metadata: Metadata = {
   },
 };
 
-export default function Home() {
+export default async function Home() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (user) {
+    redirect('/dashboard');
+  }
+
   return (
     <main className="flex flex-col bg-black min-h-screen">
       <script

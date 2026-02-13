@@ -3,29 +3,9 @@
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { type PlanTier, getPlanEntitlements } from "@/lib/plan";
+import { getEffectivePlanFromWorkspace } from "@/lib/entitlements";
 
-const GRACE_PERIOD_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
-
-function isPaidPlan(plan: string | null | undefined): plan is 'pro' | 'team' {
-  return plan === 'pro' || plan === 'team';
-}
-
-function isWorkspacePro(workspace: { plan?: string | null; subscription_status?: string | null; subscription_current_period_end?: string | null }) {
-  if (!isPaidPlan(workspace.plan)) return false;
-
-  const status = workspace.subscription_status ?? 'free';
-  const now = Date.now();
-  const periodEnd = workspace.subscription_current_period_end
-    ? new Date(workspace.subscription_current_period_end).getTime()
-    : null;
-  const withinGrace = periodEnd ? periodEnd + GRACE_PERIOD_MS > now : false;
-
-  if (status === 'active') return true;
-  if (status === 'past_due' || status === 'canceled') return withinGrace;
-  return false;
-}
-
-export async function checkProStatus(workspaceId?: string) {
+export async function checkPlanEntitlements(workspaceId?: string) {
   const freeEntitlements = getPlanEntitlements('free');
   const supabase = await createClient();
   
@@ -104,24 +84,25 @@ export async function checkProStatus(workspaceId?: string) {
   }
 
   let bestPlan: PlanTier = 'free';
-  let isPro = false;
 
   for (const workspace of workspaces) {
-    if (isWorkspacePro(workspace)) {
-      isPro = true;
-      if (workspace.plan === 'team') {
-        bestPlan = 'team';
-      } else if (bestPlan !== 'team') {
-        bestPlan = 'pro';
-      }
+    const effectivePlan = getEffectivePlanFromWorkspace(workspace);
+    if (effectivePlan === 'team') {
+      bestPlan = 'team';
+    } else if (effectivePlan === 'pro' && bestPlan !== 'team') {
+      bestPlan = 'pro';
     }
   }
 
-  const effectivePlan: PlanTier = isPro ? bestPlan : 'free';
-  const entitlements = getPlanEntitlements(effectivePlan);
+  const entitlements = getPlanEntitlements(bestPlan);
 
   return {
-    isPro,
+    isPro: bestPlan !== 'free',
     ...entitlements,
   };
+}
+
+// Backward-compatible alias; prefer `checkPlanEntitlements`.
+export async function checkProStatus(workspaceId?: string) {
+  return checkPlanEntitlements(workspaceId);
 }

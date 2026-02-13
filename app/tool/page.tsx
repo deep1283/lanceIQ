@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import QRCode from 'qrcode';
 import { v4 as uuidv4 } from "uuid";
 import { CertificateTemplate } from "@/components/CertificateTemplate";
 import { Download, RefreshCw, AlertTriangle, CheckCircle, User, LogIn, Lock, ShieldCheck } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { saveCertificate } from "@/app/actions/certificates";
-import { checkProStatus } from "@/app/actions/subscription";
+import { checkPlanEntitlements } from "@/app/actions/subscription";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
@@ -73,13 +73,29 @@ export default function Home() {
   // Signature Verification State (BYOS Phase 1)
   const [showSigVerifyModal, setShowSigVerifyModal] = useState(false);
   const [verificationResult, setVerificationResult] = useState<VerificationApiResponse | null>(null);
+  const workspaceIdRef = useRef<string | null>(null);
 
   const canExportByRole = !user || canExportCertificates(workspaceRole);
   const canExportPdfAllowed = canExportByRole && canExportPdf;
 
-  const syncProStatus = async () => {
+  useEffect(() => {
+    workspaceIdRef.current = workspaceId;
+  }, [workspaceId]);
+
+  const syncProStatus = async (workspaceScopeId?: string | null) => {
     const promoActive = Date.now() <= PROMO_END_LOCAL.getTime();
     setIsPromoActive(promoActive);
+
+    // Strict workspace-scoped gating: never resolve paid entitlements without workspace context.
+    if (!workspaceScopeId) {
+      setIsPro(false);
+      setCurrentPlan('free');
+      setIsWatermarkFree(promoActive);
+      setCanRemoveWatermark(false);
+      setCanExportPdf(false);
+      setCanVerify(false);
+      return promoActive;
+    }
 
     try {
       const {
@@ -87,14 +103,15 @@ export default function Home() {
         plan: planTier,
         canRemoveWatermark: watermarkEntitlement,
         canExportPdf: pdfEntitlement,
-      } = await checkProStatus();
+        canVerify: verifyEntitlement,
+      } = await checkPlanEntitlements(workspaceScopeId);
       const watermarkFree = promoActive || watermarkEntitlement;
       setIsPro(dbPro);
       setCurrentPlan(planTier);
       setIsWatermarkFree(watermarkFree);
       setCanRemoveWatermark(watermarkEntitlement);
       setCanExportPdf(pdfEntitlement);
-      setCanVerify(planTier !== 'free');
+      setCanVerify(verifyEntitlement);
       return watermarkFree;
     } catch (err) {
       console.error("Failed to sync pro status:", err);
@@ -116,7 +133,7 @@ export default function Home() {
     }
     
     const updatePromoState = () => {
-      void syncProStatus();
+      void syncProStatus(workspaceIdRef.current);
     };
 
     updatePromoState();
@@ -137,7 +154,9 @@ export default function Home() {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null);
-      await syncProStatus();
+      if (!session?.user) {
+        await syncProStatus(null);
+      }
     });
     
     return () => {
@@ -147,6 +166,10 @@ export default function Home() {
       }
     };
   }, [supabase, certificateId]);
+
+  useEffect(() => {
+    void syncProStatus(workspaceId);
+  }, [workspaceId]);
 
   useEffect(() => {
     if (!user) {
@@ -856,6 +879,7 @@ export default function Home() {
         onClose={() => setShowSigVerifyModal(false)}
         rawBody={jsonInput}
         headers={parsedHeadersPreview}
+        workspaceId={workspaceId}
         // Ideally pass certificateId if saved, but for new generation flow we verify first then save
         // If user is saved, we have reportId.
         // We can pass reportId. API will update DB if it matches this reportId for this user.

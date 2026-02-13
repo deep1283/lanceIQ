@@ -148,3 +148,15 @@ Decision: `/api/dodo/verify-payment` requires authenticated workspace context an
 Why: Prevents payment-id probing and exposure of customer identity data.
 Backward compatibility: Response shape changed to proof status fields without PII; plan mutation removed from this endpoint.
 Alternatives rejected: Anonymous verification and responses including customer email/name.
+
+## 2026-02-12: Workspace Context Resolution Canonicalization (V5.1)
+Decision: Dashboard SSR surfaces must resolve workspace context through one shared resolver with fallback order: explicit workspace hint, workspace cookie, deterministic primary workspace.
+Why: Prevents UI/API entitlement mismatches caused by ad-hoc `.limit(1).single()` membership selection in different server-render paths.
+Backward compatibility: Single-workspace behavior is unchanged; multi-workspace users can pass `workspace_id` for explicit targeting.
+Alternatives rejected: Keeping page-local workspace selection logic and relying on raw `workspace.plan` checks.
+
+## 2026-02-12: Workspace-Scoped Signature Verification Entitlement (V5.1)
+Decision: `/api/verify-signature` entitlement checks are workspace-scoped and membership-validated, with `workspace_id` required when a user belongs to multiple workspaces.
+Why: Unscoped verification checks can apply the wrong plan when users belong to multiple workspaces.
+Backward compatibility: Single-workspace users can omit `workspace_id`; multi-workspace users receive explicit `400` guidance.
+Alternatives rejected: User-level "best plan" checks without workspace binding.

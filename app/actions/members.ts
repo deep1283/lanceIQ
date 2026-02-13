@@ -4,6 +4,7 @@ import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 import { canInviteMembers, isOwner } from "@/lib/roles";
 import { logAuditAction, AUDIT_ACTIONS } from "@/utils/audit";
+import { checkPlanEntitlements } from "@/app/actions/subscription";
 
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -35,13 +36,8 @@ export async function inviteMember(email: string, workspaceId: string) {
   }
 
   // 2. Verify Plan (Team Only)
-  const { data: workspace } = await supabase
-    .from('workspaces')
-    .select('plan')
-    .eq('id', workspaceId)
-    .single();
-
-  if (!workspace || workspace.plan !== 'team') {
+  const entitlements = await checkPlanEntitlements(workspaceId);
+  if (!entitlements.isTeam) {
     return { error: "Inviting members is only available on the Team plan." };
   }
   

@@ -3,7 +3,7 @@ import { createClient } from '@/utils/supabase/server';
 import { computeRawBodySha256, verifySignature, detectProvider, type Provider } from '@/lib/signature-verification';
 import { rateLimit } from '@/lib/rate-limit';
 import { signVerificationToken } from '@/lib/verification-token';
-import { checkProStatus } from '@/app/actions/subscription';
+import { checkPlanEntitlements } from '@/app/actions/subscription';
 import { getPlanLimits } from '@/lib/plan';
 
 // Simple in-memory rate limiter for Phase 1 (since we don't have Redis)
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
 
     // 2. Parse Input
     const body = await request.json();
-    const { rawBody, headers, secret, certificateId, reportId } = body;
+    const { rawBody, headers, secret, certificateId, reportId, workspace_id: workspaceIdInput } = body;
 
     // Validate inputs
     if (!rawBody || !headers || !secret) {
@@ -46,9 +46,41 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Login required to verify signatures.' }, { status: 401 });
     }
 
-    const { plan } = await checkProStatus();
+    let workspaceId: string;
+    if (typeof workspaceIdInput === 'string' && workspaceIdInput.trim().length > 0) {
+      const candidateWorkspaceId = workspaceIdInput.trim();
+      const { data: membership } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', user.id)
+        .eq('workspace_id', candidateWorkspaceId)
+        .maybeSingle();
+
+      if (!membership?.workspace_id) {
+        return NextResponse.json({ error: 'You do not have access to the requested workspace.' }, { status: 403 });
+      }
+      workspaceId = membership.workspace_id;
+    } else {
+      const { data: memberships, error: membershipsError } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', user.id);
+
+      if (membershipsError || !memberships || memberships.length === 0) {
+        return NextResponse.json({ error: 'No workspace membership found.' }, { status: 403 });
+      }
+      if (memberships.length > 1) {
+        return NextResponse.json(
+          { error: 'workspace_id is required when verifying across multiple workspaces.' },
+          { status: 400 }
+        );
+      }
+      workspaceId = memberships[0].workspace_id;
+    }
+
+    const { plan, canVerify } = await checkPlanEntitlements(workspaceId);
     const limits = getPlanLimits(plan);
-    if (!limits.canVerify) {
+    if (!canVerify || !limits.canVerify) {
       return NextResponse.json({ error: 'Upgrade required to verify signatures.' }, { status: 403 });
     }
 
@@ -111,6 +143,7 @@ export async function POST(request: NextRequest) {
       verifiedAt,
       toleranceUsedSec: result.toleranceUsedSec,
       rawBodySha256,
+      workspaceId,
       verificationToken,
     });
 

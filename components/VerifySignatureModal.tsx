@@ -11,6 +11,7 @@ interface VerifySignatureModalProps {
   onClose: () => void;
   rawBody: string;
   headers: Record<string, string>;
+  workspaceId?: string | null;
   certificateId?: string; // Optional: provided if we have a saved cert (future flow)
   reportId?: string;      // Optional: provided if we have a saved cert report ID
   onVerified: (result: VerificationApiResponse) => void;
@@ -23,6 +24,7 @@ export function VerifySignatureModal({
   onClose,
   rawBody,
   headers,
+  workspaceId,
   certificateId,
   reportId,
   onVerified,
@@ -60,6 +62,7 @@ export function VerifySignatureModal({
         body: JSON.stringify({
           rawBody,
           headers,
+          workspace_id: workspaceId,
           secret,
           certificateId, // Optional persistence
           reportId       // Optional persistence

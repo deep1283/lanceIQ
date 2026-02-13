@@ -74,13 +74,20 @@ Response:
 Purpose: Verify a payload using a supplied secret.
 Auth: Workspace-scoped or limited.
 Request body:
-1. payload
+1. rawBody
 2. headers
-3. provider
-4. secret
+3. secret
+4. workspace_id (optional for single-workspace users; required when user has multiple workspaces)
+5. reportId or certificateId (optional persistence target)
 Response:
 1. verification status
 2. reason if failed
+3. provider and rawBodySha256
+4. verificationToken (when signing is configured)
+Error semantics:
+1. `400` when `workspace_id` is missing and workspace context is ambiguous (multi-workspace user)
+2. `403` when user is not a member of the supplied `workspace_id`
+3. `403` when workspace entitlement does not allow verification
 
 ### GET /api/audit-logs
 Purpose: Fetch audit logs for a workspace.

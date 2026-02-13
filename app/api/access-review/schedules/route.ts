@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { canManageWorkspace } from '@/lib/roles';
+import { hasWorkspaceEntitlement, teamPlanForbiddenBody } from '@/lib/team-plan-gate';
 
 function isValidUuid(value: string) {
   return /^[0-9a-fA-F-]{36}$/.test(value);
@@ -14,6 +15,22 @@ export async function GET(request: NextRequest) {
   const workspaceId = request.nextUrl.searchParams.get('workspace_id');
   if (!workspaceId || !isValidUuid(workspaceId)) {
     return NextResponse.json({ error: 'workspace_id required' }, { status: 400 });
+  }
+
+  const { data: membership } = await supabase
+    .from('workspace_members')
+    .select('role')
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (!membership) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const entitled = await hasWorkspaceEntitlement(workspaceId, (entitlements) => entitlements.canUseAccessReviews);
+  if (!entitled) {
+    return NextResponse.json(teamPlanForbiddenBody(), { status: 403 });
   }
 
   const { data, error } = await supabase
@@ -50,6 +67,11 @@ export async function POST(request: NextRequest) {
 
   if (!membership || !canManageWorkspace(membership.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const entitled = await hasWorkspaceEntitlement(workspaceId, (entitlements) => entitlements.canUseAccessReviews);
+  if (!entitled) {
+    return NextResponse.json(teamPlanForbiddenBody(), { status: 403 });
   }
 
   const { data, error } = await supabase

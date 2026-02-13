@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
-import { checkProStatus } from "@/app/actions/subscription";
+import { checkPlanEntitlements } from "@/app/actions/subscription";
 import { pickPrimaryWorkspace } from "@/lib/workspace";
 import { canExportCertificates } from "@/lib/roles";
 
@@ -53,7 +53,7 @@ export async function GET() {
   }
 
   // 3. Plan Check (CSV export gated by plan entitlements)
-  const { canExportCsv } = await checkProStatus(workspaceId);
+  const { canExportCsv } = await checkPlanEntitlements(workspaceId);
   if (!canExportCsv) {
     return NextResponse.json(
       { error: "Export is available on Pro and Team plans only." },

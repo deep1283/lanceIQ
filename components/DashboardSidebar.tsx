@@ -13,7 +13,9 @@ import {
   Activity,
   Settings,
   Gavel,
+  Lock,
 } from 'lucide-react';
+import type { PlanEntitlements } from '@/lib/plan';
 
 const primaryItems = [
   {
@@ -30,42 +32,49 @@ const adminItems = [
     label: 'Smart Alerts',
     href: '/dashboard/admin?section=alerts',
     icon: Bell,
+    teamOnly: true,
   },
   {
     key: 'audit',
     label: 'Audit Logs',
     href: '/dashboard/admin?section=audit',
     icon: ScrollText,
+    teamOnly: true,
   },
   {
     key: 'legal',
     label: 'Legal Hold',
     href: '/dashboard/admin?section=legal',
     icon: Gavel,
+    teamOnly: true,
   },
   {
     key: 'members',
     label: 'Team Members',
     href: '/dashboard/admin?section=members',
     icon: Users,
+    teamOnly: true,
   },
   {
     key: 'identity',
     label: 'SSO & SCIM',
     href: '/dashboard/admin?section=identity',
     icon: ShieldCheck,
+    teamOnly: true,
   },
   {
     key: 'access',
     label: 'Access Reviews',
     href: '/dashboard/admin?section=access',
     icon: ClipboardList,
+    teamOnly: true,
   },
   {
     key: 'ops',
     label: 'SLA & Incidents',
     href: '/dashboard/admin?section=ops',
     icon: Activity,
+    teamOnly: true,
   },
 ];
 
@@ -78,14 +87,32 @@ const footerItems = [
   },
 ];
 
-export default function DashboardSidebar() {
+const TEAM_FEATURE_TITLE = 'Team Feature';
+const TEAM_FEATURE_BODY = 'Available on Team plan.';
+
+type SidebarEntitlements = PlanEntitlements & {
+  isPro: boolean;
+};
+
+export default function DashboardSidebar({ initialEntitlements }: { initialEntitlements: SidebarEntitlements }) {
   const pathname = usePathname() || '';
   const searchParams = useSearchParams();
   const tab = searchParams?.get('tab');
   const section = searchParams?.get('section') || 'alerts';
+  const workspaceId = searchParams?.get('workspace_id');
 
   const isDashboard = pathname === '/dashboard';
   const isAdmin = pathname.startsWith('/dashboard/admin');
+
+  const teamEntitlementBySection: Record<string, boolean> = {
+    alerts: initialEntitlements.canUseAlerts,
+    audit: initialEntitlements.canViewAuditLogs,
+    legal: initialEntitlements.canUseLegalHold,
+    members: initialEntitlements.canViewAuditLogs,
+    identity: initialEntitlements.canUseSso,
+    access: initialEntitlements.canUseAccessReviews,
+    ops: initialEntitlements.canUseSlaIncidents,
+  };
 
   const isActive = (itemKey: string) => {
     if (itemKey === 'settings') return pathname.startsWith('/dashboard/settings');
@@ -96,23 +123,41 @@ export default function DashboardSidebar() {
     return false;
   };
 
-  const renderItem = (item: { key: string; label: string; href: string; icon: ElementType }) => {
+  const withWorkspaceHint = (href: string) => {
+    if (!workspaceId) return href;
+    const [basePath, query = ''] = href.split('?');
+    const params = new URLSearchParams(query);
+    params.set('workspace_id', workspaceId);
+    return `${basePath}?${params.toString()}`;
+  };
+
+  const renderItem = (item: { key: string; label: string; href: string; icon: ElementType; teamOnly?: boolean }) => {
     const Icon = item.icon;
     const active = isActive(item.key);
+    const entitled = teamEntitlementBySection[item.key] ?? true;
+    const locked = Boolean(item.teamOnly && !entitled);
+
+    const activeClasses = locked
+      ? 'bg-[var(--dash-surface-2)]/80 text-zinc-200 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)] before:absolute before:left-1 before:top-1/2 before:h-4 before:w-1 before:-translate-y-1/2 before:rounded-full before:bg-zinc-500 before:opacity-70'
+      : 'bg-[var(--dash-surface-2)] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)] before:absolute before:left-1 before:top-1/2 before:h-4 before:w-1 before:-translate-y-1/2 before:rounded-full before:bg-[var(--dash-accent)] before:opacity-70';
+    const inactiveClasses = locked
+      ? 'text-zinc-500 hover:text-zinc-300 hover:bg-[var(--dash-surface-2)]/60'
+      : 'text-zinc-400 hover:text-white hover:bg-[var(--dash-surface-2)]';
+
     return (
       <Link
         key={item.key}
-        href={item.href}
+        href={withWorkspaceHint(item.href)}
+        title={locked ? `${TEAM_FEATURE_TITLE}: ${TEAM_FEATURE_BODY}` : item.label}
         className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 dashboard-focus-ring ${
-          active
-            ? 'bg-[var(--dash-surface-2)] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)] before:absolute before:left-1 before:top-1/2 before:h-4 before:w-1 before:-translate-y-1/2 before:rounded-full before:bg-[var(--dash-accent)] before:opacity-70'
-            : 'text-zinc-400 hover:text-white hover:bg-[var(--dash-surface-2)]'
+          active ? activeClasses : inactiveClasses
         }`}
       >
         <Icon className="h-4 w-4 shrink-0" />
         <span className="whitespace-nowrap opacity-0 translate-x-2 transition-all duration-100 group-hover/sidebar:opacity-100 group-hover/sidebar:translate-x-0 group-hover/sidebar:delay-150">
           {item.label}
         </span>
+        {locked && <Lock className="ml-auto h-3.5 w-3.5 shrink-0 text-zinc-500" />}
       </Link>
     );
   };

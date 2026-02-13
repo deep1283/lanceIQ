@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { computeUptime } from '@/lib/sla/compute';
+import { hasWorkspaceEntitlement, teamPlanForbiddenBody } from '@/lib/team-plan-gate';
 
 function isValidUuid(value: string) {
   return /^[0-9a-fA-F-]{36}$/.test(value);
@@ -28,6 +29,11 @@ export async function GET(request: NextRequest) {
 
   if (!membership) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const entitled = await hasWorkspaceEntitlement(workspaceId, (entitlements) => entitlements.canUseSlaIncidents);
+  if (!entitled) {
+    return NextResponse.json(teamPlanForbiddenBody(), { status: 403 });
   }
 
   const windowEnd = new Date();

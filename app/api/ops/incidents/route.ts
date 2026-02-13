@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { canManageWorkspace } from '@/lib/roles';
+import { hasWorkspaceEntitlement, teamPlanForbiddenBody } from '@/lib/team-plan-gate';
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -30,29 +31,30 @@ export async function GET(request: NextRequest) {
   const workspaceId = searchParams.get('workspace_id');
   const includeGlobal = searchParams.get('include_global') !== 'false';
 
-  if (workspaceId && !isValidUuid(workspaceId)) {
+  if (!workspaceId || !isValidUuid(workspaceId)) {
     return NextResponse.json({ error: 'workspace_id invalid' }, { status: 400 });
   }
 
-  if (workspaceId) {
-    const { data: membership } = await supabase
-      .from('workspace_members')
-      .select('role')
-      .eq('workspace_id', workspaceId)
-      .eq('user_id', user.id)
-      .single();
-    if (!membership) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+  const { data: membership } = await supabase
+    .from('workspace_members')
+    .select('role')
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', user.id)
+    .single();
+  if (!membership) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const entitled = await hasWorkspaceEntitlement(workspaceId, (entitlements) => entitlements.canUseSlaIncidents);
+  if (!entitled) {
+    return NextResponse.json(teamPlanForbiddenBody(), { status: 403 });
   }
 
   let query = supabase.from('incident_reports').select('*').order('started_at', { ascending: false });
-  if (workspaceId && includeGlobal) {
+  if (includeGlobal) {
     query = query.or(`workspace_id.is.null,workspace_id.eq.${workspaceId}`);
-  } else if (workspaceId) {
-    query = query.eq('workspace_id', workspaceId);
   } else {
-    query = query.is('workspace_id', null);
+    query = query.eq('workspace_id', workspaceId);
   }
 
   const { data, error } = await query;
@@ -90,6 +92,11 @@ export async function POST(request: NextRequest) {
 
     if (!membership || !canManageWorkspace(membership.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const entitled = await hasWorkspaceEntitlement(workspaceId, (entitlements) => entitlements.canUseSlaIncidents);
+    if (!entitled) {
+      return NextResponse.json(teamPlanForbiddenBody(), { status: 403 });
     }
   }
 
@@ -152,6 +159,11 @@ export async function PATCH(request: NextRequest) {
       .single();
     if (!membership || !canManageWorkspace(membership.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const entitled = await hasWorkspaceEntitlement(existing.workspace_id, (entitlements) => entitlements.canUseSlaIncidents);
+    if (!entitled) {
+      return NextResponse.json(teamPlanForbiddenBody(), { status: 403 });
     }
   }
 

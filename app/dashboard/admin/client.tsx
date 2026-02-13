@@ -7,6 +7,7 @@ import { inviteMember, removeMember } from '@/app/actions/members';
 import { createScimToken, revokeScimToken, saveSsoProvider } from '../settings/actions';
 import type { Role } from '@/lib/roles';
 import { canInviteMembers, canManageWorkspace, canRemoveMembers, canViewAuditLogs, isLegalHoldManager, isViewer } from '@/lib/roles';
+import type { PlanEntitlements } from '@/lib/plan';
 
 interface Workspace {
   id: string;
@@ -178,8 +179,34 @@ interface RunbookCheck {
   latest_result: RunbookResult | null;
 }
 
+type AdminTab = 'alerts' | 'audit' | 'legal' | 'members' | 'identity' | 'access' | 'ops';
+type EffectiveEntitlements = PlanEntitlements & { isPro: boolean };
+
+const ADMIN_TABS: AdminTab[] = ['alerts', 'audit', 'legal', 'members', 'identity', 'access', 'ops'];
+const TEAM_FEATURE_TITLE = 'Team Feature';
+const TEAM_FEATURE_BODY = 'Available on Team plan.';
+const TEAM_FEATURE_CTA = 'Upgrade to Team';
+const TEAM_FEATURE_CTA_HREF = '/contact';
+const ROLE_RESTRICTED_MESSAGE = 'Your role does not grant access to this section.';
+
+const TEAM_FEATURE_VALUE_BY_TAB: Record<AdminTab, string> = {
+  alerts: 'Detect critical delivery failures quickly with workspace-level alerting.',
+  audit: 'Review immutable workspace audit history for security and compliance.',
+  legal: 'Track legal hold status before retention cleanup can prune data.',
+  members: 'Manage collaborators and operational ownership in one place.',
+  identity: 'Configure SAML SSO and SCIM lifecycle management for your team.',
+  access: 'Run structured access review cycles and keep attestation records.',
+  ops: 'Monitor incidents, DR replication, runbook checks, and retention automation.',
+};
+
+const isAdminTab = (value: string | null | undefined): value is AdminTab => {
+  if (!value) return false;
+  return ADMIN_TABS.includes(value as AdminTab);
+};
+
 export default function SettingsClient({ 
   workspace, 
+  initialEntitlements,
   initialSettings,
   initialAuditLogs,
   initialMembers,
@@ -196,6 +223,7 @@ export default function SettingsClient({
   initialRetentionExecutions
 }: { 
   workspace: Workspace, 
+  initialEntitlements: EffectiveEntitlements,
   initialSettings: AlertSetting | null,
   initialAuditLogs: AuditLog[],
   initialMembers: Member[],
@@ -212,9 +240,8 @@ export default function SettingsClient({
   initialRetentionExecutions: RetentionExecution[]
 }) {
   const router = useRouter();
-  const isTeam = workspace.plan === 'team';
-  const isPastDue = workspace.subscription_status === 'past_due';
-  const canUseAlerts = isTeam && (workspace.subscription_status === 'active' || isPastDue);
+  const entitlements = initialEntitlements;
+  const canUseAlertsEntitlement = entitlements.canUseAlerts;
   const canManage = canManageWorkspace(currentUserRole);
   const canViewAudit = canViewAuditLogs(currentUserRole);
   const canInvite = canInviteMembers(currentUserRole);
@@ -223,36 +250,64 @@ export default function SettingsClient({
   const canViewAccessReviews = canManage || isViewer(currentUserRole) || isLegalHoldManager(currentUserRole);
   const canViewLegalHold = canManage || isLegalHoldManager(currentUserRole);
   const canViewOps = Boolean(currentUserRole);
+  const canAccessOps = canViewOps && entitlements.canUseSlaIncidents;
+  const canManageOpsData = canManage && entitlements.canUseSlaIncidents;
 
-  type AdminTab = 'alerts' | 'audit' | 'legal' | 'members' | 'identity' | 'access' | 'ops';
+  const tabState: Record<AdminTab, { roleAllowed: boolean; entitled: boolean; locked: boolean }> = {
+    alerts: {
+      roleAllowed: canManage,
+      entitled: canUseAlertsEntitlement,
+      locked: !canUseAlertsEntitlement,
+    },
+    audit: {
+      roleAllowed: canViewAudit,
+      entitled: entitlements.canViewAuditLogs,
+      locked: !entitlements.canViewAuditLogs,
+    },
+    legal: {
+      roleAllowed: canViewLegalHold,
+      entitled: entitlements.canUseLegalHold,
+      locked: !entitlements.canUseLegalHold,
+    },
+    members: {
+      roleAllowed: canManage,
+      entitled: entitlements.canViewAuditLogs,
+      locked: !entitlements.canViewAuditLogs,
+    },
+    identity: {
+      roleAllowed: canViewSso,
+      entitled: entitlements.canUseSso,
+      locked: !entitlements.canUseSso,
+    },
+    access: {
+      roleAllowed: canViewAccessReviews,
+      entitled: entitlements.canUseAccessReviews,
+      locked: !entitlements.canUseAccessReviews,
+    },
+    ops: {
+      roleAllowed: canViewOps,
+      entitled: entitlements.canUseSlaIncidents,
+      locked: !entitlements.canUseSlaIncidents,
+    },
+  };
 
-  const availableTabs = [
-    canManage ? 'alerts' : null,
-    canViewAudit ? 'audit' : null,
-    canViewLegalHold ? 'legal' : null,
-    canManage ? 'members' : null,
-    canViewSso ? 'identity' : null,
-    canViewAccessReviews ? 'access' : null,
-    canViewOps ? 'ops' : null,
-  ].filter((tab): tab is AdminTab => Boolean(tab));
+  const isTabLocked = (tab: AdminTab) => tabState[tab].locked;
+  const canAccessTab = (tab: AdminTab) => tabState[tab].roleAllowed && tabState[tab].entitled;
+  const defaultTab =
+    ADMIN_TABS.find((tab) => canAccessTab(tab) || isTabLocked(tab)) || 'alerts';
 
   const searchParams = useSearchParams();
   const sectionParam = searchParams?.get('section');
-  const initialTab = sectionParam && availableTabs.includes(sectionParam as AdminTab)
-    ? (sectionParam as AdminTab)
-    : (availableTabs[0] || 'alerts');
+  const initialTab = isAdminTab(sectionParam) ? sectionParam : defaultTab;
 
   const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
 
   useEffect(() => {
-    if (!sectionParam) return;
-    const nextTab = availableTabs.includes(sectionParam as AdminTab)
-      ? (sectionParam as AdminTab)
-      : availableTabs[0];
-    if (nextTab && nextTab !== activeTab) {
+    const nextTab = isAdminTab(sectionParam) ? sectionParam : defaultTab;
+    if (nextTab !== activeTab) {
       setActiveTab(nextTab);
     }
-  }, [sectionParam, availableTabs, activeTab]);
+  }, [activeTab, defaultTab, sectionParam]);
 
   const [settings, setSettings] = useState<AlertSetting>(initialSettings || {
     channel: 'email',
@@ -310,8 +365,20 @@ export default function SettingsClient({
   const runbookLoadedRef = useRef(false);
   const replicationLoadedRef = useRef(false);
 
+  const buildApiErrorMessage = useCallback((
+    status: number,
+    rawError: unknown,
+    fallback: string,
+    teamEntitled: boolean
+  ) => {
+    if (status === 403) {
+      return teamEntitled ? ROLE_RESTRICTED_MESSAGE : TEAM_FEATURE_BODY;
+    }
+    return typeof rawError === 'string' && rawError.length > 0 ? rawError : fallback;
+  }, []);
+
   async function handleSave() {
-    if (!canUseAlerts) return; // Strict gating
+    if (!canAccessTab('alerts')) return;
     setSaving(true);
 
     const payload = {
@@ -370,7 +437,7 @@ export default function SettingsClient({
   }, [initialSsoProviders, selectedProviderId]);
 
   const loadReplicationStatus = useCallback(async () => {
-    if (!canManage) return;
+    if (!canManageOpsData) return;
     setReplicationLoading(true);
     setReplicationError(null);
     try {
@@ -378,7 +445,14 @@ export default function SettingsClient({
       const res = await fetch(`/api/ops/replication/status?${params.toString()}`);
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to load replication status.');
+        throw new Error(
+          buildApiErrorMessage(
+            res.status,
+            data?.error,
+            'Failed to load replication status.',
+            entitlements.canUseSlaIncidents
+          )
+        );
       }
       setReplicationStatus(data);
     } catch (error) {
@@ -386,9 +460,10 @@ export default function SettingsClient({
     } finally {
       setReplicationLoading(false);
     }
-  }, [canManage, workspace.id]);
+  }, [buildApiErrorMessage, canManageOpsData, entitlements.canUseSlaIncidents, workspace.id]);
 
   const loadRunbookChecks = useCallback(async () => {
+    if (!canAccessOps) return;
     setRunbookLoading(true);
     setRunbookError(null);
     try {
@@ -396,7 +471,14 @@ export default function SettingsClient({
       const res = await fetch(`/api/ops/runbooks/checks?${params.toString()}`);
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to load runbook checks.');
+        throw new Error(
+          buildApiErrorMessage(
+            res.status,
+            data?.error,
+            'Failed to load runbook checks.',
+            entitlements.canUseSlaIncidents
+          )
+        );
       }
       setRunbookChecks(data.checks || []);
     } catch (error) {
@@ -404,23 +486,24 @@ export default function SettingsClient({
     } finally {
       setRunbookLoading(false);
     }
-  }, [workspace.id]);
+  }, [buildApiErrorMessage, canAccessOps, entitlements.canUseSlaIncidents, workspace.id]);
 
   useEffect(() => {
-    if (activeTab !== 'ops') return;
+    if (activeTab !== 'ops' || !canAccessOps) return;
 
     if (!runbookLoadedRef.current) {
       runbookLoadedRef.current = true;
       loadRunbookChecks();
     }
 
-    if (!replicationLoadedRef.current && canManage) {
+    if (!replicationLoadedRef.current && canManageOpsData) {
       replicationLoadedRef.current = true;
       loadReplicationStatus();
     }
-  }, [activeTab, canManage, loadReplicationStatus, loadRunbookChecks]);
+  }, [activeTab, canAccessOps, canManageOpsData, loadReplicationStatus, loadRunbookChecks]);
 
   useEffect(() => {
+    if (activeTab !== 'ops' || !canAccessOps) return;
     if (!incidentsLoadedRef.current) {
       incidentsLoadedRef.current = true;
       return;
@@ -437,7 +520,14 @@ export default function SettingsClient({
         const res = await fetch(`/api/ops/incidents?${params.toString()}`);
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data.error || 'Failed to load incidents.');
+          throw new Error(
+            buildApiErrorMessage(
+              res.status,
+              data?.error,
+              'Failed to load incidents.',
+              entitlements.canUseSlaIncidents
+            )
+          );
         }
         setIncidents(data.incidents || []);
       } catch (error) {
@@ -448,7 +538,7 @@ export default function SettingsClient({
     }
 
     loadIncidents();
-  }, [includeGlobal, workspace.id]);
+  }, [activeTab, buildApiErrorMessage, canAccessOps, entitlements.canUseSlaIncidents, includeGlobal, workspace.id]);
 
   async function handleSaveSsoProvider(e: React.FormEvent) {
     e.preventDefault();
@@ -544,7 +634,7 @@ export default function SettingsClient({
 
   async function handleCreateAccessReview(e: React.FormEvent) {
     e.preventDefault();
-    if (!canManage) return;
+    if (!canManage || !canAccessTab('access')) return;
 
     setAccessCreating(true);
     setAccessError(null);
@@ -562,7 +652,14 @@ export default function SettingsClient({
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to create access review cycle.');
+        throw new Error(
+          buildApiErrorMessage(
+            res.status,
+            data?.error,
+            'Failed to create access review cycle.',
+            entitlements.canUseAccessReviews
+          )
+        );
       }
       setAccessSuccess('Access review cycle created.');
       setAccessPeriodStart('');
@@ -576,6 +673,7 @@ export default function SettingsClient({
   }
 
   async function handleRefreshSla() {
+    if (!canAccessTab('ops')) return;
     setSlaRefreshing(true);
     setSlaError(null);
     try {
@@ -586,7 +684,14 @@ export default function SettingsClient({
       const res = await fetch(`/api/ops/sla?${params.toString()}`);
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to load SLA summary.');
+        throw new Error(
+          buildApiErrorMessage(
+            res.status,
+            data?.error,
+            'Failed to load SLA summary.',
+            entitlements.canUseSlaIncidents
+          )
+        );
       }
       setSlaSummary({
         workspace_id: data.workspace_id,
@@ -645,15 +750,39 @@ export default function SettingsClient({
       .sort((a, b) => new Date(b.executed_at).getTime() - new Date(a.executed_at).getTime())[0];
   };
 
+  const renderTeamFeatureLockedCard = (tab: AdminTab) => (
+    <div className="dashboard-panel rounded-xl p-6">
+      <h2 className="text-xl font-semibold text-slate-900 mb-2">{TEAM_FEATURE_TITLE}</h2>
+      <p className="dashboard-text-muted text-sm mb-2">{TEAM_FEATURE_BODY}</p>
+      <p className="dashboard-text-muted text-sm mb-6">{TEAM_FEATURE_VALUE_BY_TAB[tab]}</p>
+      <a
+        href={TEAM_FEATURE_CTA_HREF}
+        className="inline-flex items-center justify-center dashboard-button-primary px-4 py-2 rounded-md text-sm font-medium"
+      >
+        {TEAM_FEATURE_CTA}
+      </a>
+    </div>
+  );
+
+  const renderRoleRestrictedCard = () => (
+    <div className="dashboard-panel rounded-xl p-6 dashboard-text-muted">
+      {ROLE_RESTRICTED_MESSAGE}
+    </div>
+  );
+
   return (
     <div className="max-w-5xl mx-auto py-12 px-6">
       <h1 className="text-3xl font-semibold text-slate-900 mb-2">Workspace Admin</h1>
       <p className="text-sm dashboard-text-muted mb-8">Operational controls for alerts, audit logs, identity, and compliance.</p>
 
       {/* Tab Content */}
-      {activeTab === 'alerts' && canManage ? (
+      {isTabLocked(activeTab) ? (
+        renderTeamFeatureLockedCard(activeTab)
+      ) : !canAccessTab(activeTab) ? (
+        renderRoleRestrictedCard()
+      ) : activeTab === 'alerts' ? (
         <div className="relative">
-          <div className={`dashboard-panel rounded-xl p-6 ${!canUseAlerts && 'opacity-50 pointer-events-none blur-[1px]'}`}>
+          <div className="dashboard-panel rounded-xl p-6">
             <h2 className="text-xl font-semibold text-slate-900 mb-6">Smart Alerts</h2>
             
             <div className="space-y-6">
@@ -718,23 +847,8 @@ export default function SettingsClient({
               </div>
             </div>
           </div>
-          
-          {!canUseAlerts && (
-            <div className="absolute inset-0 flex items-center justify-center z-10">
-              <div className="bg-[var(--dash-bg)] border dashboard-border p-8 rounded-xl text-center backdrop-blur-sm max-w-sm mx-4">
-                <div className="w-12 h-12 dashboard-accent-soft dashboard-accent-text rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-                </div>
-                <h3 className="text-xl font-semibold text-slate-900 mb-2">Smart Alerts are Locked</h3>
-                <p className="dashboard-text-muted mb-6 text-sm">Upgrade to the Team plan to enable real-time critical alerts via email.</p>
-                <a href="/contact" className="block w-full dashboard-button-primary font-semibold py-2.5 rounded-md transition-colors">
-                  Contact Sales
-                </a>
-              </div>
-            </div>
-          )}
         </div>
-      ) : activeTab === 'audit' && canViewAudit ? (
+      ) : activeTab === 'audit' ? (
         /* Audit Logs Tab */
         <div className="dashboard-panel rounded-xl overflow-hidden relative">
           <div className="p-6 border-b dashboard-border flex justify-between items-center">
@@ -743,7 +857,7 @@ export default function SettingsClient({
                <p className="dashboard-text-muted text-sm">Track all critical actions in your workspace.</p>
              </div>
              {/* Simple export button placeholder */}
-             <button className="text-sm dashboard-button-ghost transition-colors flex items-center gap-2" disabled={!isTeam}>
+             <button className="text-sm dashboard-button-ghost transition-colors flex items-center gap-2">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                 Export CSV
              </button>
@@ -789,22 +903,8 @@ export default function SettingsClient({
             </table>
           </div>
 
-          {!isTeam && (
-            <div className="absolute inset-0 flex items-center justify-center z-10">
-              <div className="bg-[var(--dash-bg)] border dashboard-border p-8 rounded-xl text-center backdrop-blur-sm max-w-sm mx-4">
-                <div className="w-12 h-12 dashboard-accent-soft dashboard-accent-text rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-                </div>
-                <h3 className="text-xl font-semibold text-slate-900 mb-2">Audit Log is Locked</h3>
-                <p className="dashboard-text-muted mb-6 text-sm">Upgrade to the Team plan to access audit logs.</p>
-                <a href="/contact" className="block w-full dashboard-button-primary font-semibold py-2.5 rounded-md transition-colors">
-                  Contact Sales
-                </a>
-              </div>
-            </div>
-          )}
         </div>
-      ) : activeTab === 'legal' && canViewLegalHold ? (
+      ) : activeTab === 'legal' ? (
         <div className="dashboard-panel rounded-xl p-6">
           <div className="flex items-start justify-between gap-4 mb-4">
             <div>
@@ -845,24 +945,11 @@ export default function SettingsClient({
             )}
           </div>
         </div>
-      ) : activeTab === 'members' && canManage ? (
+      ) : activeTab === 'members' ? (
         /* Team Members Tab */
-        <div className="dashboard-panel rounded-xl p-6 relative">
+        <div className="dashboard-panel rounded-xl p-6">
            <h2 className="text-xl font-semibold text-slate-900 mb-6">Team Members</h2>
-           
-           {!isTeam && (
-             <div className="absolute inset-0 flex items-center justify-center z-10 bg-[var(--dash-bg)] rounded-xl backdrop-blur-sm">
-                <div className="text-center p-8 border dashboard-border rounded-xl bg-[var(--dash-surface)] max-w-sm">
-                   <h3 className="text-xl font-semibold text-slate-900 mb-2">Team Management Locked</h3>
-                   <p className="dashboard-text-muted mb-6 text-sm">Collaborate with your team by upgrading to the Team plan.</p>
-                   <a href="/contact" className="block w-full dashboard-button-primary font-semibold py-2.5 rounded-md transition-colors">
-                      Contact Sales
-                   </a>
-                </div>
-             </div>
-           )}
-
-           <div className={`${!isTeam && 'opacity-20 pointer-events-none'}`}>
+           <div>
              {/* Invite Form */}
              {canInvite && (
                <div className="mb-8 dashboard-panel-muted p-4 rounded-lg">
@@ -940,7 +1027,7 @@ export default function SettingsClient({
              </div>
            </div>
         </div>
-      ) : activeTab === 'identity' && canViewSso ? (
+      ) : activeTab === 'identity' ? (
         <div className="space-y-8">
           <div className="dashboard-panel rounded-xl p-6">
             <div className="flex items-start justify-between">
@@ -1192,7 +1279,7 @@ export default function SettingsClient({
             </div>
           </div>
         </div>
-      ) : activeTab === 'access' && canViewAccessReviews ? (
+      ) : activeTab === 'access' ? (
         <div className="space-y-8">
           <div className="dashboard-panel rounded-xl p-6">
             <div className="flex items-start justify-between">
@@ -1321,7 +1408,7 @@ export default function SettingsClient({
             </div>
           </div>
         </div>
-      ) : activeTab === 'ops' && canViewOps ? (
+      ) : activeTab === 'ops' ? (
         <div className="space-y-8">
           <div className="dashboard-panel rounded-xl p-6">
             <div className="flex items-start justify-between">

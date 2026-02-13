@@ -7,7 +7,7 @@ import {
   extractEventId
 } from "@/lib/signature-verification";
 import { verifyVerificationToken } from "@/lib/verification-token";
-import { checkProStatus } from "@/app/actions/subscription";
+import { checkPlanEntitlements } from "@/app/actions/subscription";
 import { getPlanLimits, getRetentionExpiry } from "@/lib/plan";
 import { pickPrimaryWorkspace } from "@/lib/workspace";
 
@@ -49,8 +49,8 @@ export async function saveCertificate(data: CertificateData) {
 
   const workspaceId = activeWorkspace.id;
 
-  // Pass workspaceId to checkProStatus to ensure we check the RIGHT workspace's plan
-  const { plan } = await checkProStatus(workspaceId);
+  // Pass workspaceId so entitlements are scoped to the active workspace.
+  const { plan } = await checkPlanEntitlements(workspaceId);
   const limits = getPlanLimits(plan);
   const now = new Date();
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0));

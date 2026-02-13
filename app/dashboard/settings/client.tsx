@@ -2,6 +2,7 @@
 
 
 import { useDashboardTheme } from '@/components/DashboardThemeProvider';
+import type { PlanEntitlements } from '@/lib/plan';
 
 interface Workspace {
   id: string;
@@ -14,23 +15,30 @@ interface Workspace {
 
 export default function SettingsClient({
   workspace,
+  userEmail,
+  workspaceRole,
+  effectiveEntitlements,
+  teamAdminEmails,
 }: {
   workspace: Workspace;
+  userEmail: string | null;
+  workspaceRole: string;
+  effectiveEntitlements: PlanEntitlements & { isPro: boolean };
+  teamAdminEmails: string[];
 }) {
   const { isDark, setIsDark } = useDashboardTheme();
   const isPastDue = workspace.subscription_status === 'past_due';
+  const isTeamPlan = effectiveEntitlements.canUseSso;
+  const canViewTeamEmails = workspaceRole === 'owner' || workspaceRole === 'admin';
 
   return (
     <div className="max-w-4xl mx-auto py-10 px-6">
       <h1 className="text-3xl font-semibold mb-8 text-slate-900">Workspace Settings</h1>
 
-      {/* Appearance */}
+      {/* Dark Mode */}
       <div className="dashboard-panel rounded-xl p-6 mb-10">
         <div className="flex items-center justify-between gap-6">
-          <div>
-            <h2 className="text-xl font-semibold text-slate-900 mb-1">Appearance</h2>
-            <p className="dashboard-text-muted text-sm">Toggle dark mode for Dashboard and Settings.</p>
-          </div>
+          <h2 className="text-xl font-semibold text-slate-900">Dark Mode</h2>
           <button
             type="button"
             role="switch"
@@ -68,6 +76,37 @@ export default function SettingsClient({
             {isPastDue && <span className="ml-2 text-yellow-500 font-bold">PAST DUE</span>}
           </div>
         </div>
+      </div>
+
+      {/* Account Email */}
+      <div className="dashboard-panel rounded-xl p-6 mb-10">
+        {!isTeamPlan ? (
+          <div>
+            <h2 className="text-xl font-semibold text-slate-900 mb-4">Signed-in Email</h2>
+            <p className="font-mono text-sm dashboard-text-muted">{userEmail || 'Not available'}</p>
+          </div>
+        ) : (
+          <div>
+            <h2 className="text-xl font-semibold text-slate-900 mb-4">Team Admin Emails</h2>
+            {canViewTeamEmails ? (
+              teamAdminEmails.length > 0 ? (
+                <div className="space-y-2">
+                  {teamAdminEmails.map((email) => (
+                    <p key={email} className="font-mono text-sm dashboard-text-muted">
+                      {email}
+                    </p>
+                  ))}
+                </div>
+              ) : (
+                <p className="dashboard-text-muted text-sm">No admin emails available.</p>
+              )
+            ) : (
+              <p className="dashboard-text-muted text-sm">
+                Admin team emails are visible to owners and admins only.
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {isPastDue && (

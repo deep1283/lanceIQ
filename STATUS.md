@@ -58,6 +58,11 @@ Owner: Product Owner (You)
 47. Security hardening: in-memory rate limiter enforces `uniqueTokenPerInterval` cap.
 48. Frontend alignment: removed email-unlock purchase flow and aligned success flow to secure payment-proof contract.
 49. Security regression tests added for SAML, billing proof, and rate limiter behavior.
+50. V5.1 alignment: shared workspace context resolver added for Dashboard layout/admin/settings with deterministic fallback (hint -> cookie -> primary).
+51. V5.1 alignment: Team-feature gating now resolves from effective workspace entitlements in settings/admin/layout, removing raw-plan drift.
+52. V5.1 alignment: `/api/verify-signature` is workspace-scoped (`workspace_id` aware), blocks ambiguous multi-workspace requests, and enforces workspace membership + entitlements.
+53. V5.1 alignment: frontend verification flow sends workspace context to signature verification API.
+54. V5.1 alignment: billing activation trust boundary preserved (verify endpoints proof-only; webhook-only mutation) with regression coverage retained.
 
 ## In Progress
 1. None active (ready to start next phase).

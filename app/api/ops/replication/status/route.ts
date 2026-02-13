@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { canManageWorkspace } from '@/lib/roles';
+import { hasWorkspaceEntitlement, teamPlanForbiddenBody } from '@/lib/team-plan-gate';
 
 const DEFAULT_LAG_THRESHOLD_SEC = 60;
 
@@ -55,6 +56,11 @@ export async function GET(request: NextRequest) {
 
   if (!membership || !canManageWorkspace(membership.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const entitled = await hasWorkspaceEntitlement(workspaceId);
+  if (!entitled) {
+    return NextResponse.json(teamPlanForbiddenBody(), { status: 403 });
   }
 
   const { data: configs, error: configError } = await supabase

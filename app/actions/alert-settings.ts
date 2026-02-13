@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server';
 import { logAuditAction, AUDIT_ACTIONS } from '@/utils/audit';
 import { revalidatePath } from 'next/cache';
 import { canManageWorkspace } from '@/lib/roles';
+import { checkPlanEntitlements } from '@/app/actions/subscription';
 
 interface AlertSettingsUpdate {
   workspace_id: string;
@@ -50,25 +51,8 @@ export async function updateAlertSettings(data: AlertSettingsUpdate) {
   }
 
   // 1.5 Check plan access (server-side gating)
-  const { data: workspace, error: workspaceError } = await supabase
-    .from('workspaces')
-    .select('plan, subscription_status, subscription_current_period_end')
-    .eq('id', workspaceId)
-    .single();
-
-  if (workspaceError || !workspace) {
-    return { error: 'Workspace not found.' };
-  }
-
-  const isTeam = workspace.plan === 'team';
-  const status = workspace.subscription_status;
-  const isActive = status === 'active' || status === 'past_due';
-  const isCanceledButActive =
-    status === 'canceled' &&
-    typeof workspace.subscription_current_period_end === 'string' &&
-    new Date(workspace.subscription_current_period_end).getTime() > Date.now();
-  const canUseAlerts = isTeam && (isActive || isCanceledButActive);
-  if (!canUseAlerts) {
+  const entitlements = await checkPlanEntitlements(workspaceId);
+  if (!entitlements.canUseAlerts) {
     return { error: 'Upgrade to Team to enable alert settings.' };
   }
 

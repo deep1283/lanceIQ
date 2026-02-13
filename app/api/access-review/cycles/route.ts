@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { canManageWorkspace } from '@/lib/roles';
 import { logAuditAction, AUDIT_ACTIONS } from '@/utils/audit';
+import { hasWorkspaceEntitlement, teamPlanForbiddenBody } from '@/lib/team-plan-gate';
 
 function isValidUuid(value: string) {
   return /^[0-9a-fA-F-]{36}$/.test(value);
@@ -26,6 +27,11 @@ export async function GET(request: NextRequest) {
 
   if (!membership || !canManageWorkspace(membership.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const entitled = await hasWorkspaceEntitlement(workspaceId, (entitlements) => entitlements.canUseAccessReviews);
+  if (!entitled) {
+    return NextResponse.json(teamPlanForbiddenBody(), { status: 403 });
   }
 
   const { data, error } = await supabase
@@ -62,6 +68,11 @@ export async function POST(request: NextRequest) {
 
   if (!membership || !canManageWorkspace(membership.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const entitled = await hasWorkspaceEntitlement(workspaceId, (entitlements) => entitlements.canUseAccessReviews);
+  if (!entitled) {
+    return NextResponse.json(teamPlanForbiddenBody(), { status: 403 });
   }
 
   const { data, error } = await supabase

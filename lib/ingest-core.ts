@@ -15,6 +15,7 @@ import { checkRateLimit, getRedisClient, markAndCheckDuplicate } from '@/lib/ing
 import { isCriticalReason, maybeSendCriticalAlert, type AlertSetting } from '@/lib/alerting';
 import { anchorIngestedEvent } from '@/lib/timestamps/anchor';
 import { getPlanLimits, type PlanTier } from '@/lib/plan';
+import { getEffectiveEntitlementsForWorkspace } from '@/lib/entitlements';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -328,14 +329,7 @@ export function errorResponse(message: string, status: number, code: string, hea
 }
 
 function canSendAlerts(workspace: { plan?: string | null; subscription_status?: string | null; subscription_current_period_end?: string | null }) {
-  const plan = workspace.plan;
-  if (plan !== 'team') return false;
-  const status = workspace.subscription_status;
-  if (status === 'active' || status === 'past_due') return true;
-  if (status === 'canceled' && workspace.subscription_current_period_end) {
-    return new Date(workspace.subscription_current_period_end).getTime() > Date.now();
-  }
-  return false;
+  return getEffectiveEntitlementsForWorkspace(workspace).canUseAlerts;
 }
 
 function tryParseJson(str: string): unknown {

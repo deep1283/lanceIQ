@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { FileText, Download, Calendar, CheckCircle, ShieldCheck, ShieldAlert, AlertTriangle, Plus, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
 import { DashboardClient } from "@/components/DashboardClient";
-import { checkProStatus } from "@/app/actions/subscription";
+import { checkPlanEntitlements } from "@/app/actions/subscription";
 import { getPlanLimits } from "@/lib/plan";
 import { pickPrimaryWorkspace } from "@/lib/workspace";
 import { canExportCertificates } from "@/lib/roles";
@@ -47,7 +47,7 @@ export default async function DashboardPage({
   const workspaceRole = activeMembership?.role ?? null;
   const canExport = canExportCertificates(workspaceRole);
 
-  const { plan } = workspaceId ? await checkProStatus(workspaceId) : { plan: 'free' as const };
+  const { plan } = workspaceId ? await checkPlanEntitlements(workspaceId) : { plan: 'free' as const };
   const limits = getPlanLimits(plan);
 
   const nowIso = new Date().toISOString();

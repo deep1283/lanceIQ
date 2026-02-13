@@ -4,6 +4,7 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { generateApiKey } from '@/lib/api-key';
 import { isOwner } from '@/lib/roles';
 import { logAuditAction, AUDIT_ACTIONS } from '@/utils/audit';
+import { hasWorkspaceEntitlement, teamPlanForbiddenBody } from '@/lib/team-plan-gate';
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -34,6 +35,11 @@ export async function POST(request: NextRequest) {
 
   if (!membership || !isOwner(membership.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const entitled = await hasWorkspaceEntitlement(workspaceId, (entitlements) => entitlements.canRotateKeys);
+  if (!entitled) {
+    return NextResponse.json(teamPlanForbiddenBody(), { status: 403 });
   }
 
   const { data: workspace, error: wsError } = await supabase

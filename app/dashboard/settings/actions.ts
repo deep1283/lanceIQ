@@ -6,6 +6,7 @@ import { createClient } from '@/utils/supabase/server';
 import { createAdminClient } from '@/utils/supabase/admin';
 import { canManageWorkspace } from '@/lib/roles';
 import { hashScimToken } from '@/lib/scim/utils';
+import { hasWorkspaceEntitlement, TEAM_PLAN_REQUIRED_MESSAGE } from '@/lib/team-plan-gate';
 
 function hasAdminEnv() {
   return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -39,6 +40,11 @@ export async function saveSsoProvider(params: {
 
   if (!membership || !canManageWorkspace(membership.role)) {
     return { error: 'You do not have permission to manage SSO.' };
+  }
+
+  const entitled = await hasWorkspaceEntitlement(workspaceId, (entitlements) => entitlements.canUseSso);
+  if (!entitled) {
+    return { error: TEAM_PLAN_REQUIRED_MESSAGE };
   }
 
   const payload = {
@@ -106,6 +112,11 @@ export async function createScimToken(params: {
     return { error: 'You do not have permission to manage SCIM tokens.' };
   }
 
+  const entitled = await hasWorkspaceEntitlement(params.workspaceId, (entitlements) => entitlements.canUseScim);
+  if (!entitled) {
+    return { error: TEAM_PLAN_REQUIRED_MESSAGE };
+  }
+
   if (!hasAdminEnv()) {
     return { error: 'Server configuration error.' };
   }
@@ -157,6 +168,11 @@ export async function revokeScimToken(params: {
 
   if (!membership || !canManageWorkspace(membership.role)) {
     return { error: 'You do not have permission to manage SCIM tokens.' };
+  }
+
+  const entitled = await hasWorkspaceEntitlement(params.workspaceId, (entitlements) => entitlements.canUseScim);
+  if (!entitled) {
+    return { error: TEAM_PLAN_REQUIRED_MESSAGE };
   }
 
   if (!hasAdminEnv()) {

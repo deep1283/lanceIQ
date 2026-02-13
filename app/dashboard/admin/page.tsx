@@ -1,8 +1,11 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/utils/supabase/server';
 import AdminClient from './client';
-import { canManageWorkspace, isLegalHoldManager, isViewer } from '@/lib/roles';
+import { canManageWorkspace, canViewAuditLogs, isLegalHoldManager, isViewer } from '@/lib/roles';
 import { computeUptime } from '@/lib/sla/compute';
+import { checkPlanEntitlements } from '@/app/actions/subscription';
+import { cookies } from 'next/headers';
+import { resolveWorkspaceContext } from '@/lib/workspace-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -112,7 +115,13 @@ type RetentionExecution = {
   executed_at: string;
 };
 
-export default async function AdminPage() {
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ workspace_id?: string }>;
+} = {}) {
+  const params = searchParams ? await searchParams : undefined;
+  const workspaceIdHint = params?.workspace_id ?? null;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -120,42 +129,65 @@ export default async function AdminPage() {
     redirect('/login');
   }
 
-  const { data: membership } = await supabase
-    .from('workspace_members')
-    .select('workspace_id, role')
-    .eq('user_id', user.id)
-    .limit(1)
-    .single();
+  const cookieStore = await cookies();
+  const workspaceIdCookie = cookieStore.get('lanceiq_workspace_id')?.value ?? null;
+  const context = await resolveWorkspaceContext({
+    supabase,
+    userId: user.id,
+    workspaceIdHint,
+    workspaceIdCookie,
+  });
 
-  if (!membership) {
+  if (!context) {
     redirect('/dashboard');
   }
 
-  const currentUserRole = membership.role ?? null;
+  const workspace = {
+    id: context.workspace.id,
+    name: context.workspace.name ?? 'Workspace',
+    plan: (context.workspace.plan === 'team' || context.workspace.plan === 'pro' ? context.workspace.plan : 'free') as
+      | 'free'
+      | 'pro'
+      | 'team',
+    subscription_status: context.workspace.subscription_status ?? 'free',
+    raw_body_retention_days: context.workspace.raw_body_retention_days ?? 0,
+  };
+
+  const currentUserRole = context.role ?? null;
   const canManage = canManageWorkspace(currentUserRole);
   const canViewSso = canManage || isViewer(currentUserRole) || isLegalHoldManager(currentUserRole);
   const canViewAccessReviews = canManage || isViewer(currentUserRole) || isLegalHoldManager(currentUserRole);
 
-  const { data: workspace } = await supabase
-    .from('workspaces')
-    .select('id, name, plan, subscription_status, raw_body_retention_days')
-    .eq('id', membership.workspace_id)
-    .single();
+  const entitlements = await checkPlanEntitlements(workspace.id);
 
-  if (!workspace) {
-    redirect('/dashboard');
+  const canViewAuditLogsRole = canViewAuditLogs(currentUserRole);
+  const canViewLegalHoldRole = canManage || isLegalHoldManager(currentUserRole);
+  const canViewOpsRole = Boolean(currentUserRole);
+
+  const canLoadAlerts = canManage && entitlements.canUseAlerts;
+  const canLoadAuditLogs = canViewAuditLogsRole && entitlements.canViewAuditLogs;
+  const canLoadMembers = canManage && entitlements.canViewAuditLogs;
+  const canLoadSso = canViewSso && entitlements.canUseSso;
+  const canLoadScim = canManage && entitlements.canUseScim;
+  const canLoadAccessReviews = canViewAccessReviews && entitlements.canUseAccessReviews;
+  const canLoadLegalHold = canViewLegalHoldRole && entitlements.canUseLegalHold;
+  const canLoadOps = canViewOpsRole && entitlements.canUseSlaIncidents;
+  const canLoadRetention = canManage && entitlements.canUseSlaIncidents;
+
+  let alertSettings: any = null;
+  if (canLoadAlerts) {
+    const { data } = await supabase
+      .from('workspace_alert_settings')
+      .select('*')
+      .eq('workspace_id', workspace.id)
+      .maybeSingle();
+    alertSettings = data || null;
   }
-
-  const { data: alertSettings } = await supabase
-    .from('workspace_alert_settings')
-    .select('*')
-    .eq('workspace_id', workspace.id)
-    .maybeSingle();
 
   let auditLogs: AuditLog[] | null = null;
   let members: any[] | null = null;
 
-  if (workspace.plan === 'team') {
+  if (canLoadAuditLogs) {
     const { data: logsData } = await supabase
       .from('audit_logs')
       .select('*')
@@ -163,14 +195,16 @@ export default async function AdminPage() {
       .order('created_at', { ascending: false })
       .limit(50);
     auditLogs = logsData || [];
+  }
 
+  if (canLoadMembers) {
     const { data: membersData } = await supabase
       .rpc('get_workspace_members', { lookup_workspace_id: workspace.id });
     members = membersData || [];
   }
 
   let ssoProviders: SsoProvider[] = [];
-  if (canViewSso) {
+  if (canLoadSso) {
     const { data } = await supabase
       .from('sso_providers')
       .select('*')
@@ -180,7 +214,7 @@ export default async function AdminPage() {
   }
 
   let scimTokens: ScimToken[] = [];
-  if (canManage) {
+  if (canLoadScim) {
     const { data } = await supabase
       .from('scim_tokens')
       .select('*')
@@ -191,7 +225,7 @@ export default async function AdminPage() {
 
   let accessReviewCycles: AccessReviewCycle[] = [];
   let accessReviewDecisions: AccessReviewDecision[] = [];
-  if (canViewAccessReviews) {
+  if (canLoadAccessReviews) {
     const { data: cycles } = await supabase
       .from('access_review_cycles')
       .select('*')
@@ -211,7 +245,7 @@ export default async function AdminPage() {
   }
 
   let legalHold: LegalHoldStatus | null = null;
-  if (canManage || isLegalHoldManager(currentUserRole)) {
+  if (canLoadLegalHold) {
     const { data: holds } = await supabase
       .from('workspace_legal_holds')
       .select('id, active, reason, created_at')
@@ -223,44 +257,48 @@ export default async function AdminPage() {
   }
 
   let initialIncidents: Incident[] = [];
-  const { data: incidentsData } = await supabase
-    .from('incident_reports')
-    .select('*')
-    .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
-    .order('started_at', { ascending: false })
-    .limit(50);
-  initialIncidents = incidentsData || [];
+  if (canLoadOps) {
+    const { data: incidentsData } = await supabase
+      .from('incident_reports')
+      .select('*')
+      .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+      .order('started_at', { ascending: false })
+      .limit(50);
+    initialIncidents = incidentsData || [];
+  }
 
   let initialSlaSummary: SlaSummary | null = null;
-  const windowDays = 30;
-  const windowEnd = new Date();
-  const windowStart = new Date(windowEnd.getTime() - windowDays * 24 * 60 * 60 * 1000);
-  const { data: slaPolicies } = await supabase
-    .from('sla_policies')
-    .select('*')
-    .eq('workspace_id', workspace.id);
-  const { data: slaIncidents } = await supabase
-    .from('incident_reports')
-    .select('started_at, resolved_at')
-    .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
-    .gte('started_at', windowStart.toISOString());
-  const { uptimePercent, downtimeSeconds } = computeUptime({
-    incidents: slaIncidents || [],
-    windowStart,
-    windowEnd,
-  });
-  initialSlaSummary = {
-    workspace_id: workspace.id,
-    window_start: windowStart.toISOString(),
-    window_end: windowEnd.toISOString(),
-    uptime_percent: uptimePercent,
-    downtime_seconds: downtimeSeconds,
-    policies: (slaPolicies || []) as SlaPolicy[],
-  };
+  if (canLoadOps) {
+    const windowDays = 30;
+    const windowEnd = new Date();
+    const windowStart = new Date(windowEnd.getTime() - windowDays * 24 * 60 * 60 * 1000);
+    const { data: slaPolicies } = await supabase
+      .from('sla_policies')
+      .select('*')
+      .eq('workspace_id', workspace.id);
+    const { data: slaIncidents } = await supabase
+      .from('incident_reports')
+      .select('started_at, resolved_at')
+      .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+      .gte('started_at', windowStart.toISOString());
+    const { uptimePercent, downtimeSeconds } = computeUptime({
+      incidents: slaIncidents || [],
+      windowStart,
+      windowEnd,
+    });
+    initialSlaSummary = {
+      workspace_id: workspace.id,
+      window_start: windowStart.toISOString(),
+      window_end: windowEnd.toISOString(),
+      uptime_percent: uptimePercent,
+      downtime_seconds: downtimeSeconds,
+      policies: (slaPolicies || []) as SlaPolicy[],
+    };
+  }
 
   let retentionJobs: RetentionJob[] = [];
   let retentionExecutions: RetentionExecution[] = [];
-  if (canManage) {
+  if (canLoadRetention) {
     const { data: jobsData } = await supabase
       .from('retention_jobs')
       .select('*')
@@ -281,6 +319,7 @@ export default async function AdminPage() {
   return (
     <AdminClient
       workspace={workspace}
+      initialEntitlements={entitlements}
       initialSettings={alertSettings}
       initialAuditLogs={auditLogs || []}
       initialMembers={members || []}
