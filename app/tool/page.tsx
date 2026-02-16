@@ -92,7 +92,7 @@ export default function Home() {
       setCurrentPlan('free');
       setIsWatermarkFree(promoActive);
       setCanRemoveWatermark(false);
-      setCanExportPdf(false);
+      setCanExportPdf(true);
       setCanVerify(false);
       return promoActive;
     }
@@ -119,7 +119,7 @@ export default function Home() {
       setCurrentPlan('free');
       setIsWatermarkFree(promoActive);
       setCanRemoveWatermark(false);
-      setCanExportPdf(false);
+      setCanExportPdf(true);
       setCanVerify(false);
       return promoActive;
     }
@@ -736,7 +736,7 @@ export default function Home() {
                     )}
                     {isGenerating
                       ? 'Generating...'
-                      : !canExportPdfAllowed && user
+                      : !canExportPdfAllowed
                         ? 'Export Unavailable'
                         : isWatermarkFree
                           ? 'Download PDF (No Watermark)'

@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Loader2, Copy, Check, AlertTriangle } from 'lucide-react';
+import { Loader2, Copy, Check, AlertTriangle, Send } from 'lucide-react';
 import { createWorkspace } from '@/app/actions/workspaces';
 
 interface AddSourceModalProps {
@@ -24,6 +24,10 @@ export function AddSourceModal({ isOpen, onClose, onSuccess }: AddSourceModalPro
   // State for showing the new key
   const [newKey, setNewKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  // State for test webhook
+  const [testLoading, setTestLoading] = useState(false);
+  const [testSuccess, setTestSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -58,13 +62,53 @@ export function AddSourceModal({ isOpen, onClose, onSuccess }: AddSourceModalPro
     }
   };
 
+  const handleTestWebhook = async () => {
+    if (!newKey) return;
+    setTestLoading(true);
+    try {
+      // In a real app we would use the actual workspace ID, but here the user just got the key.
+      // We can send to the ingestion endpoint directly using the key.
+      // The ingestion URL structure is typically /api/ingest/{API_KEY}
+      const ingestUrl = `/api/ingest/${newKey}`;
+      
+      const res = await fetch(ingestUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'LanceIQ-Test-Event': 'true'
+        },
+        body: JSON.stringify({
+          event: "test.ping",
+          timestamp: new Date().toISOString(),
+          message: "This is a test webhook from LanceIQ"
+        })
+      });
+
+      if (res.ok) {
+        setTestSuccess(true);
+        setTimeout(() => setTestSuccess(false), 3000);
+      } else {
+        alert('Test failed. Please check your network.');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Failed to send test webhook');
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
   const handleClose = () => {
     setNewKey(null);
     setName('');
     setProvider('stripe');
     setSecret('');
     setStoreRawBody(false);
+    setSecret('');
+    setStoreRawBody(false);
     setLoading(false);
+    setTestLoading(false);
+    setTestSuccess(false);
     onClose();
   };
 
@@ -96,7 +140,25 @@ export function AddSourceModal({ isOpen, onClose, onSuccess }: AddSourceModalPro
              
              <div className="bg-yellow-50 p-3 rounded-md border border-yellow-100 flex gap-3 text-sm text-yellow-800">
                 <AlertTriangle className="w-5 h-5 text-yellow-600 shrink-0" />
-                <p>Make sure to verify your connection by sending a test webhook.</p>
+                <div className="flex-1 flex items-center justify-between">
+                  <p>Verify your connection by sending a test webhook.</p>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="bg-white border-yellow-200 text-yellow-800 hover:bg-yellow-50 hover:text-yellow-900 h-8"
+                    onClick={handleTestWebhook}
+                    disabled={testLoading || testSuccess}
+                  >
+                    {testLoading ? (
+                      <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                    ) : testSuccess ? (
+                      <Check className="w-3 h-3 mr-1" />
+                    ) : (
+                      <Send className="w-3 h-3 mr-1" />
+                    )}
+                    {testLoading ? 'Sending...' : testSuccess ? 'Sent!' : 'Send Test'}
+                  </Button>
+                </div>
              </div>
           </div>
         ) : (
