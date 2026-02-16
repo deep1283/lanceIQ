@@ -73,4 +73,53 @@ describe('ingest-core helpers', () => {
     expect(ingestCoreTestUtils.tryParseJson('{"ok":true}')).toEqual({ ok: true });
     expect(ingestCoreTestUtils.tryParseJson('not json')).toBeNull();
   });
+
+  it('extracts stripe provider_payment_id from payment_intent payload', () => {
+    const id = ingestCoreTestUtils.extractProviderPaymentId(
+      'stripe',
+      {
+        id: 'evt_1',
+        data: {
+          object: {
+            object: 'charge',
+            payment_intent: 'pi_123',
+          },
+        },
+      },
+      {}
+    );
+    expect(id).toBe('pi_123');
+  });
+
+  it('extracts razorpay provider_payment_id from payload entity', () => {
+    const id = ingestCoreTestUtils.extractProviderPaymentId(
+      'razorpay',
+      {
+        event: 'payment.captured',
+        payload: {
+          payment: {
+            entity: {
+              id: 'pay_123',
+            },
+          },
+        },
+      },
+      {}
+    );
+    expect(id).toBe('pay_123');
+  });
+
+  it('extracts lemon_squeezy provider_payment_id from data.id', () => {
+    const id = ingestCoreTestUtils.extractProviderPaymentId(
+      'lemon_squeezy',
+      {
+        data: {
+          id: 'order_123',
+          type: 'orders',
+        },
+      },
+      {}
+    );
+    expect(id).toBe('order_123');
+  });
 });

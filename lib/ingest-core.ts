@@ -197,6 +197,13 @@ export async function processIngestEvent(req: NextRequest, apiKey: string): Prom
       verificationResult = verifySignature(providerToVerify, rawBody, sanitizedHeaders, secret);
     }
 
+    const providerForPaymentId = verifiedProvider === 'unknown' ? detectedProvider : verifiedProvider;
+    const providerPaymentId = extractProviderPaymentId(
+      providerForPaymentId,
+      parsedPayload,
+      sanitizedHeaders
+    );
+
     // 6. Store Event
     const expiresAt = workspace.store_raw_body
       ? new Date(Date.now() + (workspace.raw_body_retention_days || 7) * 24 * 60 * 60 * 1000)
@@ -216,6 +223,7 @@ export async function processIngestEvent(req: NextRequest, apiKey: string): Prom
       signature_status: verificationResult.status,
       signature_reason: verificationResult.reason,
       provider_event_id: providerEventId,
+      provider_payment_id: providerPaymentId,
       is_duplicate: isDuplicate,
     };
 
@@ -343,6 +351,89 @@ export function errorResponse(message: string, status: number, code: string, hea
 
 function canSendAlerts(workspace: { plan?: string | null; subscription_status?: string | null; subscription_current_period_end?: string | null }) {
   return getEffectiveEntitlementsForWorkspace(workspace).canUseAlerts;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function toStringCandidate(value: unknown): string | null {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length ? trimmed : null;
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+  return null;
+}
+
+function readPath(payload: unknown, path: string[]): unknown {
+  let current: unknown = payload;
+  for (const segment of path) {
+    const record = asRecord(current);
+    if (!record) return null;
+    current = record[segment];
+  }
+  return current;
+}
+
+function firstStringCandidate(candidates: unknown[]) {
+  for (const value of candidates) {
+    const asString = toStringCandidate(value);
+    if (asString) return asString;
+  }
+  return null;
+}
+
+function extractStripePaymentId(payload: unknown, headers: Record<string, string>) {
+  const dataObject = asRecord(readPath(payload, ['data', 'object']));
+  return firstStringCandidate([
+    headers['x-stripe-payment-intent'],
+    headers['stripe-payment-intent'],
+    dataObject?.payment_intent,
+    readPath(dataObject?.payment_intent, ['id']),
+    dataObject?.object === 'payment_intent' ? dataObject.id : null,
+    readPath(payload, ['payment_intent']),
+    readPath(payload, ['data', 'object', 'payment_intent', 'id']),
+  ]);
+}
+
+function extractRazorpayPaymentId(payload: unknown, headers: Record<string, string>) {
+  return firstStringCandidate([
+    headers['x-razorpay-payment-id'],
+    headers['razorpay-payment-id'],
+    readPath(payload, ['payload', 'payment', 'entity', 'id']),
+    readPath(payload, ['payload', 'payment_link', 'entity', 'payment_id']),
+    readPath(payload, ['payload', 'refund', 'entity', 'payment_id']),
+    readPath(payload, ['payload', 'invoice', 'entity', 'payment_id']),
+    readPath(payload, ['payment', 'id']),
+    readPath(payload, ['payment_id']),
+    readPath(payload, ['payload', 'order', 'entity', 'id']),
+  ]);
+}
+
+function extractLemonPaymentId(payload: unknown, headers: Record<string, string>) {
+  return firstStringCandidate([
+    headers['x-lemon-payment-id'],
+    headers['x-payment-id'],
+    readPath(payload, ['data', 'id']),
+    readPath(payload, ['data', 'attributes', 'order_id']),
+    readPath(payload, ['data', 'attributes', 'identifier']),
+    readPath(payload, ['meta', 'custom_data', 'provider_payment_id']),
+  ]);
+}
+
+function extractProviderPaymentId(
+  provider: Provider,
+  payload: unknown,
+  headers: Record<string, string>
+): string | null {
+  if (provider === 'stripe') return extractStripePaymentId(payload, headers);
+  if (provider === 'razorpay') return extractRazorpayPaymentId(payload, headers);
+  if (provider === 'lemon_squeezy') return extractLemonPaymentId(payload, headers);
+  return null;
 }
 
 async function maybeEnqueueForwardingJobs(params: {
@@ -628,4 +719,5 @@ export const ingestCoreTestUtils = {
   getMonthKey,
   parseBatchMetadata,
   isValidUuid,
+  extractProviderPaymentId,
 };
