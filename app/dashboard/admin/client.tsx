@@ -8,6 +8,15 @@ import { createScimToken, revokeScimToken, saveSsoProvider } from '../settings/a
 import type { Role } from '@/lib/roles';
 import { canInviteMembers, canManageWorkspace, canRemoveMembers, canViewAuditLogs, isLegalHoldManager, isViewer } from '@/lib/roles';
 import type { PlanEntitlements } from '@/lib/plan';
+import {
+  getProviderPaymentIdLabel,
+  getReconciliationEventLabel,
+  PROVIDER_PAYMENT_ID_FALLBACK_LABEL,
+  RECONCILIATION_CASE_FILTERS,
+  RECONCILIATION_TWO_WAY_MESSAGE,
+  type ReconciliationCaseFilter,
+  type ReconciliationCaseStatus,
+} from './reconciliation-ui';
 
 interface Workspace {
   id: string;
@@ -189,7 +198,7 @@ interface ReconciliationRun {
   report_json: Record<string, unknown> | null;
 }
 
-interface ReconciliationSummary {
+interface ReconciliationSummaryTotals {
   totals: {
     items_processed: number;
     discrepancies_found: number;
@@ -199,8 +208,59 @@ interface ReconciliationSummary {
     missing_deliveries: number;
     failed_verifications: number;
     provider_mismatches: number;
+    downstream_not_activated: number;
+    downstream_error: number;
+    downstream_unconfigured: number;
+    pending_activation: number;
   };
+}
+
+interface ReconciliationCaseTotals {
+  total: number;
+  open: number;
+  pending: number;
+  resolved: number;
+  ignored: number;
+}
+
+interface ReconciliationSummary extends ReconciliationSummaryTotals {
+  coverage_mode: 'two_way_active' | 'three_way_active' | string;
+  downstream_activation_status: string | null;
+  downstream_status_message: string | null;
+  cases: ReconciliationCaseTotals;
   runs: ReconciliationRun[];
+}
+
+interface ReconciliationCase {
+  id: string;
+  workspace_id: string;
+  provider: string;
+  provider_payment_id: string | null;
+  status: ReconciliationCaseStatus;
+  severity: string | null;
+  reason_code: string | null;
+  first_detected_at: string | null;
+  last_seen_at: string | null;
+  grace_until: string | null;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  resolution_note: string | null;
+  masked_customer_label: string | null;
+  amount_minor: number | null;
+  currency: string | null;
+}
+
+interface ReconciliationCaseDetail extends ReconciliationCase {
+  created_at: string;
+  updated_at: string;
+}
+
+interface ReconciliationCaseEvent {
+  id: string;
+  event_type: string;
+  details_json: Record<string, unknown> | null;
+  actor_id: string | null;
+  created_at: string;
 }
 
 type AdminTab = 'alerts' | 'audit' | 'legal' | 'members' | 'identity' | 'access' | 'ops' | 'reconciliation';
@@ -399,6 +459,19 @@ export default function SettingsClient({
   const [reconciliationLoading, setReconciliationLoading] = useState(false);
   const [reconciliationError, setReconciliationError] = useState<string | null>(null);
   const [reconciliationRunning, setReconciliationRunning] = useState(false);
+  const [reconciliationCases, setReconciliationCases] = useState<ReconciliationCase[]>([]);
+  const [reconciliationCasesLoading, setReconciliationCasesLoading] = useState(false);
+  const [reconciliationCasesError, setReconciliationCasesError] = useState<string | null>(null);
+  const [reconciliationCaseFilter, setReconciliationCaseFilter] = useState<ReconciliationCaseFilter>('open');
+  const [selectedReconciliationCaseId, setSelectedReconciliationCaseId] = useState<string | null>(null);
+  const [reconciliationCaseDetail, setReconciliationCaseDetail] = useState<ReconciliationCaseDetail | null>(null);
+  const [reconciliationCaseEvents, setReconciliationCaseEvents] = useState<ReconciliationCaseEvent[]>([]);
+  const [reconciliationCaseLoading, setReconciliationCaseLoading] = useState(false);
+  const [reconciliationCaseError, setReconciliationCaseError] = useState<string | null>(null);
+  const [reconciliationActionLoading, setReconciliationActionLoading] = useState(false);
+  const [reconciliationResolutionNote, setReconciliationResolutionNote] = useState('');
+  const [reconciliationActionError, setReconciliationActionError] = useState<string | null>(null);
+  const [reconciliationActionSuccess, setReconciliationActionSuccess] = useState<string | null>(null);
   const reconciliationLoadedRef = useRef(false);
 
   const buildApiErrorMessage = useCallback((
@@ -543,6 +616,11 @@ export default function SettingsClient({
         );
       }
       setReconciliationSummary({
+        coverage_mode: typeof data?.coverage_mode === 'string' ? data.coverage_mode : 'two_way_active',
+        downstream_activation_status:
+          typeof data?.downstream_activation_status === 'string' ? data.downstream_activation_status : null,
+        downstream_status_message:
+          typeof data?.downstream_status_message === 'string' ? data.downstream_status_message : null,
         totals: {
           items_processed: Number(data?.totals?.items_processed) || 0,
           discrepancies_found: Number(data?.totals?.discrepancies_found) || 0,
@@ -552,6 +630,17 @@ export default function SettingsClient({
           missing_deliveries: Number(data?.totals?.missing_deliveries) || 0,
           failed_verifications: Number(data?.totals?.failed_verifications) || 0,
           provider_mismatches: Number(data?.totals?.provider_mismatches) || 0,
+          downstream_not_activated: Number(data?.totals?.downstream_not_activated) || 0,
+          downstream_error: Number(data?.totals?.downstream_error) || 0,
+          downstream_unconfigured: Number(data?.totals?.downstream_unconfigured) || 0,
+          pending_activation: Number(data?.totals?.pending_activation) || 0,
+        },
+        cases: {
+          total: Number(data?.cases?.total) || 0,
+          open: Number(data?.cases?.open) || 0,
+          pending: Number(data?.cases?.pending) || 0,
+          resolved: Number(data?.cases?.resolved) || 0,
+          ignored: Number(data?.cases?.ignored) || 0,
         },
         runs: Array.isArray(data?.runs) ? data.runs : [],
       });
@@ -561,6 +650,85 @@ export default function SettingsClient({
       );
     } finally {
       setReconciliationLoading(false);
+    }
+  }, [buildApiErrorMessage, canViewReconciliation, entitlements.canUseReconciliation, workspace.id]);
+
+  const loadReconciliationCases = useCallback(async (statusFilter: ReconciliationCaseFilter) => {
+    if (!entitlements.canUseReconciliation || !canViewReconciliation) return;
+    setReconciliationCasesLoading(true);
+    setReconciliationCasesError(null);
+    try {
+      const params = new URLSearchParams({ workspace_id: workspace.id, limit: '100' });
+      if (statusFilter !== 'all') {
+        params.set('status', statusFilter);
+      }
+      const response = await fetch(`/api/reconciliation/cases?${params.toString()}`);
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(
+          buildApiErrorMessage(
+            response.status,
+            data?.error,
+            'Failed to load reconciliation cases.',
+            entitlements.canUseReconciliation
+          )
+        );
+      }
+      const nextCases = Array.isArray(data?.cases) ? (data.cases as ReconciliationCase[]) : [];
+      setReconciliationCases(nextCases);
+      if (nextCases.length === 0) {
+        setSelectedReconciliationCaseId(null);
+        setReconciliationCaseDetail(null);
+        setReconciliationCaseEvents([]);
+        setReconciliationCaseError(null);
+      } else {
+        setSelectedReconciliationCaseId((current) => {
+          if (current && nextCases.some((item) => item.id === current)) {
+            return current;
+          }
+          return nextCases[0].id;
+        });
+      }
+    } catch (error) {
+      setReconciliationCasesError(
+        error instanceof Error ? error.message : 'Failed to load reconciliation cases.'
+      );
+    } finally {
+      setReconciliationCasesLoading(false);
+    }
+  }, [buildApiErrorMessage, canViewReconciliation, entitlements.canUseReconciliation, workspace.id]);
+
+  const loadReconciliationCaseDetail = useCallback(async (caseId: string) => {
+    if (!entitlements.canUseReconciliation || !canViewReconciliation) return;
+    setReconciliationCaseLoading(true);
+    setReconciliationCaseError(null);
+    setReconciliationActionError(null);
+    setReconciliationActionSuccess(null);
+    try {
+      const params = new URLSearchParams({ workspace_id: workspace.id });
+      const response = await fetch(`/api/reconciliation/cases/${caseId}?${params.toString()}`);
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(
+          buildApiErrorMessage(
+            response.status,
+            data?.error,
+            'Failed to load reconciliation case.',
+            entitlements.canUseReconciliation
+          )
+        );
+      }
+      setReconciliationCaseDetail((data?.case || null) as ReconciliationCaseDetail | null);
+      setReconciliationCaseEvents(Array.isArray(data?.events) ? (data.events as ReconciliationCaseEvent[]) : []);
+      setReconciliationResolutionNote('');
+    } catch (error) {
+      setReconciliationCaseError(
+        error instanceof Error ? error.message : 'Failed to load reconciliation case.'
+      );
+      setReconciliationCaseDetail(null);
+      setReconciliationCaseEvents([]);
+    } finally {
+      setReconciliationCaseLoading(false);
     }
   }, [buildApiErrorMessage, canViewReconciliation, entitlements.canUseReconciliation, workspace.id]);
 
@@ -622,7 +790,36 @@ export default function SettingsClient({
       reconciliationLoadedRef.current = true;
       loadReconciliationSummary();
     }
-  }, [activeTab, canViewReconciliation, entitlements.canUseReconciliation, loadReconciliationSummary]);
+  }, [
+    activeTab,
+    canViewReconciliation,
+    entitlements.canUseReconciliation,
+    loadReconciliationSummary,
+  ]);
+
+  useEffect(() => {
+    if (activeTab !== 'reconciliation' || !entitlements.canUseReconciliation || !canViewReconciliation) return;
+    if (!reconciliationLoadedRef.current) return;
+    loadReconciliationCases(reconciliationCaseFilter);
+  }, [
+    activeTab,
+    canViewReconciliation,
+    entitlements.canUseReconciliation,
+    loadReconciliationCases,
+    reconciliationCaseFilter,
+  ]);
+
+  useEffect(() => {
+    if (activeTab !== 'reconciliation' || !entitlements.canUseReconciliation || !canViewReconciliation) return;
+    if (!selectedReconciliationCaseId) return;
+    loadReconciliationCaseDetail(selectedReconciliationCaseId);
+  }, [
+    activeTab,
+    canViewReconciliation,
+    entitlements.canUseReconciliation,
+    loadReconciliationCaseDetail,
+    selectedReconciliationCaseId,
+  ]);
 
   async function handleSaveSsoProvider(e: React.FormEvent) {
     e.preventDefault();
@@ -814,10 +1011,87 @@ export default function SettingsClient({
         );
       }
       await loadReconciliationSummary();
+      await loadReconciliationCases(reconciliationCaseFilter);
     } catch (error) {
       setReconciliationError(error instanceof Error ? error.message : 'Failed to run reconciliation.');
     } finally {
       setReconciliationRunning(false);
+    }
+  }
+
+  async function handleReplayReconciliationCase(caseId: string) {
+    if (!canManage || !canAccessTab('reconciliation')) return;
+    setReconciliationActionLoading(true);
+    setReconciliationActionError(null);
+    setReconciliationActionSuccess(null);
+    try {
+      const response = await fetch(`/api/reconciliation/cases/${caseId}/replay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspace_id: workspace.id }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(
+          buildApiErrorMessage(
+            response.status,
+            data?.error,
+            'Failed to replay reconciliation case.',
+            entitlements.canUseReconciliation
+          )
+        );
+      }
+      setReconciliationActionSuccess('Replay queued for this case.');
+      await loadReconciliationSummary();
+      await loadReconciliationCases(reconciliationCaseFilter);
+      await loadReconciliationCaseDetail(caseId);
+    } catch (error) {
+      setReconciliationActionError(
+        error instanceof Error ? error.message : 'Failed to replay reconciliation case.'
+      );
+    } finally {
+      setReconciliationActionLoading(false);
+    }
+  }
+
+  async function handleResolveReconciliationCase(caseId: string) {
+    if (!canManage || !canAccessTab('reconciliation')) return;
+    const note = reconciliationResolutionNote.trim();
+    if (!note) {
+      setReconciliationActionError('Resolution note is required.');
+      return;
+    }
+
+    setReconciliationActionLoading(true);
+    setReconciliationActionError(null);
+    setReconciliationActionSuccess(null);
+    try {
+      const response = await fetch(`/api/reconciliation/cases/${caseId}/resolve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspace_id: workspace.id, resolution_note: note }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(
+          buildApiErrorMessage(
+            response.status,
+            data?.error,
+            'Failed to resolve reconciliation case.',
+            entitlements.canUseReconciliation
+          )
+        );
+      }
+      setReconciliationActionSuccess('Case resolved.');
+      await loadReconciliationSummary();
+      await loadReconciliationCases(reconciliationCaseFilter);
+      await loadReconciliationCaseDetail(caseId);
+    } catch (error) {
+      setReconciliationActionError(
+        error instanceof Error ? error.message : 'Failed to resolve reconciliation case.'
+      );
+    } finally {
+      setReconciliationActionLoading(false);
     }
   }
 
@@ -843,6 +1117,20 @@ export default function SettingsClient({
     }
     return 'bg-[var(--dash-surface-2)] text-slate-500 border dashboard-border';
   };
+
+  const reconciliationStatusBadge = (status: string | null | undefined) => {
+    const normalized = (status || 'unknown').toLowerCase();
+    if (normalized === 'open') return 'bg-red-500/15 text-red-400 border border-red-500/20';
+    if (normalized === 'pending') return 'bg-amber-500/15 text-amber-500 border border-amber-500/20';
+    if (normalized === 'resolved') return 'dashboard-accent-chip';
+    if (normalized === 'ignored') return 'bg-[var(--dash-surface-2)] text-slate-500 border dashboard-border';
+    return 'bg-[var(--dash-surface-2)] text-slate-500 border dashboard-border';
+  };
+
+  const reconcileCaseScopeMessage =
+    reconciliationSummary?.coverage_mode === 'two_way_active'
+      ? RECONCILIATION_TWO_WAY_MESSAGE
+      : reconciliationSummary?.downstream_status_message || null;
 
   const retentionScopes = Array.from(
     new Set([
@@ -1528,20 +1816,35 @@ export default function SettingsClient({
               <div>
                 <h2 className="text-xl font-semibold text-slate-900 mb-1">Reconciliation</h2>
                 <p className="text-zinc-400 text-sm">
-                  Provider records vs LanceIQ receipt + delivery outcomes.
+                  Review reconciliation coverage and lifecycle status for payment cases.
                 </p>
               </div>
-              {canManage ? (
+              <div className="flex items-center gap-2">
                 <button
-                  onClick={handleRunReconciliation}
-                  disabled={reconciliationRunning}
-                  className="dashboard-button-primary px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50"
+                  onClick={async () => {
+                    await loadReconciliationSummary();
+                    await loadReconciliationCases(reconciliationCaseFilter);
+                    if (selectedReconciliationCaseId) {
+                      await loadReconciliationCaseDetail(selectedReconciliationCaseId);
+                    }
+                  }}
+                  disabled={reconciliationLoading || reconciliationCasesLoading || reconciliationCaseLoading}
+                  className="text-sm dashboard-text-muted hover:text-[var(--dash-text)] transition-colors disabled:opacity-50"
                 >
-                  {reconciliationRunning ? 'Running...' : 'Run Now'}
+                  Refresh
                 </button>
-              ) : (
-                <span className="text-xs text-zinc-500">Read-only</span>
-              )}
+                {canManage ? (
+                  <button
+                    onClick={handleRunReconciliation}
+                    disabled={reconciliationRunning}
+                    className="dashboard-button-primary px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50"
+                  >
+                    {reconciliationRunning ? 'Running...' : 'Run Now'}
+                  </button>
+                ) : (
+                  <span className="text-xs text-zinc-500">Read-only</span>
+                )}
+              </div>
             </div>
 
             {reconciliationError && <p className="text-sm text-red-400 mt-4">{reconciliationError}</p>}
@@ -1550,6 +1853,54 @@ export default function SettingsClient({
               <p className="text-sm text-zinc-500 mt-4">Loading reconciliation summary...</p>
             ) : reconciliationSummary ? (
               <div className="mt-6 space-y-6">
+                <div className="dashboard-panel-muted rounded-lg p-4 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${
+                      reconciliationSummary.coverage_mode === 'three_way_active'
+                        ? 'dashboard-accent-chip'
+                        : 'bg-[var(--dash-surface-2)] text-slate-500 border-[var(--dash-border)]'
+                    }`}>
+                      {reconciliationSummary.coverage_mode === 'three_way_active' ? '3-way coverage' : '2-way coverage'}
+                    </span>
+                    <span className="text-xs text-zinc-500">
+                      Activation: {reconciliationSummary.downstream_activation_status || 'unknown'}
+                    </span>
+                  </div>
+                  {reconciliationSummary.coverage_mode === 'two_way_active' ? (
+                    <p className="text-sm text-zinc-400">{RECONCILIATION_TWO_WAY_MESSAGE}</p>
+                  ) : (
+                    <p className="text-sm text-zinc-400">{reconcileCaseScopeMessage || 'Downstream activation configured.'}</p>
+                  )}
+                  {reconciliationSummary.coverage_mode === 'two_way_active' && (
+                    <p className="text-xs text-zinc-500">
+                      Two-way mode compares provider records and LanceIQ evidence only. Downstream mismatch detection is unavailable until activation is configured.
+                    </p>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <div className="dashboard-panel-muted rounded-lg p-4">
+                    <p className="text-xs uppercase text-zinc-500 mb-2">Total Cases</p>
+                    <p className="text-2xl font-semibold text-slate-900">{reconciliationSummary.cases.total}</p>
+                  </div>
+                  <div className="dashboard-panel-muted rounded-lg p-4">
+                    <p className="text-xs uppercase text-zinc-500 mb-2">Open</p>
+                    <p className="text-2xl font-semibold text-red-400">{reconciliationSummary.cases.open}</p>
+                  </div>
+                  <div className="dashboard-panel-muted rounded-lg p-4">
+                    <p className="text-xs uppercase text-zinc-500 mb-2">Pending</p>
+                    <p className="text-2xl font-semibold text-amber-400">{reconciliationSummary.cases.pending}</p>
+                  </div>
+                  <div className="dashboard-panel-muted rounded-lg p-4">
+                    <p className="text-xs uppercase text-zinc-500 mb-2">Resolved</p>
+                    <p className="text-2xl font-semibold dashboard-accent-text">{reconciliationSummary.cases.resolved}</p>
+                  </div>
+                  <div className="dashboard-panel-muted rounded-lg p-4">
+                    <p className="text-xs uppercase text-zinc-500 mb-2">Ignored</p>
+                    <p className="text-2xl font-semibold text-slate-500">{reconciliationSummary.cases.ignored}</p>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="dashboard-panel-muted rounded-lg p-4">
                     <p className="text-xs uppercase text-zinc-500 mb-2">Missing Receipts</p>
@@ -1566,6 +1917,25 @@ export default function SettingsClient({
                   <div className="dashboard-panel-muted rounded-lg p-4">
                     <p className="text-xs uppercase text-zinc-500 mb-2">Provider Mismatches</p>
                     <p className="text-2xl font-semibold text-amber-400">{reconciliationSummary.totals.provider_mismatches}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="dashboard-panel-muted rounded-lg p-4">
+                    <p className="text-xs uppercase text-zinc-500 mb-2">Downstream Not Activated</p>
+                    <p className="text-2xl font-semibold text-slate-900">{reconciliationSummary.totals.downstream_not_activated}</p>
+                  </div>
+                  <div className="dashboard-panel-muted rounded-lg p-4">
+                    <p className="text-xs uppercase text-zinc-500 mb-2">Downstream Error</p>
+                    <p className="text-2xl font-semibold text-slate-900">{reconciliationSummary.totals.downstream_error}</p>
+                  </div>
+                  <div className="dashboard-panel-muted rounded-lg p-4">
+                    <p className="text-xs uppercase text-zinc-500 mb-2">Downstream Unconfigured</p>
+                    <p className="text-2xl font-semibold text-slate-900">{reconciliationSummary.totals.downstream_unconfigured}</p>
+                  </div>
+                  <div className="dashboard-panel-muted rounded-lg p-4">
+                    <p className="text-xs uppercase text-zinc-500 mb-2">Pending Activation</p>
+                    <p className="text-2xl font-semibold text-slate-900">{reconciliationSummary.totals.pending_activation}</p>
                   </div>
                 </div>
 
@@ -1608,6 +1978,196 @@ export default function SettingsClient({
               </div>
             ) : (
               <p className="text-sm text-zinc-500 mt-4">No reconciliation data available.</p>
+            )}
+          </div>
+
+          <div className="dashboard-panel rounded-xl p-6">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h3 className="text-lg font-semibold text-slate-900">Reconciliation Cases</h3>
+              <select
+                value={reconciliationCaseFilter}
+                onChange={(e) => setReconciliationCaseFilter(e.target.value as ReconciliationCaseFilter)}
+                className="rounded-md px-3 py-2 dashboard-select text-sm"
+              >
+                {RECONCILIATION_CASE_FILTERS.map((status) => (
+                  <option key={status} value={status}>
+                    {status === 'all' ? 'All statuses' : status}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {reconciliationCasesError && <p className="text-sm text-red-400 mb-4">{reconciliationCasesError}</p>}
+            {reconciliationCasesLoading && reconciliationCases.length === 0 ? (
+              <p className="text-sm text-zinc-500">Loading reconciliation cases...</p>
+            ) : (
+              <div className="overflow-hidden border dashboard-border rounded-lg">
+                <table className="w-full text-left text-sm dashboard-table">
+                  <thead className="border-b dashboard-border">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">Status</th>
+                      <th className="px-4 py-3 font-medium">Provider</th>
+                      <th className="px-4 py-3 font-medium">Provider Payment ID</th>
+                      <th className="px-4 py-3 font-medium">Reason</th>
+                      <th className="px-4 py-3 font-medium">Last Seen</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--dash-border)]">
+                    {reconciliationCases.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-6 text-center text-zinc-500">
+                          No reconciliation cases for this filter.
+                        </td>
+                      </tr>
+                    ) : (
+                      reconciliationCases.map((item) => {
+                        const providerPaymentLabel = getProviderPaymentIdLabel(item.provider_payment_id);
+                        const missingProviderPaymentId = providerPaymentLabel === PROVIDER_PAYMENT_ID_FALLBACK_LABEL;
+                        return (
+                          <tr
+                            key={item.id}
+                            className={`dashboard-row cursor-pointer ${
+                              selectedReconciliationCaseId === item.id ? 'bg-[var(--dash-surface-2)]' : ''
+                            }`}
+                            onClick={() => setSelectedReconciliationCaseId(item.id)}
+                          >
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${reconciliationStatusBadge(item.status)}`}>
+                                {item.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-zinc-200">{item.provider}</td>
+                            <td className={`px-4 py-3 font-mono text-xs ${missingProviderPaymentId ? 'text-zinc-500' : 'text-zinc-300'}`}>
+                              {providerPaymentLabel}
+                            </td>
+                            <td className="px-4 py-3 text-zinc-400">{item.reason_code || '-'}</td>
+                            <td className="px-4 py-3 text-zinc-500">{formatDate(item.last_seen_at)}</td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="dashboard-panel rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-slate-900 mb-4">Case Detail</h3>
+            {!selectedReconciliationCaseId ? (
+              <p className="text-sm text-zinc-500">Select a case to view details and timeline.</p>
+            ) : reconciliationCaseLoading ? (
+              <p className="text-sm text-zinc-500">Loading case detail...</p>
+            ) : reconciliationCaseError ? (
+              <p className="text-sm text-red-400">{reconciliationCaseError}</p>
+            ) : reconciliationCaseDetail ? (
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="dashboard-panel-muted rounded-lg p-4">
+                    <p className="text-xs uppercase text-zinc-500 mb-2">Status</p>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${reconciliationStatusBadge(reconciliationCaseDetail.status)}`}>
+                      {reconciliationCaseDetail.status}
+                    </span>
+                  </div>
+                  <div className="dashboard-panel-muted rounded-lg p-4">
+                    <p className="text-xs uppercase text-zinc-500 mb-2">Provider</p>
+                    <p className="text-sm text-zinc-200">{reconciliationCaseDetail.provider}</p>
+                  </div>
+                  <div className="dashboard-panel-muted rounded-lg p-4">
+                    <p className="text-xs uppercase text-zinc-500 mb-2">Provider Payment ID</p>
+                    <p className={`text-xs font-mono ${
+                      getProviderPaymentIdLabel(reconciliationCaseDetail.provider_payment_id) === PROVIDER_PAYMENT_ID_FALLBACK_LABEL
+                        ? 'text-zinc-500'
+                        : 'text-zinc-300'
+                    }`}>
+                      {getProviderPaymentIdLabel(reconciliationCaseDetail.provider_payment_id)}
+                    </p>
+                  </div>
+                  <div className="dashboard-panel-muted rounded-lg p-4">
+                    <p className="text-xs uppercase text-zinc-500 mb-2">Reason</p>
+                    <p className="text-sm text-zinc-300">{reconciliationCaseDetail.reason_code || '-'}</p>
+                  </div>
+                  <div className="dashboard-panel-muted rounded-lg p-4">
+                    <p className="text-xs uppercase text-zinc-500 mb-2">Severity</p>
+                    <p className="text-sm text-zinc-300">{reconciliationCaseDetail.severity || '-'}</p>
+                  </div>
+                  <div className="dashboard-panel-muted rounded-lg p-4">
+                    <p className="text-xs uppercase text-zinc-500 mb-2">Last Seen</p>
+                    <p className="text-sm text-zinc-300">{formatDate(reconciliationCaseDetail.last_seen_at)}</p>
+                  </div>
+                </div>
+
+                {canManage ? (
+                  <div className="dashboard-panel-muted rounded-lg p-4 space-y-4">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        onClick={() => handleReplayReconciliationCase(reconciliationCaseDetail.id)}
+                        disabled={
+                          reconciliationActionLoading ||
+                          getProviderPaymentIdLabel(reconciliationCaseDetail.provider_payment_id) === PROVIDER_PAYMENT_ID_FALLBACK_LABEL
+                        }
+                        className="dashboard-button-primary px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50"
+                      >
+                        Replay Case
+                      </button>
+                      <input
+                        value={reconciliationResolutionNote}
+                        onChange={(e) => setReconciliationResolutionNote(e.target.value)}
+                        placeholder="Resolution note"
+                        className="flex-1 min-w-[220px] rounded-md px-4 py-2 dashboard-input"
+                      />
+                      <button
+                        onClick={() => handleResolveReconciliationCase(reconciliationCaseDetail.id)}
+                        disabled={reconciliationActionLoading}
+                        className="dashboard-button-primary px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50"
+                      >
+                        Resolve Case
+                      </button>
+                    </div>
+                    {getProviderPaymentIdLabel(reconciliationCaseDetail.provider_payment_id) === PROVIDER_PAYMENT_ID_FALLBACK_LABEL && (
+                      <p className="text-xs text-zinc-500">
+                        Replay is unavailable when provider payment ID is unavailable.
+                      </p>
+                    )}
+                    {reconciliationActionError && <p className="text-sm text-red-400">{reconciliationActionError}</p>}
+                    {reconciliationActionSuccess && <p className="text-sm dashboard-accent-text">{reconciliationActionSuccess}</p>}
+                  </div>
+                ) : (
+                  <p className="text-sm text-zinc-500">Replay and resolve actions are available to owners/admins only.</p>
+                )}
+
+                <div className="overflow-hidden border dashboard-border rounded-lg">
+                  <table className="w-full text-left text-sm dashboard-table">
+                    <thead className="border-b dashboard-border">
+                      <tr>
+                        <th className="px-4 py-3 font-medium">Event</th>
+                        <th className="px-4 py-3 font-medium">Actor</th>
+                        <th className="px-4 py-3 font-medium">Details</th>
+                        <th className="px-4 py-3 font-medium">Created</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--dash-border)]">
+                      {reconciliationCaseEvents.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="px-4 py-6 text-center text-zinc-500">
+                            No timeline events recorded.
+                          </td>
+                        </tr>
+                      ) : (
+                        reconciliationCaseEvents.map((event) => (
+                          <tr key={event.id} className="dashboard-row">
+                            <td className="px-4 py-3 text-zinc-200 capitalize">{getReconciliationEventLabel(event.event_type)}</td>
+                            <td className="px-4 py-3 text-zinc-500">{shortId(event.actor_id)}</td>
+                            <td className="px-4 py-3 text-zinc-400 max-w-xs truncate">{event.details_json ? JSON.stringify(event.details_json) : '-'}</td>
+                            <td className="px-4 py-3 text-zinc-500">{formatDate(event.created_at)}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-zinc-500">No case detail available.</p>
             )}
           </div>
         </div>
