@@ -36,6 +36,8 @@ describe('plan', () => {
     expect(free.canExportCsv).toBe(false);
     expect(free.canVerify).toBe(false);
     expect(free.canRemoveWatermark).toBe(false);
+    expect(free.canUseForwarding).toBe(false);
+    expect(free.canUseReconciliation).toBe(false);
     expect(free.canUseAlerts).toBe(false);
     expect(free.canUseSso).toBe(false);
     expect(free.canUseScim).toBe(false);
@@ -49,6 +51,8 @@ describe('plan', () => {
     expect(pro.canExportCsv).toBe(true);
     expect(pro.canVerify).toBe(true);
     expect(pro.canRemoveWatermark).toBe(true);
+    expect(pro.canUseForwarding).toBe(true);
+    expect(pro.canUseReconciliation).toBe(false);
     expect(pro.canUseAlerts).toBe(false);
     expect(pro.canUseSso).toBe(false);
     expect(pro.canUseScim).toBe(false);
@@ -62,6 +66,8 @@ describe('plan', () => {
     expect(team.canExportCsv).toBe(true);
     expect(team.canVerify).toBe(true);
     expect(team.canRemoveWatermark).toBe(true);
+    expect(team.canUseForwarding).toBe(true);
+    expect(team.canUseReconciliation).toBe(true);
     expect(team.canUseAlerts).toBe(true);
     expect(team.canUseSso).toBe(true);
     expect(team.canUseScim).toBe(true);
