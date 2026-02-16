@@ -1,8 +1,7 @@
 # LanceIQ
 
-LanceIQ is a payments-focused webhook evidence ledger.
-
-It records what LanceIQ received (`payload + headers`), computes verification status, and stores audit-ready evidence. For paid plans, it also adds forwarding reliability (delivery attempts, retries, replay) and reconciliation surfaces.
+LanceIQ prevents revenue loss caused by failed or missing payment webhooks — and provides verifiable proof when disputes happen.
+ LanceIQ received (`payload + headers`), computes verification status, and stores audit-ready evidence. For paid plans, it also adds forwarding reliability (delivery attempts, retries, replay) and reconciliation surfaces.
 
 ## Scope Of Proof (Contractual Boundary)
 LanceIQ proves:
