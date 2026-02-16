@@ -1,82 +1,96 @@
 # LanceIQ Atomization
 
 ## Purpose
-Define feature-level atoms so multiple agents can work in parallel without breaking contracts or evidence semantics.
+Define feature atoms so parallel agents can work without boundary drift.
 
 ## Rules
-1. Atom boundaries follow feature paths, not individual functions.
-2. Changes that cross atoms require explicit coordination and review.
-3. Tier 1 files remain protected even if they sit inside an atom.
+1. Atoms are feature paths, not single functions.
+2. Cross-atom edits require explicit handoff notes.
+3. Tier-1 files remain protected regardless of atom.
 
 ## Atoms
 
-### Atom A: Ingestion Pipeline
-Owner: Backend Owner
+### Atom A: Ingestion + Verification Core
+Owner: Backend
 Scope:
-1. app/api/ingest
-2. app/api/ingest/[apiKey]
-3. lib/verification/*
-4. lib/hashing/*
-5. lib/timestamps/*
+1. `app/api/ingest/*`
+2. `lib/ingest-core.ts`
+3. `lib/signature-verification.ts`
+4. `lib/timestamps/*`
 Boundaries:
-1. Must preserve contract semantics.
-2. Must remain append-only for evidence data.
+1. Preserve ingest contracts.
+2. Preserve receipt evidence semantics.
 
-### Atom B: Evidence Storage and Retention
-Owner: Database Owner
+### Atom B: Delivery Reliability
+Owner: Backend
 Scope:
-1. supabase/migrations
-2. retention functions and policies
+1. `lib/delivery/*`
+2. `app/api/ops/delivery/*`
+3. `app/api/delivery/replay/*`
+4. `app/api/workspaces/test-webhook/*`
 Boundaries:
-1. No breaking schema changes without a decision record.
-2. RLS must remain workspace-scoped.
+1. Ingest must remain non-blocking on enqueue failures.
+2. Replay must use immutable retained raw body.
 
-### Atom C: Certificates and Verification Views
-Owner: Frontend Owner
+### Atom C: Reconciliation + Evidence Packs
+Owner: Backend
 Scope:
-1. app/verify
-2. app/tool
-3. components/CertificateTemplate
-4. lib/pdf/*
+1. `app/api/ops/reconciliation/*`
+2. `app/api/reconciliation/*`
+3. `app/api/evidence-packs/*`
+4. `lib/delivery/reconciliation.ts`
 Boundaries:
-1. Scope-of-proof text must remain visible.
-2. Evidence fields must not be reworded to imply business truth.
+1. Team-gated entitlements only.
+2. No PII overreach in provider-object summary surfaces.
 
-### Atom D: Workspace and Membership
-Owner: Backend Owner
+### Atom D: Workspace Context + Entitlements
+Owner: Payments + Backend
 Scope:
-1. app/actions/workspaces
-2. app/actions/members
-3. workspace role policies
+1. `lib/plan.ts`
+2. `lib/entitlements.ts`
+3. `app/actions/subscription.ts`
+4. `lib/workspace-context.ts`
 Boundaries:
-1. Role checks must use canonical role helpers.
-2. No role expansion without DB migration.
+1. Workspace-scoped entitlements are canonical for gating.
+2. Avoid raw `workspace.plan` gating in UI/API logic.
 
-### Atom E: Alerts and Audit Logs
-Owner: Backend Owner
+### Atom E: Governance APIs
+Owner: Backend
 Scope:
-1. app/actions/alert-settings
-2. utils/audit
-3. audit and alert delivery policies
+1. `app/api/audit-logs/*`
+2. `app/api/access-review/*`
+3. `app/api/ops/sla/*`
+4. `app/api/ops/incidents/*`
+5. `app/api/ingest/legal-holds/*`
 Boundaries:
-1. Audit logs are append-only.
-2. No client-side inserts to audit logs.
+1. Audit is append-only.
+2. Team-only governance remains entitlement-gated.
 
-### Atom F: Billing and Plans
-Owner: Payments Owner
+### Atom F: Dashboard + Tool UX
+Owner: Frontend
 Scope:
-1. app/api/dodo
-2. app/actions/subscription
-3. plan gating logic
+1. `app/dashboard/*`
+2. `components/*`
+3. `app/tool/*`
+4. `app/verify/*`
 Boundaries:
-1. No changes to evidence semantics.
-2. Plan enforcement must be server-side.
+1. Scope-of-proof wording must remain intact.
+2. Locked-state UX must not bypass server/API gating.
 
-### Atom G: Marketing and Site UI
-Owner: Frontend Owner
+### Atom G: Billing + Identity Trust Boundaries
+Owner: Payments + Backend
 Scope:
-1. app/(marketing)
-2. components/marketing
-3. public assets
+1. `app/api/dodo/*`
+2. `app/api/sso/saml/*`
+3. `app/api/scim/*`
 Boundaries:
-1. Claims must follow scope-of-proof language.
+1. Plan mutation via billing webhook only.
+2. SAML must remain fail-closed.
+
+### Atom H: Database Integrity
+Owner: DB
+Scope:
+1. `supabase/migrations/*`
+Boundaries:
+1. RLS and immutability guarantees cannot be weakened.
+2. Index/constraint changes require compatibility notes.

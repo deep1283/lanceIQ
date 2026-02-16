@@ -6,6 +6,8 @@ const PLAN_ENTITLEMENTS = {
     canExportCsv: false,
     canVerify: false,
     canRemoveWatermark: false,
+    canUseForwarding: false,
+    canUseReconciliation: false,
     canUseAlerts: false,
     canUseSso: false,
     canUseScim: false,
@@ -20,6 +22,8 @@ const PLAN_ENTITLEMENTS = {
     canExportCsv: true,
     canVerify: true,
     canRemoveWatermark: true,
+    canUseForwarding: true,
+    canUseReconciliation: false,
     canUseAlerts: false,
     canUseSso: false,
     canUseScim: false,
@@ -34,6 +38,8 @@ const PLAN_ENTITLEMENTS = {
     canExportCsv: true,
     canVerify: true,
     canRemoveWatermark: true,
+    canUseForwarding: true,
+    canUseReconciliation: true,
     canUseAlerts: true,
     canUseSso: true,
     canUseScim: true,
@@ -48,6 +54,8 @@ const PLAN_ENTITLEMENTS = {
   canExportCsv: boolean;
   canVerify: boolean;
   canRemoveWatermark: boolean;
+  canUseForwarding: boolean;
+  canUseReconciliation: boolean;
   canUseAlerts: boolean;
   canUseSso: boolean;
   canUseScim: boolean;

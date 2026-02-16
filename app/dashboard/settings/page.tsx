@@ -13,7 +13,7 @@ export default async function SettingsPage({
   searchParams,
 }: {
   searchParams?: Promise<{ workspace_id?: string }>;
-} = {}) {
+}) {
   const params = searchParams ? await searchParams : undefined;
   const workspaceIdHint = params?.workspace_id ?? null;
   const supabase = await createClient();

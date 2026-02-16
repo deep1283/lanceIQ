@@ -1,33 +1,37 @@
 # Open Core Strategy
 
-LanceIQ follows an **Open Core** model to balance community adoption with sustainable operations.
+LanceIQ currently ships as AGPL-licensed source while using plan-gated hosted behavior.
 
-## Licensing Status
-*   **Current**: [GNU AGPLv3](./LICENSE) for the entire codebase.
-*   **Future Goal**: Dual-Licensing (AGPL for OSS / Commercial for Enterprise).
+## License State
+1. Current license: AGPL-3.0 for repository code.
+2. Commercial licensing can be handled separately outside this file.
 
-## Feature Boundary
+## Functional Boundary (Code Reality)
+### Core capabilities in repo
+1. Webhook ingest and signature verification engine.
+2. Certificate generation and verification surfaces.
+3. Workspace model with role-based access.
+4. Audit/governance APIs and operational endpoints.
+5. Reliability and reconciliation APIs.
 
-### ✅ Core (Open Source - AGPL)
-These features are free forever and form the foundation of trust.
-*   **Signature Verification**: `lib/signature-verification`, `/api/verify` logic.
-*   **Public Verification Page**: `/verify/[id]` (Read-only proof).
-*   **PDF Generation**: Certificate rendering.
-*   **Manual Tools**: "Paste & Verify" debugger.
-*   **Ingestion (Basic)**: Standard webhook capture (with 24h retention).
+### Plan-gated behavior (same repo)
+Gating is entitlement-driven (`/Users/deepmishra/vscode/LanceIQ/lib/plan.ts`), not separate code packages.
 
-### 💎 Pro (Hosted / Proprietary Context)
-These features are designed for teams and scaling operations.
-*   **Monetization**: Dodo Payments integration, Subscription management.
-*   **Smart Alerts**: Email/Slack notifications for critical failures.
-*   **Extended Retention**: 7-day or 30-day storage enforcement.
-*   **Rate Limiting**: Distributed limits (Upstash/Redis) for high volume.
-*   **Admin Console**: Multi-workspace management and audit logs.
+1. Free:
+1. PDF export allowed.
+2. CSV export disabled.
+3. Forwarding/reconciliation/governance features locked.
 
-## Repository Structure Logic
-While currently a single monorepo, we conceptualize the code as:
+2. Pro:
+1. Signature verification enabled.
+2. CSV export enabled.
+3. Forwarding/replay reliability enabled.
 
-*   `/core`: Essential logic for verification and proof generation.
-*   `/pro`: Billing, Alerting, and Compliance logic.
+3. Team:
+1. Reconciliation enabled.
+2. Governance stack enabled (alerts, audit logs, SSO/SCIM, access reviews, SLA/incidents, legal hold, key rotation).
 
-*Note: Enterprise users requiring a non-AGPL license for embedding LanceIQ should contact sales.*
+## Practical Repository Layout
+The repository is one codebase with entitlement checks at API/server-action/UI layers.
+
+There is no separate `/core` and `/pro` directory split in the current implementation.

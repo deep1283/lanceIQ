@@ -16,6 +16,8 @@ import { isCriticalReason, maybeSendCriticalAlert, type AlertSetting } from '@/l
 import { anchorIngestedEvent } from '@/lib/timestamps/anchor';
 import { getPlanLimits, type PlanTier } from '@/lib/plan';
 import { getEffectiveEntitlementsForWorkspace } from '@/lib/entitlements';
+import { enqueueDeliveryJob, listActiveDeliveryTargets } from '@/lib/delivery/service';
+import { buildForwardingEnvelopeV1 } from '@/lib/delivery/payload';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -309,6 +311,17 @@ export async function processIngestEvent(req: NextRequest, apiKey: string): Prom
       }
     }
 
+    await maybeEnqueueForwardingJobs({
+      supabase,
+      workspace,
+      eventId: event.id,
+      rawBody,
+      sourceHeaders: sanitizedHeaders,
+      sourceContentType: req.headers.get('content-type') || 'application/json',
+      detectedProvider: verifiedProvider,
+      providerEventId: providerEventId ?? null,
+    });
+
     const statusText = isDuplicate ? 'duplicate' : 'queued';
     const httpStatus = isDuplicate ? 200 : 202;
     return NextResponse.json(
@@ -330,6 +343,98 @@ export function errorResponse(message: string, status: number, code: string, hea
 
 function canSendAlerts(workspace: { plan?: string | null; subscription_status?: string | null; subscription_current_period_end?: string | null }) {
   return getEffectiveEntitlementsForWorkspace(workspace).canUseAlerts;
+}
+
+async function maybeEnqueueForwardingJobs(params: {
+  supabase: any;
+  workspace: {
+    id: string;
+    plan?: string | null;
+    subscription_status?: string | null;
+    subscription_current_period_end?: string | null;
+  };
+  eventId: string;
+  rawBody: string;
+  sourceHeaders: Record<string, string>;
+  sourceContentType: string;
+  detectedProvider: string;
+  providerEventId: string | null;
+}) {
+  const entitlements = getEffectiveEntitlementsForWorkspace(params.workspace);
+  const canUseForwarding = Boolean((entitlements as any).canUseForwarding);
+  if (!canUseForwarding) return;
+
+  const { targets, error: targetError } = await listActiveDeliveryTargets(
+    params.supabase,
+    params.workspace.id
+  );
+  if (targetError) {
+    await writeIngestAuditFailure(params.supabase, params.workspace.id, {
+      event_id: params.eventId,
+      reason: targetError,
+      stage: 'targets_fetch',
+    });
+    return;
+  }
+
+  if (!targets.length) return;
+
+  const eventType = `lanceiq.ingest.${params.detectedProvider || 'generic'}`;
+  for (const target of targets) {
+    const idempotencyKey = [
+      'ingest',
+      params.eventId,
+      target.id,
+      params.providerEventId || 'none',
+    ].join(':');
+
+    const forwardingPayload = buildForwardingEnvelopeV1({
+      rawBody: params.rawBody,
+      sourceHeaders: params.sourceHeaders,
+      sourceContentType: params.sourceContentType || 'application/json',
+      metadata: {
+        ingested_event_id: params.eventId,
+        detected_provider: params.detectedProvider,
+        provider_event_id: params.providerEventId,
+      },
+    });
+
+    const result = await enqueueDeliveryJob({
+      admin: params.supabase,
+      workspaceId: params.workspace.id,
+      targetId: target.id,
+      eventType,
+      payload: forwardingPayload,
+      triggerSource: 'ingest',
+      idempotencyKey,
+      ingestedEventId: params.eventId,
+      createdBy: null,
+      priority: 5,
+    });
+
+    if (result.error) {
+      await writeIngestAuditFailure(params.supabase, params.workspace.id, {
+        event_id: params.eventId,
+        target_id: target.id,
+        reason: result.error,
+        stage: 'enqueue_delivery_job',
+      });
+    }
+  }
+}
+
+async function writeIngestAuditFailure(
+  supabase: any,
+  workspaceId: string,
+  details: Record<string, unknown>
+) {
+  await supabase.from('audit_logs').insert({
+    workspace_id: workspaceId,
+    actor_id: null,
+    action: 'delivery.enqueue_failed',
+    target_resource: 'delivery_jobs',
+    details,
+  });
 }
 
 function tryParseJson(str: string): unknown {

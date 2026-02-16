@@ -160,3 +160,75 @@ Decision: `/api/verify-signature` entitlement checks are workspace-scoped and me
 Why: Unscoped verification checks can apply the wrong plan when users belong to multiple workspaces.
 Backward compatibility: Single-workspace users can omit `workspace_id`; multi-workspace users receive explicit `400` guidance.
 Alternatives rejected: User-level "best plan" checks without workspace binding.
+
+## 2026-02-16: Payments-First Product Scope (V6)
+Decision: Prioritize payment webhook use cases as the primary product surface and buyer motion.
+Why: Payment disputes, delivery failures, and audit requests are high-severity and recurring; scope focus improves GTM clarity and implementation depth.
+Backward compatibility: Existing generic ingestion remains functional; messaging and roadmap are payment-first.
+Alternatives rejected: Broad horizontal webhook tooling as primary positioning.
+
+## 2026-02-16: Forwarding Reliability Semantics (V6)
+Decision: Add optional forwarding with retries, DLQ, replay, and breaker controls while preserving receipt-first evidence semantics.
+Why: Reliability and operational recovery are core buyer requirements for payment webhook pipelines.
+Backward compatibility: Ingestion success is non-blocking even when forwarding enqueue fails; forwarding is additive and plan-gated.
+Alternatives rejected: Provider-facing ingest only with no delivery recovery layer.
+
+## 2026-02-16: Immutable Forwarding Envelope (V6)
+Decision: Forwarding payload is derived from a raw-body envelope (`raw_body_base64` plus allowlisted source headers), not JSON re-serialization.
+Why: Avoids payload mutation drift and preserves evidence fidelity for replay and delivery proof.
+Backward compatibility: Non-envelope payloads remain supported for legacy internal flows; ingest-generated forwarding uses envelope format.
+Alternatives rejected: Re-serializing parsed JSON before delivery.
+
+## 2026-02-16: Circuit Breaker Policy (V6)
+Decision: Open delivery breaker after 5 consecutive destination 5xx responses; close only after manual resume plus successful health-check.
+Why: Prevents retry storms and gives operators explicit recovery control.
+Backward compatibility: Retry model remains additive; existing delivery jobs are not invalidated.
+Alternatives rejected: Unlimited retries or auto-close without operator confirmation.
+
+## 2026-02-16: Reconciliation Semantics (V6/V6.1)
+Decision: Reconciliation compares provider pulls against LanceIQ receipts and delivery outcomes; V6.1 adds destination-state snapshots via signed callback.
+Why: Enterprises need explainable mismatch counters (`missing_receipts`, `missing_deliveries`, `failed_verifications`, `provider_mismatches`).
+Backward compatibility: Reconciliation is Team-gated and additive; no changes to ingest/certificate contracts are required for base flows.
+Alternatives rejected: Delivery-only dashboards without provider-side comparison.
+
+## 2026-02-16: Evidence Pack Integrity Model (V6)
+Decision: Evidence packs are sealed with manifest SHA-256 plus server HMAC signature and exposed via verification endpoint.
+Why: Provides portable integrity proof for dispute and audit workflows.
+Backward compatibility: Pack generation and verification are additive APIs; existing certificate exports unchanged.
+Alternatives rejected: Unsigned pack exports and client-only verification logic.
+
+## 2026-02-16: Ops Runner Auth Model (V6)
+Decision: Allow dual trigger modes for delivery/reconciliation runners: service-token scheduled execution and owner/admin manual execution.
+Why: Supports production cron automation while preserving operator-driven remediation.
+Backward compatibility: Manual UI/API triggers continue to work.
+Alternatives rejected: Manual-only runners or unauthenticated cron endpoints.
+
+## 2026-02-16: Reliability/Reconciliation Plan Gating Finalization (V6)
+Decision: `canUseForwarding` is enabled for Pro and Team; `canUseReconciliation` remains Team-only.
+Why: Forwarding solves immediate operational reliability for SMB/Pro buyers, while reconciliation remains the Team differentiator.
+Backward compatibility: Additive entitlement flags; existing free behavior unchanged.
+Alternatives rejected: Team-only forwarding (too restrictive for SMB), or enabling reconciliation on Pro (dilutes Team governance tier).
+
+## 2026-02-16: Delivery Retry and Breaker Runtime Defaults (V6)
+Decision: Delivery worker defaults to 5 attempts (`DELIVERY_MAX_ATTEMPTS` override), lock window from `DELIVERY_LOCK_SECONDS`, and breaker opens on 5 consecutive 5xx.
+Why: Operationally safe default that limits retry storms while allowing tuning via environment configuration.
+Backward compatibility: New reliability layer is additive; ingest success remains non-blocking.
+Alternatives rejected: Unbounded retries and auto-recovery without operator control.
+
+## 2026-02-16: Ops Runner Dual-Auth Execution (V6)
+Decision: Delivery and reconciliation runners support both manual owner/admin execution and service-token execution (`OPS_SERVICE_TOKEN`, fallback `CRON_SECRET`).
+Why: Supports scheduled automation and incident-time manual recovery in the same APIs.
+Backward compatibility: Existing manual behavior preserved.
+Alternatives rejected: Manual-only or unauthenticated cron execution.
+
+## 2026-02-16: Test Webhook API-Key Mode (V6)
+Decision: `POST /api/workspaces/test-webhook` supports `api_key` mode in addition to legacy `{workspace_id,target_id}` mode.
+Why: Avoids exposing API keys in URL paths from Add Source UX and keeps test flow audit-logged/structured.
+Backward compatibility: Legacy mode remains supported.
+Alternatives rejected: Continuing direct `/api/ingest/{apiKey}` calls from UI.
+
+## 2026-02-16: Evidence Pack Verification Side Effects (V6.1)
+Decision: Evidence pack verification is returned to caller and audit-logged, but not persisted back to sealed pack rows.
+Why: Preserves sealed-pack immutability constraints and avoids post-seal mutation conflicts.
+Backward compatibility: Verification API remains additive and deterministic.
+Alternatives rejected: In-place update of sealed evidence records.

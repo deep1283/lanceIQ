@@ -14,12 +14,20 @@ interface AddSourceModalProps {
   onSuccess: () => void;
 }
 
+interface InlineErrorState {
+  message: string;
+  code?: string | null;
+  id?: string | null;
+  status?: number | null;
+}
+
 export function AddSourceModal({ isOpen, onClose, onSuccess }: AddSourceModalProps) {
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState('');
   const [provider, setProvider] = useState('stripe');
   const [secret, setSecret] = useState('');
   const [storeRawBody, setStoreRawBody] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   
   // State for showing the new key
   const [newKey, setNewKey] = useState<string | null>(null);
@@ -28,9 +36,11 @@ export function AddSourceModal({ isOpen, onClose, onSuccess }: AddSourceModalPro
   // State for test webhook
   const [testLoading, setTestLoading] = useState(false);
   const [testSuccess, setTestSuccess] = useState(false);
+  const [testError, setTestError] = useState<InlineErrorState | null>(null);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setCreateError(null);
     setLoading(true);
     try {
       const result = await createWorkspace({
@@ -41,16 +51,19 @@ export function AddSourceModal({ isOpen, onClose, onSuccess }: AddSourceModalPro
       });
       
       if (result.error) {
-        throw new Error(result.error);
+        setCreateError(result.error);
+        setLoading(false);
+        return;
       }
       
       setNewKey(result.apiKey || null); // Show the key
+      setLoading(false);
       onSuccess(); // Refresh list in background
       // Don't close yet, wait for user to copy key
     } catch (error) {
       console.error(error);
-      alert('Failed to create source');
-      setLoading(false); // Only stop loading on error, on success we stay loading/showing key
+      setCreateError('Failed to create source.');
+      setLoading(false);
     }
   };
 
@@ -65,34 +78,46 @@ export function AddSourceModal({ isOpen, onClose, onSuccess }: AddSourceModalPro
   const handleTestWebhook = async () => {
     if (!newKey) return;
     setTestLoading(true);
+    setTestError(null);
     try {
-      // In a real app we would use the actual workspace ID, but here the user just got the key.
-      // We can send to the ingestion endpoint directly using the key.
-      // The ingestion URL structure is typically /api/ingest/{API_KEY}
-      const ingestUrl = `/api/ingest/${newKey}`;
-      
-      const res = await fetch(ingestUrl, {
+      const payload = {
+        api_key: newKey,
+        payload: {
+          event: 'test.ping',
+          source: 'workspace_test_webhook_ui',
+          timestamp: new Date().toISOString(),
+          message: 'This is a test webhook from LanceIQ',
+        },
+      };
+
+      const res = await fetch('/api/workspaces/test-webhook', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'LanceIQ-Test-Event': 'true'
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          event: "test.ping",
-          timestamp: new Date().toISOString(),
-          message: "This is a test webhook from LanceIQ"
-        })
+        body: JSON.stringify(payload)
       });
+
+      const data = await res.json().catch(() => ({}));
 
       if (res.ok) {
         setTestSuccess(true);
+        setTestError(null);
         setTimeout(() => setTestSuccess(false), 3000);
       } else {
-        alert('Test failed. Please check your network.');
+        setTestError({
+          message: typeof data.error === 'string' && data.error ? data.error : 'Test webhook failed.',
+          code: typeof data.error_code === 'string' ? data.error_code : null,
+          id: typeof data.id === 'string' ? data.id : null,
+          status: res.status,
+        });
       }
     } catch (e) {
       console.error(e);
-      alert('Failed to send test webhook');
+      setTestError({
+        message: 'Failed to send test webhook.',
+        status: null,
+      });
     } finally {
       setTestLoading(false);
     }
@@ -104,11 +129,11 @@ export function AddSourceModal({ isOpen, onClose, onSuccess }: AddSourceModalPro
     setProvider('stripe');
     setSecret('');
     setStoreRawBody(false);
-    setSecret('');
-    setStoreRawBody(false);
+    setCreateError(null);
     setLoading(false);
     setTestLoading(false);
     setTestSuccess(false);
+    setTestError(null);
     onClose();
   };
 
@@ -160,6 +185,16 @@ export function AddSourceModal({ isOpen, onClose, onSuccess }: AddSourceModalPro
                   </Button>
                 </div>
              </div>
+             {testError && (
+              <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800 space-y-1">
+                <p className="font-medium">{testError.message}</p>
+                <p className="text-xs">
+                  {typeof testError.status === 'number' ? `HTTP ${testError.status}` : 'Network error'}
+                  {testError.code ? ` • ${testError.code}` : ''}
+                  {testError.id ? ` • Ref ${testError.id}` : ''}
+                </p>
+              </div>
+             )}
           </div>
         ) : (
           <form id="add-source-form" onSubmit={handleSubmit} className="space-y-4 py-4">
@@ -212,6 +247,11 @@ export function AddSourceModal({ isOpen, onClose, onSuccess }: AddSourceModalPro
               </div>
               <Switch checked={storeRawBody} onCheckedChange={setStoreRawBody} />
             </div>
+            {createError && (
+              <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                {createError}
+              </div>
+            )}
           </form>
         )}
 

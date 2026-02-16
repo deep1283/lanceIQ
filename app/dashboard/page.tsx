@@ -47,7 +47,8 @@ export default async function DashboardPage({
   const workspaceRole = activeMembership?.role ?? null;
   const canExport = canExportCertificates(workspaceRole);
 
-  const { plan } = workspaceId ? await checkPlanEntitlements(workspaceId) : { plan: 'free' as const };
+  const entitlements = workspaceId ? await checkPlanEntitlements(workspaceId) : await checkPlanEntitlements();
+  const { plan } = entitlements;
   const limits = getPlanLimits(plan);
 
   const nowIso = new Date().toISOString();
@@ -93,7 +94,7 @@ export default async function DashboardPage({
 
   return (
     <main className="min-h-screen bg-transparent">
-      <DashboardClient workspaceRole={workspaceRole} initialTab={initialTab}>
+      <DashboardClient workspaceRole={workspaceRole} initialTab={initialTab} entitlements={entitlements}>
         {/* Stats */}
         <div className="flex items-center justify-between mb-6">
           <Link 

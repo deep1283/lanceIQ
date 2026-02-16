@@ -6,6 +6,17 @@ import { revalidatePath } from 'next/cache';
 import { logAuditAction, AUDIT_ACTIONS } from '@/utils/audit';
 
 import { encrypt } from '@/lib/encryption';
+import { checkPlanEntitlements } from '@/app/actions/subscription';
+import { canManageWorkspace, type Role } from '@/lib/roles';
+
+export interface WorkspaceDeliveryTarget {
+  id: string;
+  workspace_id: string;
+  name: string;
+  url: string;
+  is_active: boolean | null;
+  updated_at: string | null;
+}
 
 export async function createWorkspace(data: {
   name: string;
@@ -124,6 +135,151 @@ export async function getWorkspaces() {
   }
 
   return data;
+}
+
+export async function getWorkspaceDeliveryTargets() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from('workspace_delivery_targets')
+    .select('id, workspace_id, name, url, is_active, updated_at')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Get Delivery Targets Error:', error);
+    return [];
+  }
+
+  return (data || []) as WorkspaceDeliveryTarget[];
+}
+
+function isAllowedTargetUrl(url: string) {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return { ok: false as const, error: 'Destination URL must be valid.' };
+  }
+
+  const allowInsecureLocalhost = process.env.ALLOW_INSECURE_LOCALHOST_FORWARDING === 'true';
+  const isLocalhost = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+  if (parsed.protocol === 'https:') {
+    return { ok: true as const };
+  }
+  if (parsed.protocol === 'http:' && allowInsecureLocalhost && isLocalhost) {
+    return { ok: true as const };
+  }
+  return { ok: false as const, error: 'Destination URL must use HTTPS.' };
+}
+
+async function requireWorkspaceManagerRole(params: { supabase: any; workspaceId: string; userId: string }) {
+  const { data: membership } = await params.supabase
+    .from('workspace_members')
+    .select('role')
+    .eq('workspace_id', params.workspaceId)
+    .eq('user_id', params.userId)
+    .maybeSingle();
+
+  const role = (membership?.role || null) as Role | null;
+  if (!canManageWorkspace(role)) {
+    return { ok: false as const, error: 'Only owners/admins can manage forwarding targets.' };
+  }
+
+  return { ok: true as const };
+}
+
+export async function upsertWorkspaceDeliveryTarget(input: {
+  workspaceId: string;
+  destinationUrl: string;
+  enabled: boolean;
+  name?: string;
+}) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: 'Unauthorized' };
+
+  const workspaceId = input.workspaceId?.trim();
+  if (!workspaceId) return { error: 'workspaceId is required.' };
+
+  const manager = await requireWorkspaceManagerRole({
+    supabase,
+    workspaceId,
+    userId: user.id,
+  });
+  if (!manager.ok) return { error: manager.error };
+
+  const entitlements = await checkPlanEntitlements(workspaceId);
+  if (!entitlements.canUseForwarding) {
+    return { error: 'Forwarding is available on Pro and Team plans.' };
+  }
+
+  const destinationUrl = input.destinationUrl?.trim();
+  const urlValidation = isAllowedTargetUrl(destinationUrl);
+  if (!destinationUrl || !urlValidation.ok) {
+    return { error: urlValidation.ok ? 'Destination URL is required.' : urlValidation.error };
+  }
+
+  const targetName = input.name?.trim() || 'Primary Destination';
+
+  const { data: existing } = await supabase
+    .from('workspace_delivery_targets')
+    .select('id')
+    .eq('workspace_id', workspaceId)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (existing?.id) {
+    const { error } = await supabase
+      .from('workspace_delivery_targets')
+      .update({
+        name: targetName,
+        url: destinationUrl,
+        is_active: input.enabled,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existing.id)
+      .eq('workspace_id', workspaceId);
+
+    if (error) {
+      console.error('Update Delivery Target Error:', error);
+      return { error: 'Failed to update forwarding target.' };
+    }
+  } else {
+    const { error } = await supabase.from('workspace_delivery_targets').insert({
+      workspace_id: workspaceId,
+      name: targetName,
+      url: destinationUrl,
+      is_active: input.enabled,
+      created_by: user.id,
+    });
+    if (error) {
+      console.error('Create Delivery Target Error:', error);
+      return { error: 'Failed to create forwarding target.' };
+    }
+  }
+
+  await logAuditAction({
+    workspaceId,
+    actorId: user.id,
+    action: AUDIT_ACTIONS.WORKSPACE_UPDATED,
+    targetResource: 'workspace_delivery_targets',
+    details: {
+      enabled: input.enabled,
+      destination_url: destinationUrl,
+    },
+  });
+
+  revalidatePath('/dashboard');
+  revalidatePath('/dashboard/admin');
+  return { success: true };
 }
 
 export async function deleteWorkspace(id: string) {

@@ -1,39 +1,45 @@
 # LanceIQ Operating Rules
 
 ## Purpose
-Prevent boundary violations and hallucinations when multiple agents work in parallel.
+Prevent boundary violations and undocumented behavior drift.
 
 ## Read-First Requirement
 Before making changes, every chat must read:
-1. OWNERSHIP.md
-2. ATOMIZATION.md
-3. ARCHITECTURE.md
-4. CONTRACTS.md
-5. DECISIONS.md
-6. STATUS.md
-7. OPERATING_RULES.md
+1. `/Users/deepmishra/vscode/LanceIQ/OWNERSHIP.md`
+2. `/Users/deepmishra/vscode/LanceIQ/ATOMIZATION.md`
+3. `/Users/deepmishra/vscode/LanceIQ/ARCHITECTURE.md`
+4. `/Users/deepmishra/vscode/LanceIQ/CONTRACTS.md`
+5. `/Users/deepmishra/vscode/LanceIQ/DECISIONS.md`
+6. `/Users/deepmishra/vscode/LanceIQ/STATUS.md`
+7. `/Users/deepmishra/vscode/LanceIQ/OPERATING_RULES.md`
 
 ## Evidence Discipline
-1. Never claim behavior unless it is verified in code or a doc.
-2. If the information is not in repo docs, ask for clarification.
-3. Do not infer legal claims; follow scope-of-proof language.
+1. Never claim behavior unless verified in code.
+2. Keep scope-of-proof language strict.
+3. Do not infer legal guarantees not present in contracts.
 
 ## Security Boundaries
-1. Do not accept unsigned or weakly validated identity assertions in auth flows.
-2. Do not grant or upgrade plans from email-only or payment-id-only verification paths.
-3. Plan state changes must remain webhook and proof bound.
-4. Do not return customer PII from proof/verification endpoints unless explicitly contract-approved.
+1. No unsigned/weak identity assertions in auth flows.
+2. No email-only/payment-id-only plan activation.
+3. Plan changes are webhook/proof-bound.
+4. Do not return customer PII from proof endpoints unless contract-approved.
 
-## Change Control
-1. Tier 1 changes require explicit approval.
-2. Contract changes require a decision record.
-3. Evidence semantics are append-only and must not be weakened.
+## Tier Control
+1. Tier-1 changes require Product Owner approval.
+2. Contract changes require decision record updates.
+3. Immutability/RLS semantics cannot be weakened.
 
-## Status Updates
-1. Only the Status Owner updates STATUS.md.
-2. Other roles must report changes in their response, not by editing STATUS.md.
+## Documentation Rule
+When product behavior changes:
+1. Update `CONTRACTS.md` for interface changes.
+2. Update `DECISIONS.md` for semantic/security choices.
+3. Update `STATUS.md` for milestone state.
+4. Confirm docs against current code before handoff.
 
-## Communication Rules
-1. Reference exact file paths for any change.
-2. Include a brief rationale for non-trivial changes.
+## Status Ownership
+Only Product Owner updates `STATUS.md`.
+
+## Communication Rule
+1. Include exact file paths in handoffs.
+2. State rationale for non-trivial changes.
 3. If unsure, stop and ask.

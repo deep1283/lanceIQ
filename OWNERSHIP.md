@@ -1,100 +1,89 @@
 # LanceIQ Ownership
 
-## Rule of Engagement
-No one edits files outside their assigned area. If ownership is unclear, do not touch the file.
-See ATOMIZATION.md for feature-level boundaries.
+## Rule Of Engagement
+No one edits files outside assigned ownership without explicit approval.
 
 ## Read-First Requirement
-Before making changes, every chat must read:
-1. OWNERSHIP.md
-2. ATOMIZATION.md
-3. ARCHITECTURE.md
-4. CONTRACTS.md
-5. DECISIONS.md
-6. STATUS.md
+1. `/Users/deepmishra/vscode/LanceIQ/OWNERSHIP.md`
+2. `/Users/deepmishra/vscode/LanceIQ/ATOMIZATION.md`
+3. `/Users/deepmishra/vscode/LanceIQ/ARCHITECTURE.md`
+4. `/Users/deepmishra/vscode/LanceIQ/CONTRACTS.md`
+5. `/Users/deepmishra/vscode/LanceIQ/DECISIONS.md`
+6. `/Users/deepmishra/vscode/LanceIQ/STATUS.md`
+7. `/Users/deepmishra/vscode/LanceIQ/OPERATING_RULES.md`
 
-## Tier 1 — Protected (Almost Frozen)
-Changes require rationale plus a backward-compatibility note.
-1. app/api/ingest
-2. lib/verification/*
-3. lib/hashing/*
-4. lib/certificates/*
-5. lib/timestamps/*
-6. supabase/migrations
-7. CONTRACTS.md
+## Tier 1 — Protected (Approval Required)
+Changes require rationale + backward-compatibility note.
+1. `app/api/ingest/*`
+2. `lib/ingest-core.ts`
+3. `lib/signature-verification.ts`
+4. `lib/delivery/*`
+5. `lib/workspace-context.ts`
+6. `supabase/migrations/*`
+7. `CONTRACTS.md`
+8. `ARCHITECTURE.md`
+9. `DECISIONS.md`
 
-## Tier 2 — Owned but Evolvable
-Can evolve but may not break contracts.
-1. app/api/certificates
-2. app/api/verify
-3. app/api/audit-logs
-4. app/api/access-review
-5. app/api/ops
-6. lib/pdf/*
-7. lib/providers/*
+## Tier 2 — Owned But Evolvable
+Can evolve without breaking contracts.
+1. `app/api/verify-signature/*`
+2. `app/api/delivery/*`
+3. `app/api/ops/*`
+4. `app/api/reconciliation/*`
+5. `app/api/evidence-packs/*`
+6. `app/actions/*`
+7. `app/dashboard/*`
+8. `components/*`
 
-## Tier 3 — Flexible
-UX may change; evidence must not.
-1. components/*
-2. app/ui/*
-3. styles/*
-4. docs/* (except CONTRACTS.md)
-5. app/dashboard/*
-6. app/dashboard/settings/*
+## Tier 3 — Flexible UX/Content
+1. `app/(marketing)/*`
+2. `styles/*`
+3. `README.md`
+4. `overview.md`
+5. `STATUS.md`
+6. `V6_PLAN.md`
 
 ## Ownership Map
-1. Platform Contracts: CONTRACTS.md, ARCHITECTURE.md, DECISIONS.md
-Owner: Product Owner
+### Product Owner
+Owns:
+1. `ARCHITECTURE.md`
+2. `CONTRACTS.md`
+3. `DECISIONS.md`
+4. `STATUS.md`
+5. `V6_PLAN.md`
 
-2. Ingestion and Verification: app/api/ingest, lib/verification/*
-Owner: Backend Owner
+### Backend Owner
+Owns:
+1. `app/api/*` (except DB migration logic)
+2. `lib/ingest-core.ts`
+3. `lib/delivery/*`
+4. `lib/workspace-context.ts`
+5. `utils/audit.ts`
 
-3. Evidence Storage and Migrations: supabase/migrations
-Owner: Database Owner
+### Database Owner
+Owns:
+1. `supabase/migrations/*`
+2. RLS/trigger/index policy correctness.
 
-4. UI and Certificate Rendering: app/verify, app/tool, app/dashboard, app/dashboard/settings, components
-Owner: Frontend Owner
+### Frontend Owner
+Owns:
+1. `app/tool/*`
+2. `app/dashboard/*`
+3. `app/verify/*`
+4. `components/*`
+5. `styles/*`
 
-5. Billing and Plans: app/api/dodo, app/actions/subscription
-Owner: Payments Owner
-
-## Role Cards
-Use these to assign a human to a role with clear boundaries.
-
-**Product Owner**
-1. Owns: CONTRACTS.md, ARCHITECTURE.md, DECISIONS.md.
-2. May approve Tier 1 changes.
-3. Responsible for scope-of-proof language and liability boundaries.
-
-**Backend Owner**
-1. Owns: app/api/ingest, lib/verification/*, lib/hashing/*, lib/timestamps/*.
-2. Must preserve contracts and append-only evidence semantics.
-3. Requires Product Owner approval for Tier 1 changes.
-
-**Database Owner**
-1. Owns: supabase/migrations.
-2. Responsible for RLS, retention, and data integrity.
-3. Requires Product Owner approval for evidence schema changes.
-
-**Frontend Owner**
-1. Owns: app/verify, app/tool, components, styles, UI work.
-2. Must keep scope-of-proof text intact in evidence views and PDFs.
-3. Cannot change contracts or evidence semantics.
-
-**Payments Owner**
-1. Owns: app/api/dodo, app/actions/subscription.
-2. Responsible for billing workflows and plan gating.
-3. Cannot modify evidence records or verification logic.
-
-## Change Rules
-1. Tier 1 changes require explicit approval, rationale, and a backward-compatibility note.
-2. Contract changes require a decision record.
-3. Ownership transfers must be recorded here.
+### Payments Owner
+Owns:
+1. `app/api/dodo/*`
+2. `app/actions/subscription.ts`
+3. entitlement/promo/purchase-flow alignment.
 
 ## Approval Rules
-1. Product Owner approves all Tier 1 changes and all contract changes.
-2. Product Owner approves any changes that affect evidence semantics or legal language.
-3. Database Owner approves migration changes after Product Owner sign-off.
+1. Product Owner approves all Tier-1 and contract-semantic changes.
+2. DB Owner signs off migrations after Product Owner approval.
+3. Payments Owner cannot change evidence semantics.
+4. Frontend Owner cannot change contract payload semantics.
 
 ## Status Ownership
-STATUS.md is owned by the Product Owner. Other roles must report changes in their response only.
+`STATUS.md` is Product Owner-owned; other roles report status in handoff notes.

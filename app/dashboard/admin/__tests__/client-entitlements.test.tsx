@@ -39,6 +39,8 @@ const FREE_EFFECTIVE_ENTITLEMENTS = {
   canExportCsv: false,
   canVerify: false,
   canRemoveWatermark: false,
+  canUseForwarding: false,
+  canUseReconciliation: false,
   canUseAlerts: false,
   canUseSso: false,
   canUseScim: false,

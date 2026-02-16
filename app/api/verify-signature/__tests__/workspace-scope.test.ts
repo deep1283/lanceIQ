@@ -109,6 +109,8 @@ const PRO_ENTITLEMENTS = {
   canExportCsv: true,
   canVerify: true,
   canRemoveWatermark: true,
+  canUseForwarding: true,
+  canUseReconciliation: false,
   canUseAlerts: false,
   canUseSso: false,
   canUseScim: false,
@@ -127,6 +129,7 @@ const FREE_ENTITLEMENTS = {
   canExportCsv: false,
   canVerify: false,
   canRemoveWatermark: false,
+  canUseForwarding: false,
 };
 
 describe('POST /api/verify-signature workspace scoping', () => {

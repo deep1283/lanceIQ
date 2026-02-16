@@ -14,6 +14,7 @@ import {
   Settings,
   Gavel,
   Lock,
+  GitCompareArrows,
 } from 'lucide-react';
 import type { PlanEntitlements } from '@/lib/plan';
 
@@ -76,6 +77,13 @@ const adminItems = [
     icon: Activity,
     teamOnly: true,
   },
+  {
+    key: 'reconciliation',
+    label: 'Reconciliation',
+    href: '/dashboard/admin?section=reconciliation',
+    icon: GitCompareArrows,
+    teamOnly: true,
+  },
 ];
 
 const footerItems = [
@@ -112,6 +120,7 @@ export default function DashboardSidebar({ initialEntitlements }: { initialEntit
     identity: initialEntitlements.canUseSso,
     access: initialEntitlements.canUseAccessReviews,
     ops: initialEntitlements.canUseSlaIncidents,
+    reconciliation: initialEntitlements.canUseReconciliation,
   };
 
   const isActive = (itemKey: string) => {

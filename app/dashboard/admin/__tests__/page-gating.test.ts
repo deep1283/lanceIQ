@@ -51,6 +51,8 @@ function makeEntitlements(kind: 'free' | 'team') {
       canExportCsv: false,
       canVerify: false,
       canRemoveWatermark: false,
+      canUseForwarding: false,
+      canUseReconciliation: false,
       canUseAlerts: false,
       canUseSso: false,
       canUseScim: false,
@@ -70,6 +72,8 @@ function makeEntitlements(kind: 'free' | 'team') {
     canExportCsv: true,
     canVerify: true,
     canRemoveWatermark: true,
+    canUseForwarding: true,
+    canUseReconciliation: true,
     canUseAlerts: true,
     canUseSso: true,
     canUseScim: true,
@@ -193,7 +197,7 @@ describe('Admin page server-render Team gating', () => {
     const effectiveEntitlements = makeEntitlements('free');
     mocks.checkPlanEntitlements.mockResolvedValue(effectiveEntitlements);
 
-    const result = await AdminPage();
+    const result = await AdminPage({});
     const props = (result as any).props;
     expect(props.workspace.plan).toBe('team');
     expect(props.initialEntitlements).toEqual(effectiveEntitlements);
@@ -231,7 +235,7 @@ describe('Admin page server-render Team gating', () => {
     const effectiveEntitlements = makeEntitlements('team');
     mocks.checkPlanEntitlements.mockResolvedValue(effectiveEntitlements);
 
-    const result = await AdminPage();
+    const result = await AdminPage({});
     const props = (result as any).props;
     expect(props.initialEntitlements).toEqual(effectiveEntitlements);
     expect(props.initialSettings?.id).toBe('alert_1');
@@ -279,7 +283,7 @@ describe('Admin page server-render Team gating', () => {
       },
     });
 
-    const result = await AdminPage();
+    const result = await AdminPage({});
     const props = (result as any).props;
     expect(props.initialSettings).toBeNull();
     expect(props.initialAuditLogs).toEqual([]);

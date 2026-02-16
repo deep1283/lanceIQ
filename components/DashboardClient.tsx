@@ -9,14 +9,16 @@ import { SourcesList } from '@/components/SourcesList';
 import Link from 'next/link';
 import { canManageWorkspace, isExporter, isLegalHoldManager, isViewer } from '@/lib/roles';
 import type { Role } from '@/lib/roles';
+import type { PlanEntitlements } from '@/lib/plan';
 
 interface DashboardClientProps {
   children: React.ReactNode; // The server-rendered certificates list
   workspaceRole?: Role | null;
   initialTab?: 'certificates' | 'sources';
+  entitlements: PlanEntitlements & { isPro: boolean };
 }
 
-export function DashboardClient({ children, workspaceRole, initialTab = 'certificates' }: DashboardClientProps) {
+export function DashboardClient({ children, workspaceRole, initialTab = 'certificates', entitlements }: DashboardClientProps) {
   const [activeTab, setActiveTab] = useState<'certificates' | 'sources'>(initialTab);
   const [isAddSourceOpen, setIsAddSourceOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -85,6 +87,8 @@ export function DashboardClient({ children, workspaceRole, initialTab = 'certifi
               refreshTrigger={refreshTrigger}
               canManageSources={canAddSource}
               workspaceRole={workspaceRole}
+              canUseForwarding={entitlements.canUseForwarding}
+              canUseReconciliation={entitlements.canUseReconciliation}
             />
           </TabsContent>
         </Tabs>

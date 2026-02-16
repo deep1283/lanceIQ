@@ -1,90 +1,75 @@
 # LanceIQ Status
 
-Last updated: 2026-02-12
-Owner: Product Owner (You)
+Last updated: 2026-02-16
+Owner: Product Owner
 
 ## Current State
-1. Architecture, contracts, ownership, decisions, and atomization docs are in place.
-2. Scope-of-proof language is embedded in certificate PDF and verification page.
-3. Minimal role helpers added for owner/admin/member checks.
+LanceIQ is operating as a payments-first webhook evidence platform with:
+1. Receipt + verification evidence.
+2. Pro/Team forwarding reliability (retry, breaker, replay, delivery attempts).
+3. Team reconciliation baseline (provider pulls + discrepancy counters).
+4. Team evidence-pack APIs (manifest hash + signature verify).
+5. Workspace-scoped entitlement and context alignment across dashboard SSR/UI/API.
 
-## Completed
-1. ARCHITECTURE.md created with scope-of-proof and enterprise roadmap.
-2. CONTRACTS.md created and aligned with ingest headers and certificate fields.
-3. DECISIONS.md created with core architectural decisions.
-4. OWNERSHIP.md updated with tiered boundaries and approval rules.
-5. ATOMIZATION.md created with feature-level boundaries.
-6. Scope-of-proof disclaimer added to certificate template and verification page.
-7. Role helpers introduced and used in server actions.
-8. Ingest contract compliance (status + id, 202 for queued, 200 for duplicate).
-9. Standardized ingest error responses.
-10. Plan quota enforcement on ingest endpoints.
-11. Audit logging for workspace/member actions.
-12. Alert delivery hardening and input validation.
-13. Alert settings gating honors grace period.
-14. workspace_usage_periods.event_count defaulted to 0 for safe increment trigger.
-15. Audit logs API: read-only, paginated, owner/admin, team-plan only via RLS.
-16. Scope-of-proof language added to marketing pages and tool download flow.
-17. Tool UI shows read-only audit logs for team owners/admins.
-18. Legal hold schema, RLS, and DB-level deletion blocks added.
-19. Evidence immutability enforced at DB layer (updates blocked except raw_body expiry cleanup).
-20. DB-level idempotency for provider_event_id (workspace+provider unique).
-21. Usage metering defaults and trigger safe increment.
-22. Retention status wired into tool view, verification page, and PDF export.
-23. Legal hold status wired into tool view for owners/admins.
-24. V3 DB: timestamp_receipts table with RLS and append-only enforcement.
-25. V3 DB: workspace roles expanded to viewer/exporter/legal_hold_manager.
-26. V3 DB: canonical_json_sha256 added to ingested_events with indexes.
-27. V3 Backend: RFC-3161 anchoring on ingest with timestamp_receipts.
-28. V3 Backend: canonical_json_sha256 stored on ingested_events.
-29. V3 Backend: role enforcement for viewer/exporter/legal_hold_manager.
-30. V3 Backend: export includes anchor metadata and canonical hash.
-31. V3 Frontend: RFC-3161 timestamp proof displayed in certificate and verification views.
-32. V3 Frontend: role-based UI gating across dashboard, tool, and settings.
-33. V3 Frontend: compliance pages added (SOC2/DPA/SLA templates).
-34. V4 Backend: SAML SSO, SCIM, SLA incidents, access review, and key rotation implemented.
-35. V4 DB: SSO/SCIM identity mappings, access reviews, SLA/incidents, key rotation, retention policies, and RLS.
-36. V4 Frontend: SSO/SCIM, SLA/Incidents, Access Reviews, and Key Rotation UI shipped.
-37. V4 Frontend: retention placeholders removed in certificate and verification views.
-38. V5 Backend: batch ingest processed/failed counts updated idempotently.
-39. V5 DB: retention/legal hold enforcement, DR replication status, runbook checks, and batch ingest counters.
-40. V5 Backend: replication status API, runbook checks API, retention runner endpoint.
-41. V5 Frontend: DR replication status, runbook checks, and retention automation UI.
-42. Provider expansion: Lemon Squeezy added (verification + provider selection).
-43. Security hardening: SAML verification is fail-closed (signed assertion, issuer/audience/destination/time checks, replay protection).
-44. Security hardening: `/api/dodo/verify` deprecated with explicit `410` and no plan mutation.
-45. Security hardening: `/api/dodo/verify-payment` requires auth + workspace-bound proof and no PII response fields.
-46. Security hardening: SSO provider domain normalization and verified-domain enforcement at DB level.
-47. Security hardening: in-memory rate limiter enforces `uniqueTokenPerInterval` cap.
-48. Frontend alignment: removed email-unlock purchase flow and aligned success flow to secure payment-proof contract.
-49. Security regression tests added for SAML, billing proof, and rate limiter behavior.
-50. V5.1 alignment: shared workspace context resolver added for Dashboard layout/admin/settings with deterministic fallback (hint -> cookie -> primary).
-51. V5.1 alignment: Team-feature gating now resolves from effective workspace entitlements in settings/admin/layout, removing raw-plan drift.
-52. V5.1 alignment: `/api/verify-signature` is workspace-scoped (`workspace_id` aware), blocks ambiguous multi-workspace requests, and enforces workspace membership + entitlements.
-53. V5.1 alignment: frontend verification flow sends workspace context to signature verification API.
-54. V5.1 alignment: billing activation trust boundary preserved (verify endpoints proof-only; webhook-only mutation) with regression coverage retained.
+## Readiness Snapshot
+1. V1: Complete
+2. V2: Complete
+3. V3: Complete
+4. V4: Complete
+5. V5: Complete
+6. V5.1: Complete
+7. V6: Complete
+8. V6.1: Complete (backend callbacks + docs alignment baseline)
 
-## In Progress
-1. None active (ready to start next phase).
+## Implemented Milestones
+### Evidence + verification baseline
+1. Ingest contracts: `status + id`, duplicate semantics, standardized errors.
+2. DB idempotency for provider events.
+3. Canonical JSON hash + raw body hash storage.
+4. RFC-3161 receipt anchoring support.
+5. Scope-of-proof language in evidence UI/PDF.
 
-## Next Up (V6 Provider Expansion)
-1. Add low-effort providers (Paddle).
-2. Add enterprise providers (PayPal/JWS, Adyen) as a second wave.
-3. Wire non-email access review notifications (Slack/webhook) after config is defined.
+### Governance and enterprise controls
+1. Legal hold schema + DB enforcement.
+2. Audit logs API with pagination.
+3. Team roles (`viewer`, `exporter`, `legal_hold_manager`) and role checks.
+4. SSO/SCIM/access review/SLA-incidents/key rotation feature set.
+5. Workspace context canonicalization across dashboard layout/admin/settings.
 
-## Enterprise Roadmap (Post-V5)
-1. External audit/attestation (SOC2 Type II).
-2. Multi-region DR drills with published RTO/RPO.
-3. Provider verification expansion.
+### Security hardening
+1. SAML fail-closed validation and replay protection.
+2. Deprecated insecure billing verify endpoint (`/api/dodo/verify` -> `410`).
+3. `/api/dodo/verify-payment` proof-only, workspace-bound, no PII response.
+4. Rate-limit cardinality cap in in-memory limiter.
 
-## Risks / Gaps
-1. External audit/attestation not completed yet.
-2. Provider verification limited to Stripe, Razorpay, and Lemon Squeezy.
-3. Non-email access review notifications not wired yet.
+### V6 reliability + reconciliation
+1. Forwarding entitlements introduced (`canUseForwarding`, `canUseReconciliation`).
+2. Ingest enqueue is best-effort and non-blocking.
+3. Forwarding uses immutable raw-body envelope (`raw_body_base64`).
+4. Delivery runner API with manual + service-token execution.
+5. Circuit breaker + health-check API.
+6. Replay API with explicit `raw_body_unavailable` behavior.
+7. Reconciliation runner persists provider objects and discrepancy counters.
+8. Reconciliation summary API for Team workspaces.
+9. Signed callback-capable state snapshot API.
+10. Evidence pack generate/get/verify APIs.
+11. Test-webhook API supports both target mode and API-key ingest mode.
 
-## Readiness
-1. V1: Complete.
-2. V2: Complete.
-3. V3: Complete.
-4. V4: Complete.
-5. V5: Complete.
+### Frontend alignment delivered
+1. Dashboard Sources tab includes forwarding config panel.
+2. Recent ingestion list includes delivery status/attempt context.
+3. Payment Delivery Recovery panel with replay actions.
+4. Admin sidebar includes Team-only Reconciliation section (visible-but-locked when not entitled).
+5. Admin reconciliation view supports manual run + discrepancy counters.
+6. Add Source modal test send now uses `/api/workspaces/test-webhook` with structured inline errors.
+
+## Remaining Gaps (Known)
+1. Provider signature verification support is still limited to Stripe, Razorpay, and Lemon Squeezy (PayPal still unsupported in verification engine).
+2. Evidence-pack verification response is not persisted to sealed pack rows (by design for immutability).
+3. Storage-level WORM/object-lock is not implemented (app-level immutability + legal hold is current baseline).
+4. Reconciliation provider integration management is backend/data-driven; no dedicated end-user setup wizard yet.
+
+## Post-V6.1 Optional Roadmap
+1. Destination-state drill-down UI on top of snapshot records.
+2. Storage-level WORM add-on for strict regulated deployments.
+3. Additional provider verification adapters.

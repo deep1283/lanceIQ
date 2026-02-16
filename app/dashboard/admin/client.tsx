@@ -179,10 +179,34 @@ interface RunbookCheck {
   latest_result: RunbookResult | null;
 }
 
-type AdminTab = 'alerts' | 'audit' | 'legal' | 'members' | 'identity' | 'access' | 'ops';
+interface ReconciliationRun {
+  id: string;
+  status: string;
+  started_at: string;
+  completed_at: string | null;
+  items_processed: number;
+  discrepancies_found: number;
+  report_json: Record<string, unknown> | null;
+}
+
+interface ReconciliationSummary {
+  totals: {
+    items_processed: number;
+    discrepancies_found: number;
+    completed_runs: number;
+    failed_runs: number;
+    missing_receipts: number;
+    missing_deliveries: number;
+    failed_verifications: number;
+    provider_mismatches: number;
+  };
+  runs: ReconciliationRun[];
+}
+
+type AdminTab = 'alerts' | 'audit' | 'legal' | 'members' | 'identity' | 'access' | 'ops' | 'reconciliation';
 type EffectiveEntitlements = PlanEntitlements & { isPro: boolean };
 
-const ADMIN_TABS: AdminTab[] = ['alerts', 'audit', 'legal', 'members', 'identity', 'access', 'ops'];
+const ADMIN_TABS: AdminTab[] = ['alerts', 'audit', 'legal', 'members', 'identity', 'access', 'ops', 'reconciliation'];
 const TEAM_FEATURE_TITLE = 'Team Feature';
 const TEAM_FEATURE_BODY = 'Available on Team plan.';
 const TEAM_FEATURE_CTA = 'Upgrade to Team';
@@ -197,6 +221,7 @@ const TEAM_FEATURE_VALUE_BY_TAB: Record<AdminTab, string> = {
   identity: 'Configure SAML SSO and SCIM lifecycle management for your team.',
   access: 'Run structured access review cycles and keep attestation records.',
   ops: 'Monitor incidents, DR replication, runbook checks, and retention automation.',
+  reconciliation: 'Compare provider records vs LanceIQ receipts vs delivery outcomes and replay failures quickly.',
 };
 
 const isAdminTab = (value: string | null | undefined): value is AdminTab => {
@@ -250,6 +275,7 @@ export default function SettingsClient({
   const canViewAccessReviews = canManage || isViewer(currentUserRole) || isLegalHoldManager(currentUserRole);
   const canViewLegalHold = canManage || isLegalHoldManager(currentUserRole);
   const canViewOps = Boolean(currentUserRole);
+  const canViewReconciliation = Boolean(currentUserRole);
   const canAccessOps = canViewOps && entitlements.canUseSlaIncidents;
   const canManageOpsData = canManage && entitlements.canUseSlaIncidents;
 
@@ -288,6 +314,11 @@ export default function SettingsClient({
       roleAllowed: canViewOps,
       entitled: entitlements.canUseSlaIncidents,
       locked: !entitlements.canUseSlaIncidents,
+    },
+    reconciliation: {
+      roleAllowed: canViewReconciliation,
+      entitled: entitlements.canUseReconciliation,
+      locked: !entitlements.canUseReconciliation,
     },
   };
 
@@ -364,6 +395,11 @@ export default function SettingsClient({
   const [runbookError, setRunbookError] = useState<string | null>(null);
   const runbookLoadedRef = useRef(false);
   const replicationLoadedRef = useRef(false);
+  const [reconciliationSummary, setReconciliationSummary] = useState<ReconciliationSummary | null>(null);
+  const [reconciliationLoading, setReconciliationLoading] = useState(false);
+  const [reconciliationError, setReconciliationError] = useState<string | null>(null);
+  const [reconciliationRunning, setReconciliationRunning] = useState(false);
+  const reconciliationLoadedRef = useRef(false);
 
   const buildApiErrorMessage = useCallback((
     status: number,
@@ -488,6 +524,46 @@ export default function SettingsClient({
     }
   }, [buildApiErrorMessage, canAccessOps, entitlements.canUseSlaIncidents, workspace.id]);
 
+  const loadReconciliationSummary = useCallback(async () => {
+    if (!entitlements.canUseReconciliation || !canViewReconciliation) return;
+    setReconciliationLoading(true);
+    setReconciliationError(null);
+    try {
+      const params = new URLSearchParams({ workspace_id: workspace.id });
+      const response = await fetch(`/api/reconciliation/summary?${params.toString()}`);
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(
+          buildApiErrorMessage(
+            response.status,
+            data?.error,
+            'Failed to load reconciliation summary.',
+            entitlements.canUseReconciliation
+          )
+        );
+      }
+      setReconciliationSummary({
+        totals: {
+          items_processed: Number(data?.totals?.items_processed) || 0,
+          discrepancies_found: Number(data?.totals?.discrepancies_found) || 0,
+          completed_runs: Number(data?.totals?.completed_runs) || 0,
+          failed_runs: Number(data?.totals?.failed_runs) || 0,
+          missing_receipts: Number(data?.totals?.missing_receipts) || 0,
+          missing_deliveries: Number(data?.totals?.missing_deliveries) || 0,
+          failed_verifications: Number(data?.totals?.failed_verifications) || 0,
+          provider_mismatches: Number(data?.totals?.provider_mismatches) || 0,
+        },
+        runs: Array.isArray(data?.runs) ? data.runs : [],
+      });
+    } catch (error) {
+      setReconciliationError(
+        error instanceof Error ? error.message : 'Failed to load reconciliation summary.'
+      );
+    } finally {
+      setReconciliationLoading(false);
+    }
+  }, [buildApiErrorMessage, canViewReconciliation, entitlements.canUseReconciliation, workspace.id]);
+
   useEffect(() => {
     if (activeTab !== 'ops' || !canAccessOps) return;
 
@@ -539,6 +615,14 @@ export default function SettingsClient({
 
     loadIncidents();
   }, [activeTab, buildApiErrorMessage, canAccessOps, entitlements.canUseSlaIncidents, includeGlobal, workspace.id]);
+
+  useEffect(() => {
+    if (activeTab !== 'reconciliation' || !entitlements.canUseReconciliation || !canViewReconciliation) return;
+    if (!reconciliationLoadedRef.current) {
+      reconciliationLoadedRef.current = true;
+      loadReconciliationSummary();
+    }
+  }, [activeTab, canViewReconciliation, entitlements.canUseReconciliation, loadReconciliationSummary]);
 
   async function handleSaveSsoProvider(e: React.FormEvent) {
     e.preventDefault();
@@ -705,6 +789,35 @@ export default function SettingsClient({
       setSlaError(error instanceof Error ? error.message : 'Failed to load SLA summary.');
     } finally {
       setSlaRefreshing(false);
+    }
+  }
+
+  async function handleRunReconciliation() {
+    if (!canManage || !canAccessTab('reconciliation')) return;
+    setReconciliationRunning(true);
+    setReconciliationError(null);
+    try {
+      const response = await fetch('/api/ops/reconciliation/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspace_id: workspace.id }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(
+          buildApiErrorMessage(
+            response.status,
+            data?.error,
+            'Failed to run reconciliation.',
+            entitlements.canUseReconciliation
+          )
+        );
+      }
+      await loadReconciliationSummary();
+    } catch (error) {
+      setReconciliationError(error instanceof Error ? error.message : 'Failed to run reconciliation.');
+    } finally {
+      setReconciliationRunning(false);
     }
   }
 
@@ -1406,6 +1519,96 @@ export default function SettingsClient({
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      ) : activeTab === 'reconciliation' ? (
+        <div className="space-y-8">
+          <div className="dashboard-panel rounded-xl p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-slate-900 mb-1">Reconciliation</h2>
+                <p className="text-zinc-400 text-sm">
+                  Provider records vs LanceIQ receipt + delivery outcomes.
+                </p>
+              </div>
+              {canManage ? (
+                <button
+                  onClick={handleRunReconciliation}
+                  disabled={reconciliationRunning}
+                  className="dashboard-button-primary px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50"
+                >
+                  {reconciliationRunning ? 'Running...' : 'Run Now'}
+                </button>
+              ) : (
+                <span className="text-xs text-zinc-500">Read-only</span>
+              )}
+            </div>
+
+            {reconciliationError && <p className="text-sm text-red-400 mt-4">{reconciliationError}</p>}
+
+            {reconciliationLoading && !reconciliationSummary ? (
+              <p className="text-sm text-zinc-500 mt-4">Loading reconciliation summary...</p>
+            ) : reconciliationSummary ? (
+              <div className="mt-6 space-y-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="dashboard-panel-muted rounded-lg p-4">
+                    <p className="text-xs uppercase text-zinc-500 mb-2">Missing Receipts</p>
+                    <p className="text-2xl font-semibold text-red-400">{reconciliationSummary.totals.missing_receipts}</p>
+                  </div>
+                  <div className="dashboard-panel-muted rounded-lg p-4">
+                    <p className="text-xs uppercase text-zinc-500 mb-2">Missing Deliveries</p>
+                    <p className="text-2xl font-semibold text-red-400">{reconciliationSummary.totals.missing_deliveries}</p>
+                  </div>
+                  <div className="dashboard-panel-muted rounded-lg p-4">
+                    <p className="text-xs uppercase text-zinc-500 mb-2">Failed Verification</p>
+                    <p className="text-2xl font-semibold text-amber-400">{reconciliationSummary.totals.failed_verifications}</p>
+                  </div>
+                  <div className="dashboard-panel-muted rounded-lg p-4">
+                    <p className="text-xs uppercase text-zinc-500 mb-2">Provider Mismatches</p>
+                    <p className="text-2xl font-semibold text-amber-400">{reconciliationSummary.totals.provider_mismatches}</p>
+                  </div>
+                </div>
+
+                <div className="overflow-hidden border dashboard-border rounded-lg">
+                  <table className="w-full text-left text-sm dashboard-table">
+                    <thead className="border-b dashboard-border">
+                      <tr>
+                        <th className="px-4 py-3 font-medium">Run</th>
+                        <th className="px-4 py-3 font-medium">Status</th>
+                        <th className="px-4 py-3 font-medium">Processed</th>
+                        <th className="px-4 py-3 font-medium">Discrepancies</th>
+                        <th className="px-4 py-3 font-medium">Started</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--dash-border)]">
+                      {reconciliationSummary.runs.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-4 py-6 text-center text-zinc-500">
+                            No reconciliation runs yet.
+                          </td>
+                        </tr>
+                      ) : (
+                        reconciliationSummary.runs.map((run) => (
+                          <tr key={run.id} className="dashboard-row">
+                            <td className="px-4 py-3 font-mono text-zinc-200">{shortId(run.id)}</td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${statusBadge(run.status)}`}>
+                                {run.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-zinc-400">{run.items_processed || 0}</td>
+                            <td className="px-4 py-3 text-zinc-400">{run.discrepancies_found || 0}</td>
+                            <td className="px-4 py-3 text-zinc-500">{formatDate(run.started_at)}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-zinc-500 mt-4">No reconciliation data available.</p>
+            )}
           </div>
         </div>
       ) : activeTab === 'ops' ? (
