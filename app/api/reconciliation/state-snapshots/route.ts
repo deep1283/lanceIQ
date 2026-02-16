@@ -14,8 +14,13 @@ import { logAuditAction, AUDIT_ACTIONS } from '@/utils/audit';
 
 type SnapshotInput = {
   target_id: string;
+  provider: string;
+  provider_payment_id: string;
+  downstream_state: 'activated' | 'not_activated' | 'error';
+  observed_at: string;
   object_ref?: string | null;
   state_hash: string;
+  reason_code?: string | null;
   captured_data?: Record<string, unknown> | null;
 };
 
@@ -32,16 +37,32 @@ type CallbackVerification = {
 function normalizeSnapshots(input: unknown) {
   if (!Array.isArray(input)) return null;
   const out: SnapshotInput[] = [];
+  const validStates = new Set(['activated', 'not_activated', 'error']);
+  const validProviders = new Set(['stripe', 'razorpay', 'lemon_squeezy']);
   for (const item of input) {
     if (!item || typeof item !== 'object') continue;
     const row = item as Record<string, unknown>;
     const targetId = typeof row.target_id === 'string' ? row.target_id : '';
+    const provider = typeof row.provider === 'string' ? row.provider.trim() : '';
+    const providerPaymentId = typeof row.provider_payment_id === 'string' ? row.provider_payment_id.trim() : '';
+    const downstreamState =
+      typeof row.downstream_state === 'string' ? row.downstream_state.trim().toLowerCase() : '';
+    const observedAtRaw = typeof row.observed_at === 'string' ? row.observed_at : '';
     const stateHash = typeof row.state_hash === 'string' ? row.state_hash : '';
-    if (!isValidUuid(targetId) || !stateHash) continue;
+    if (!isValidUuid(targetId) || !stateHash || !providerPaymentId) continue;
+    if (!validProviders.has(provider) || !validStates.has(downstreamState)) continue;
+    const observedAt = new Date(observedAtRaw);
+    if (Number.isNaN(observedAt.getTime())) continue;
+
     out.push({
       target_id: targetId,
+      provider,
+      provider_payment_id: providerPaymentId,
+      downstream_state: downstreamState as SnapshotInput['downstream_state'],
+      observed_at: observedAt.toISOString(),
       object_ref: typeof row.object_ref === 'string' ? row.object_ref : null,
       state_hash: stateHash,
+      reason_code: typeof row.reason_code === 'string' ? row.reason_code : null,
       captured_data:
         row.captured_data && typeof row.captured_data === 'object' && !Array.isArray(row.captured_data)
           ? (row.captured_data as Record<string, unknown>)
@@ -232,7 +253,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(err.body, { status: err.status });
   }
   if (!snapshots || snapshots.length === 0) {
-    const err = apiError('snapshots[] is required.', 400, 'invalid_snapshots');
+    const err = apiError(
+      'snapshots[] must include target_id, provider, provider_payment_id, downstream_state, observed_at, and state_hash.',
+      400,
+      'invalid_snapshots'
+    );
     return NextResponse.json(err.body, { status: err.status });
   }
   const signature = request.headers.get('x-lanceiq-signature')?.trim() || '';
@@ -303,16 +328,34 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(err.body, { status: err.status });
   }
 
-  const payload = snapshots.map((snapshot) => ({
+  const dedupe = new Set<string>();
+  const payload = snapshots
+    .map((snapshot) => ({
     workspace_id: workspaceId,
     run_id: runId,
     target_id: snapshot.target_id,
+    provider: snapshot.provider,
+    provider_payment_id: snapshot.provider_payment_id,
+    downstream_state: snapshot.downstream_state,
+    observed_at: snapshot.observed_at,
     object_ref: snapshot.object_ref || null,
     state_hash: snapshot.state_hash,
+    reason_code: snapshot.reason_code || null,
     captured_data: snapshot.captured_data || null,
-  }));
+  }))
+    .filter((row) => {
+      const key = [row.workspace_id, row.provider, row.provider_payment_id, row.observed_at, row.state_hash].join(':');
+      if (dedupe.has(key)) return false;
+      dedupe.add(key);
+      return true;
+    });
 
-  const { error } = await admin.from('destination_state_snapshots').insert(payload);
+  const { error } = await admin
+    .from('destination_state_snapshots')
+    .upsert(payload, {
+      onConflict: 'workspace_id,provider,provider_payment_id,observed_at,state_hash',
+      ignoreDuplicates: true,
+    });
   if (error) {
     const err = apiError('Failed to store snapshots.', 500, 'snapshot_insert_failed');
     return NextResponse.json(err.body, { status: err.status });

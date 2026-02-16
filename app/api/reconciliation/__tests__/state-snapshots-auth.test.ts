@@ -71,18 +71,19 @@ function createAdminMock() {
   };
 
   const snapshotInsert = vi.fn(async () => ({ error: null }));
+  const snapshotUpsert = vi.fn(async () => ({ error: null }));
 
   const admin = {
     from: vi.fn((table: string) => {
       if (table === 'reconciliation_runs') return runBuilder;
       if (table === 'workspace_delivery_targets') return targetBuilder;
       if (table === 'workspace_delivery_signing_keys') return signingBuilder;
-      if (table === 'destination_state_snapshots') return { insert: snapshotInsert };
+      if (table === 'destination_state_snapshots') return { insert: snapshotInsert, upsert: snapshotUpsert };
       return { insert: vi.fn(async () => ({ error: null })) };
     }),
   };
 
-  return { admin, snapshotInsert };
+  return { admin, snapshotInsert, snapshotUpsert };
 }
 
 function signedRequest(body: Record<string, unknown>) {
@@ -130,7 +131,16 @@ describe('POST /api/reconciliation/state-snapshots auth modes', () => {
     const request = signedRequest({
       workspace_id: WORKSPACE_ID,
       run_id: RUN_ID,
-      snapshots: [{ target_id: TARGET_ID, state_hash: 'sha256:abc' }],
+      snapshots: [
+        {
+          target_id: TARGET_ID,
+          provider: 'stripe',
+          provider_payment_id: 'pay_1',
+          downstream_state: 'activated',
+          observed_at: '2026-02-16T12:00:00.000Z',
+          state_hash: 'sha256:abc',
+        },
+      ],
     });
 
     const response = await POST(request as any);
@@ -160,7 +170,16 @@ describe('POST /api/reconciliation/state-snapshots auth modes', () => {
       body: JSON.stringify({
         workspace_id: WORKSPACE_ID,
         run_id: RUN_ID,
-        snapshots: [{ target_id: TARGET_ID, state_hash: 'sha256:abc' }],
+        snapshots: [
+          {
+            target_id: TARGET_ID,
+            provider: 'stripe',
+            provider_payment_id: 'pay_1',
+            downstream_state: 'activated',
+            observed_at: '2026-02-16T12:00:00.000Z',
+            state_hash: 'sha256:abc',
+          },
+        ],
       }),
     });
 
@@ -177,7 +196,16 @@ describe('POST /api/reconciliation/state-snapshots auth modes', () => {
     const request = signedRequest({
       workspace_id: WORKSPACE_ID,
       run_id: RUN_ID,
-      snapshots: [{ target_id: TARGET_ID, state_hash: 'sha256:abc' }],
+      snapshots: [
+        {
+          target_id: TARGET_ID,
+          provider: 'stripe',
+          provider_payment_id: 'pay_1',
+          downstream_state: 'not_activated',
+          observed_at: '2026-02-16T12:00:00.000Z',
+          state_hash: 'sha256:abc',
+        },
+      ],
     });
 
     const response = await POST(request as any);
@@ -191,7 +219,16 @@ describe('POST /api/reconciliation/state-snapshots auth modes', () => {
     const request = manualRequest({
       workspace_id: WORKSPACE_ID,
       run_id: RUN_ID,
-      snapshots: [{ target_id: TARGET_ID, state_hash: 'sha256:abc' }],
+      snapshots: [
+        {
+          target_id: TARGET_ID,
+          provider: 'stripe',
+          provider_payment_id: 'pay_1',
+          downstream_state: 'activated',
+          observed_at: '2026-02-16T12:00:00.000Z',
+          state_hash: 'sha256:abc',
+        },
+      ],
     });
 
     const response = await POST(request as any);

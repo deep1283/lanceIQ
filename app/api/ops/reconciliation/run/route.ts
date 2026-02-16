@@ -80,6 +80,7 @@ export async function POST(request: NextRequest) {
     admin,
     workspaceId,
     batchId: batchId || null,
+    actorId: actorId || null,
   });
   if (reconciliation.error) {
     await admin
@@ -129,6 +130,9 @@ export async function POST(request: NextRequest) {
       batch_id: batchId || null,
       items_processed: reconciliation.itemsProcessed,
       discrepancies: reconciliation.discrepanciesFound,
+      coverage_mode: reconciliation.coverageMode,
+      downstream_activation_status: reconciliation.downstreamStatus,
+      case_stats: reconciliation.caseStats,
       trigger_mode: viaServiceToken ? 'service_token' : 'manual',
     },
   });
@@ -138,6 +142,9 @@ export async function POST(request: NextRequest) {
     id: run.id,
     items_processed: reconciliation.itemsProcessed,
     discrepancies_found: reconciliation.discrepanciesFound,
+    coverage_mode: reconciliation.coverageMode,
+    downstream_activation_status: reconciliation.downstreamStatus,
+    case_stats: reconciliation.caseStats,
     report: reconciliation.reportJson,
   });
 }

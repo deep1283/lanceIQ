@@ -7,6 +7,7 @@ import {
   requireUser,
   requireWorkspaceAccess,
 } from '@/lib/delivery/api';
+import { DOWNSTREAM_UNCONFIGURED_MESSAGE } from '@/lib/delivery/reconciliation';
 
 export async function GET(request: NextRequest) {
   const { supabase, admin } = await getApiClients();
@@ -57,6 +58,10 @@ export async function GET(request: NextRequest) {
         acc.missing_deliveries += Number(counters.missing_deliveries) || 0;
         acc.failed_verifications += Number(counters.failed_verifications) || 0;
         acc.provider_mismatches += Number(counters.provider_mismatches) || 0;
+        acc.downstream_not_activated += Number(counters.downstream_not_activated) || 0;
+        acc.downstream_error += Number(counters.downstream_error) || 0;
+        acc.downstream_unconfigured += Number(counters.downstream_unconfigured) || 0;
+        acc.pending_activation += Number(counters.pending_activation) || 0;
       }
       return acc;
     },
@@ -69,13 +74,48 @@ export async function GET(request: NextRequest) {
       missing_deliveries: 0,
       failed_verifications: 0,
       provider_mismatches: 0,
+      downstream_not_activated: 0,
+      downstream_error: 0,
+      downstream_unconfigured: 0,
+      pending_activation: 0,
     }
+  );
+
+  const { data: setting } = await admin
+    .from('workspace_reconciliation_settings')
+    .select('downstream_snapshots_enabled')
+    .eq('workspace_id', workspaceId)
+    .maybeSingle();
+
+  const downstreamConfigured = Boolean(setting?.downstream_snapshots_enabled);
+
+  const { data: cases } = await admin
+    .from('payment_reconciliation_cases')
+    .select('status')
+    .eq('workspace_id', workspaceId)
+    .limit(5000);
+
+  const caseTotals = (cases || []).reduce(
+    (acc, row) => {
+      const status = row.status as string | null;
+      acc.total += 1;
+      if (status === 'open') acc.open += 1;
+      if (status === 'pending') acc.pending += 1;
+      if (status === 'resolved') acc.resolved += 1;
+      if (status === 'ignored') acc.ignored += 1;
+      return acc;
+    },
+    { total: 0, open: 0, pending: 0, resolved: 0, ignored: 0 }
   );
 
   return NextResponse.json({
     status: 'ok',
     workspace_id: workspaceId,
+    coverage_mode: downstreamConfigured ? 'three_way_active' : 'two_way_active',
+    downstream_activation_status: downstreamConfigured ? 'configured' : 'downstream_unconfigured',
+    downstream_status_message: downstreamConfigured ? null : DOWNSTREAM_UNCONFIGURED_MESSAGE,
     totals,
+    cases: caseTotals,
     runs: runs || [],
   });
 }
