@@ -28,6 +28,8 @@ function makeEntitlements(overrides: Partial<EffectiveEntitlements> = {}): Effec
     canExportCsv: false,
     canVerify: false,
     canRemoveWatermark: false,
+    canUseForwarding: false,
+    canUseReconciliation: false,
     canUseAlerts: false,
     canUseSso: false,
     canUseScim: false,
@@ -79,6 +81,7 @@ describe('Dashboard sidebar entitlement source', () => {
           canUseScim: true,
           canUseAccessReviews: true,
           canUseSlaIncidents: true,
+          canUseReconciliation: true,
         })}
       />
     );

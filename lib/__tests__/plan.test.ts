@@ -52,7 +52,7 @@ describe('plan', () => {
     expect(pro.canVerify).toBe(true);
     expect(pro.canRemoveWatermark).toBe(true);
     expect(pro.canUseForwarding).toBe(true);
-    expect(pro.canUseReconciliation).toBe(false);
+    expect(pro.canUseReconciliation).toBe(true);
     expect(pro.canUseAlerts).toBe(false);
     expect(pro.canUseSso).toBe(false);
     expect(pro.canUseScim).toBe(false);

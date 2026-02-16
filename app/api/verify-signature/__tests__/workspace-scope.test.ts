@@ -110,7 +110,7 @@ const PRO_ENTITLEMENTS = {
   canVerify: true,
   canRemoveWatermark: true,
   canUseForwarding: true,
-  canUseReconciliation: false,
+  canUseReconciliation: true,
   canUseAlerts: false,
   canUseSso: false,
   canUseScim: false,
