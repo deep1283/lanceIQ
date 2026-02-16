@@ -188,7 +188,7 @@ Alternatives rejected: Unlimited retries or auto-close without operator confirma
 ## 2026-02-16: Reconciliation Semantics (V6/V6.1)
 Decision: Reconciliation compares provider pulls against LanceIQ receipts and delivery outcomes; V6.1 adds destination-state snapshots via signed callback.
 Why: Enterprises need explainable mismatch counters (`missing_receipts`, `missing_deliveries`, `failed_verifications`, `provider_mismatches`).
-Backward compatibility: Reconciliation is Team-gated and additive; no changes to ingest/certificate contracts are required for base flows.
+Backward compatibility: Reconciliation is additive and workspace-scoped via entitlements; receipt/certificate scope-of-proof language remains unchanged.
 Alternatives rejected: Delivery-only dashboards without provider-side comparison.
 
 ## 2026-02-16: Evidence Pack Integrity Model (V6)
@@ -204,10 +204,10 @@ Backward compatibility: Manual UI/API triggers continue to work.
 Alternatives rejected: Manual-only runners or unauthenticated cron endpoints.
 
 ## 2026-02-16: Reliability/Reconciliation Plan Gating Finalization (V6)
-Decision: `canUseForwarding` is enabled for Pro and Team; `canUseReconciliation` remains Team-only.
-Why: Forwarding solves immediate operational reliability for SMB/Pro buyers, while reconciliation remains the Team differentiator.
+Decision: `canUseForwarding` is enabled for Pro and Team; `canUseReconciliation` is enabled for Pro and Team.
+Why: Pro buyers need operational reconciliation for payment incidents; Team remains differentiated by governance controls (SSO/SCIM/audit/legal-hold/access reviews/incidents).
 Backward compatibility: Additive entitlement flags; existing free behavior unchanged.
-Alternatives rejected: Team-only forwarding (too restrictive for SMB), or enabling reconciliation on Pro (dilutes Team governance tier).
+Alternatives rejected: Team-only forwarding and Team-only reconciliation (too restrictive for paying SMB/pro users).
 
 ## 2026-02-16: Delivery Retry and Breaker Runtime Defaults (V6)
 Decision: Delivery worker defaults to 5 attempts (`DELIVERY_MAX_ATTEMPTS` override), lock window from `DELIVERY_LOCK_SECONDS`, and breaker opens on 5 consecutive 5xx.
@@ -232,3 +232,21 @@ Decision: Evidence pack verification is returned to caller and audit-logged, but
 Why: Preserves sealed-pack immutability constraints and avoids post-seal mutation conflicts.
 Backward compatibility: Verification API remains additive and deterministic.
 Alternatives rejected: In-place update of sealed evidence records.
+
+## 2026-02-16: Provider Payment ID Capture on Ingest (V6.2 Tier-1)
+Decision: When derivable for supported providers (Stripe, Razorpay, Lemon Squeezy), `provider_payment_id` is extracted during ingest and persisted on `ingested_events`.
+Why: V6.2 three-way reconciliation uses `(workspace_id, provider, provider_payment_id)` as the primary join key; ingest-time capture improves correctness and avoids delayed inference drift.
+Backward compatibility: Additive field population only; events where `provider_payment_id` is not derivable remain accepted and stored with existing semantics.
+Alternatives rejected: Deriving payment id only during reconciliation runs from provider pulls/snapshots.
+
+## 2026-02-16: Reconciliation Auto-Resolve Policy (V6.2)
+Decision: Reconciliation runner auto-transitions active cases (`open`/`pending`) to `resolved` only when current three-way signals are healthy; it appends `auto_resolved` timeline events.
+Why: Reduces manual case toil while preserving an auditable lifecycle tied to current evidence signals.
+Backward compatibility: Manual resolve endpoint and role checks remain unchanged; no auto-resolve occurs during downstream grace window.
+Alternatives rejected: Manual-only closure and immediate auto-resolve without timeline evidence.
+
+## 2026-02-16: Progressive Reconciliation Coverage Language (V6.2)
+Decision: Reconciliation responses explicitly declare coverage mode (`two_way_active` or `three_way_active`) and downstream activation status.
+Why: Avoids overclaiming mismatch detection when downstream activation snapshots are not configured.
+Backward compatibility: Additive response fields only (`coverage_mode`, `downstream_activation_status`, `downstream_status_message`, case totals).
+Alternatives rejected: Implicit downstream assumptions from provider/receipt/delivery-only data.

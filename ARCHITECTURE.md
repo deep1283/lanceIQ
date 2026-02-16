@@ -5,7 +5,7 @@ LanceIQ is a payment-webhook evidence system that combines:
 1. Receipt evidence (what LanceIQ received).
 2. Verification evidence (how LanceIQ verified signatures).
 3. Reliability evidence (how LanceIQ attempted forwarding).
-4. Team reconciliation evidence (provider pulls vs receipts vs deliveries, with optional signed destination-state snapshots).
+4. Reconciliation evidence (provider pulls vs receipts vs deliveries, with optional signed destination-state snapshots).
 
 ## One-Line Principle
 LanceIQ records and verifies receipt, not business truth.
@@ -93,10 +93,16 @@ Provider webhook
 7. UI labels "DLQ" map to failed/cancelled delivery job outcomes.
 
 ## Reconciliation Semantics (As Implemented)
-1. Team-gated by `canUseReconciliation`.
+1. Plan-gated by `canUseReconciliation` (Pro/Team).
 2. Pulls Stripe/Razorpay/Lemon Squeezy provider objects.
 3. Computes discrepancy counters from provider objects, receipts, and deliveries.
-4. V6.1 snapshots can be inserted manually (owner/admin) or via signed callback headers with nonce/timestamp replay protection.
+4. Supports progressive coverage modes:
+1. `two_way_active`: provider/receipt/delivery only.
+2. `three_way_active`: downstream destination-state snapshots configured.
+5. In `two_way_active`, downstream activation mismatch is explicitly marked unconfigured and never overclaimed.
+6. V6.1/V6.2 snapshots can be inserted manually (owner/admin) or via signed callback headers with nonce/timestamp replay protection.
+7. V6.2 reconciliation creates and updates payment reconciliation cases with timeline events.
+8. V6.2 runner auto-resolves active cases only when signals are healthy and never during downstream grace window.
 
 ## Evidence Pack Semantics (As Implemented)
 1. Generate endpoint creates manifest JSON, computes SHA-256, signs with active workspace HMAC key, and seals pack.

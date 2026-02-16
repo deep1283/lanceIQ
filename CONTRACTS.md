@@ -18,7 +18,7 @@ Source: `/Users/deepmishra/vscode/LanceIQ/lib/plan.ts`
 | `canVerify` | false | true | true |
 | `canRemoveWatermark` | false | true | true |
 | `canUseForwarding` | false | true | true |
-| `canUseReconciliation` | false | false | true |
+| `canUseReconciliation` | false | true | true |
 | `canUseAlerts` | false | false | true |
 | `canUseSso` | false | false | true |
 | `canUseScim` | false | false | true |
@@ -177,7 +177,7 @@ Semantics:
 Success:
 `{ status: "ok", id: <ingested_event_id>, queued_jobs: [] }`
 
-## Reconciliation APIs (Team)
+## Reconciliation APIs (Pro/Team)
 
 ### `POST /api/ops/reconciliation/run`
 Purpose: Run provider reconciliation.
@@ -194,7 +194,13 @@ Entitlement:
 1. `canUseReconciliation`
 
 Success:
-`{ status: "ok", id, items_processed, discrepancies_found, report }`
+`{ status: "ok", id, items_processed, discrepancies_found, coverage_mode, downstream_activation_status, case_stats, report }`
+
+`case_stats` shape:
+1. `opened`
+2. `updated`
+3. `resolved`
+4. `errors`
 
 ### `GET /api/reconciliation/summary`
 Purpose: Return recent runs + aggregate counters.
@@ -207,13 +213,28 @@ Query:
 1. `workspace_id`
 
 Success:
-`{ status: "ok", workspace_id, totals, runs }`
+`{ status: "ok", workspace_id, coverage_mode, downstream_activation_status, downstream_status_message, totals, cases, runs }`
 
 Totals include:
 1. `missing_receipts`
 2. `missing_deliveries`
 3. `failed_verifications`
 4. `provider_mismatches`
+5. `downstream_not_activated`
+6. `downstream_error`
+7. `downstream_unconfigured`
+8. `pending_activation`
+
+`cases` totals include:
+1. `total`
+2. `open`
+3. `pending`
+4. `resolved`
+5. `ignored`
+
+Two-way mode language:
+1. When downstream snapshots are not configured, `downstream_status_message` is:
+`"Downstream activation status not configured."`
 
 ### `POST /api/reconciliation/state-snapshots`
 Purpose: Insert destination-state snapshots for reconciliation.
@@ -221,8 +242,18 @@ Purpose: Insert destination-state snapshots for reconciliation.
 Body:
 1. `workspace_id`
 2. `run_id`
-3. `snapshots[]` with `target_id`, `state_hash`, optional `object_ref`, optional `captured_data`
-4. `target_id` optional (required in signed-callback ambiguity resolution)
+3. `snapshots[]` required fields:
+1. `target_id`
+2. `provider` (`stripe | razorpay | lemon_squeezy`)
+3. `provider_payment_id`
+4. `downstream_state` (`activated | not_activated | error`)
+5. `observed_at`
+6. `state_hash`
+4. `snapshots[]` optional fields:
+1. `reason_code`
+2. `object_ref`
+3. `captured_data`
+5. Top-level `target_id` optional (required in signed-callback ambiguity resolution when snapshots are ambiguous).
 
 Auth modes:
 1. Manual owner/admin + entitlement.
@@ -239,7 +270,66 @@ Signed callback requirements:
 Success:
 `{ status: "ok", run_id, inserted }`
 
-## Evidence Pack APIs (Team)
+### `GET /api/reconciliation/cases`
+Purpose: List reconciliation cases for a workspace.
+
+Auth:
+1. Workspace member.
+2. `canUseReconciliation`.
+
+Query:
+1. `workspace_id` (required)
+2. `status` (optional: `open | pending | resolved | ignored`)
+3. `limit` (optional, default `50`, max `200`)
+
+Success:
+`{ status: "ok", workspace_id, count, cases }`
+
+### `GET /api/reconciliation/cases/[id]`
+Purpose: Load one reconciliation case and timeline events.
+
+Auth:
+1. Workspace member.
+2. `canUseReconciliation`.
+
+Query:
+1. `workspace_id` (required)
+
+Success:
+`{ status: "ok", workspace_id, case, events }`
+
+### `POST /api/reconciliation/cases/[id]/replay`
+Purpose: Owner/admin replay action for one reconciliation case.
+
+Auth:
+1. Owner/admin workspace role.
+2. `canUseReconciliation`.
+
+Body:
+1. `workspace_id` (required)
+
+Semantics:
+1. Internal replay only (delivery jobs from retained raw body).
+2. Returns `409 raw_body_unavailable` when replay source body has been pruned.
+
+Success:
+`{ status: "ok", id, queued_jobs, queued_count }`
+
+### `POST /api/reconciliation/cases/[id]/resolve`
+Purpose: Owner/admin manual case resolution.
+
+Auth:
+1. Owner/admin workspace role.
+2. `canUseReconciliation`.
+
+Body:
+1. `workspace_id` (required)
+2. `resolution_note` (required)
+
+Success:
+`{ status: "ok", id, case }`
+
+## Evidence Pack APIs (Pro/Team)
 
 ### `POST /api/evidence-packs/generate`
 Purpose: Generate and seal evidence pack.

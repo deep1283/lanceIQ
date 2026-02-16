@@ -7,8 +7,8 @@ Owner: Product Owner
 LanceIQ is operating as a payments-first webhook evidence platform with:
 1. Receipt + verification evidence.
 2. Pro/Team forwarding reliability (retry, breaker, replay, delivery attempts).
-3. Team reconciliation baseline (provider pulls + discrepancy counters).
-4. Team evidence-pack APIs (manifest hash + signature verify).
+3. Pro/Team reconciliation (two-way and optional three-way with downstream snapshots).
+4. Pro/Team evidence-pack APIs (manifest hash + signature verify).
 5. Workspace-scoped entitlement and context alignment across dashboard SSR/UI/API.
 
 ## Readiness Snapshot
@@ -19,7 +19,8 @@ LanceIQ is operating as a payments-first webhook evidence platform with:
 5. V5: Complete
 6. V5.1: Complete
 7. V6: Complete
-8. V6.1: Complete (backend callbacks + docs alignment baseline)
+8. V6.1: Complete
+9. V6.2: Complete (progressive reconciliation coverage, cases lifecycle, auto-resolve)
 
 ## Implemented Milestones
 ### Evidence + verification baseline
@@ -50,16 +51,27 @@ LanceIQ is operating as a payments-first webhook evidence platform with:
 5. Circuit breaker + health-check API.
 6. Replay API with explicit `raw_body_unavailable` behavior.
 7. Reconciliation runner persists provider objects and discrepancy counters.
-8. Reconciliation summary API for Team workspaces.
+8. Reconciliation summary API for entitled workspaces (Pro/Team).
 9. Signed callback-capable state snapshot API.
 10. Evidence pack generate/get/verify APIs.
 11. Test-webhook API supports both target mode and API-key ingest mode.
+
+### V6.2 progressive reconciliation
+1. Ingest derives `provider_payment_id` for Stripe/Razorpay/Lemon Squeezy when derivable.
+2. Reconciliation uses explicit coverage modes:
+1. `two_way_active`
+2. `three_way_active`
+3. Two-way mode always returns explicit downstream message and avoids downstream activation overclaims.
+4. Reconciliation cases API added (`list`, `detail`, `replay`, `resolve`).
+5. Case timeline events include `created`, `status_change`, `replay_triggered`, `resolved`, `auto_resolved`.
+6. Runner auto-resolves active cases when current signals become healthy (outside grace windows).
+7. Frontend admin reconciliation UI now supports summary, case list/detail, and replay/resolve actions.
 
 ### Frontend alignment delivered
 1. Dashboard Sources tab includes forwarding config panel.
 2. Recent ingestion list includes delivery status/attempt context.
 3. Payment Delivery Recovery panel with replay actions.
-4. Admin sidebar includes Team-only Reconciliation section (visible-but-locked when not entitled).
+4. Admin sidebar includes Reconciliation section (visible-but-locked when not entitled).
 5. Admin reconciliation view supports manual run + discrepancy counters.
 6. Add Source modal test send now uses `/api/workspaces/test-webhook` with structured inline errors.
 
@@ -68,8 +80,9 @@ LanceIQ is operating as a payments-first webhook evidence platform with:
 2. Evidence-pack verification response is not persisted to sealed pack rows (by design for immutability).
 3. Storage-level WORM/object-lock is not implemented (app-level immutability + legal hold is current baseline).
 4. Reconciliation provider integration management is backend/data-driven; no dedicated end-user setup wizard yet.
+5. `provider_payment_id` can still be null when upstream payloads do not expose a derivable payment identifier.
 
-## Post-V6.1 Optional Roadmap
+## Post-V6.2 Optional Roadmap
 1. Destination-state drill-down UI on top of snapshot records.
 2. Storage-level WORM add-on for strict regulated deployments.
 3. Additional provider verification adapters.
